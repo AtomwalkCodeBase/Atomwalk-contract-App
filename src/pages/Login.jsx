@@ -207,17 +207,17 @@ const Logins = () => {
   // const [company, setCompany] = useState("")
   const [loading, setLoading] = useState(false)
   const [companies, setCompanies] = useState([])
-  const [placeholderdatas, setPlaceholderdatas] = useState("Employee ID");
+  const [placeholderdatas, setPlaceholderdatas] = useState("Mobile Number");
   const { customerlogin } = useAuth()
   const path = window.location.pathname;
   useEffect(() => {
     const fetchCompanyName = async () => {
       const company = await getCompanyName()
       if (company.status === 200) {
-        if (path === "/customer/login.html") {
+        if (path === "/retainer/login.html") {
 
           const filter = company.data?.filter(
-            (data) => data.ref_cust_name === "DEMO Area"
+            (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
           );
 
           setCompanies(filter);
@@ -236,6 +236,7 @@ const Logins = () => {
           }
         } else {
           setCompanies(company.data)
+          // console.log(company.data)
         }
       }
     }
@@ -287,7 +288,7 @@ const Logins = () => {
         <BannerContent>
           <BannerTitle>Welcome to Atomwalk</BannerTitle>
           <BannerText>
-            A comprehensive Human Resource Management System designed to streamline your HR processes.
+            A comprehensive retainer and associate employee management portal.
           </BannerText>
         </BannerContent>
       </LoginBanner>
@@ -295,7 +296,7 @@ const Logins = () => {
       <LoginFormContainer>
         <LoginForm onSubmit={handleSubmit}>
           <FormTitle>Login to your account</FormTitle>
-          <FormGroup>
+          {/* <FormGroup>
             <FormLabel htmlFor="company">Company</FormLabel>
             <InputGroup>
               <InputIcon>
@@ -318,7 +319,7 @@ const Logins = () => {
                 ))}
               </FormSelect>
             </InputGroup>
-          </FormGroup>
+          </FormGroup> */}
           <FormGroup>
             <FormLabel htmlFor="mobile">{placeholderdatas}</FormLabel>
             <InputGroup>
@@ -358,7 +359,7 @@ const Logins = () => {
           <LoginButton type="submit" disabled={loading}>
             {loading ? "Logging in..." : "Login"}
           </LoginButton>
-          { placeholderdatas==="Employee ID" ?
+          {/* { placeholderdatas==="Employee ID" ?
 
           <FormFooter onClick={() => setPlaceholderdatas("Mobile Number")}>
             <Link>Login With Mobile Number</Link>
@@ -367,7 +368,7 @@ const Logins = () => {
           <FormFooter onClick={() => setPlaceholderdatas("Employee ID")}>
             <Link>Login With Employee ID</Link>
           </FormFooter>
-          }
+          } */}
         </LoginForm>
       </LoginFormContainer>
     </LoginContainer>

@@ -9,6 +9,8 @@ const ProtectedRoute = ({ children }) => {
     return <div style={{color: "black"}}>Loading...</div>
   }
 
+  // console.log("currentUser", currentUser)
+
   if (!currentUser) {
     return <Navigate to="/login.html" />
   }

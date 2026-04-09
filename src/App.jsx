@@ -23,7 +23,6 @@ import Logins from "./pages/Login";
 import Hello from "./pages/Hello";
 import Profile from "./pages/Profile";
 
-
 function App() {
   const url = "https://www.atomwalk.com/rest-auth/login/";
   const data = {
@@ -59,8 +58,8 @@ function App() {
             {/* <Router> */}
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<Hello />} />
-                <Route path="/login.html" element={<Logins />} />
+                {/* <Route path="/" element={<Hello />} /> */}
+                <Route path="/login" element={<Logins />} />
 
                 {/* Protected Routes with GlobalStyles */}
                 <Route

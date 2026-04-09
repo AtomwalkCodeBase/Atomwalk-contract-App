@@ -1,4 +1,4 @@
-import {  processAppointee, setuserpin, getCompany, forgetPin,  profileDtlURL, getCustomerDetailListURL,} from "../services/ConstantServies";
+import {  processAppointee, setuserpin, getCompany, forgetPin,  profileDtlURL, getCustomerDetailListURL, processAppointeeFileUpload,} from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosget, authAxiosPost } from "./HttpMethod";
 
 export function getCompanyName(isFms) {
@@ -15,6 +15,12 @@ export function postAppointee(res) {
   }
   // console.log('Data to be sent:', data);
   return authAxiosPost(processAppointee, data)
+
+}
+
+export function postAppointeeFile(res) {
+  // console.log('Data to be sent:', data);
+  return authAxiosFilePost(processAppointeeFileUpload, res)
 
 }
 

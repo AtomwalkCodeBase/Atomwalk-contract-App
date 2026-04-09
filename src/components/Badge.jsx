@@ -78,6 +78,12 @@ ${(props) =>
   background: #66666622;
   color: #666666;
 `}
+${(props) =>
+  props.variant === "pink" &&
+  `
+  background: #ffe5f2;
+  color: #FF69B4;
+`}
 `
 
 const Badge = ({ children, variant = "primary", ...props }) => {

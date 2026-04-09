@@ -495,6 +495,7 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
         icon: <FaUserCircle />,
         items: [
           { path: "/dashboard", name: "Retainer Dashboard", icon: <FaHome /> },
+          // { path: "/finance_user", name: "Approve Dashboard", icon: <FaHome /> },
         ],
       },
     ]
@@ -551,7 +552,7 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
               style={{ width: "80px", marginRight: "1rem", borderRadius: "10px" }}
             />{" "}
             {/* {companyInfo.business_type === "APM" ? "PMT" : fmsdata ? "FMS" : companyInfo.business_type === "LMS" ? "LMS" : "HRMS"} */}
-            CRM
+            CPM
           </Logo>
         )}
         <ToggleButton onClick={toggleSidebar} uiPreferences={uiPreferences}>

@@ -27,3 +27,4 @@ export const getCustomerDetailListURL = `${endpoint}/customer_detail_list/${db_n
 export const profileDtlURL = `${newhrendpoint}/get_employee_list/${db_name}/`;
 export const profileInfoURL = `${endpoint}/profile_info/${db_name}/`;
 export const processAppointee = `${newhrendpoint}/process_employee_job/${db_name}/`;
+export const processAppointeeFileUpload = `${newhrendpoint}/process_employee_file/${db_name}/`;

@@ -340,7 +340,7 @@ const Header = ({ sidebarWidth = "250px", onMobileMenuClick }) => {
         <MobileMenuButton onClick={onMobileMenuClick}>
           <FaBars />
         </MobileMenuButton>
-        <img src={companyInfo.image} alt="Company Logo" style={{ width: "80px", height: "50px", borderRadius: "10px", marginRight: "10px", border: "0.2px solid #000" }} />
+        <img src={profile.image} alt="Company Logo" style={{ width: "80px", height: "50px", borderRadius: "10px", marginRight: "10px", border: "0.2px solid #000" }} />
         <SearchBar expanded={searchExpanded}>
           <FaSearch onClick={handleSearchClick} style={{ cursor: "pointer", color: `${theme.colors.textLight}` }} />
           <SearchInput
@@ -394,13 +394,13 @@ const Header = ({ sidebarWidth = "250px", onMobileMenuClick }) => {
         </UserProfile> */}
 
         <UserProfile onClick={handleprofile}>
-          {profile?.image ? (
+          {/* {profile?.image ? (
             <img src={profile.image} alt="Profile" style={{ width: "50px", height: "50px", marginRight: "1rem", borderRadius: "50%", border: "2px solid rgb(245, 247, 214)" }} />
-          ) : (
+          ) : ( */}
             <UserAvatar>
               {profile?.name?.charAt(0) || <FaUser />}
             </UserAvatar>
-          )}
+          {/* )} */}
           <UserName>{profile?.name || "User"}</UserName>
         </UserProfile>
 
