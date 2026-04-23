@@ -277,11 +277,11 @@ export const AddAndUpdateForm = ({
             <>
               <CompactRow>
                 <FormGroup>
-                  <Label>Emp ID <Required>*</Required></Label>
+                  <Label>Auditor ID <Required>*</Required></Label>
                   <Input type="text" value={formData.emp_id} onChange={(e) => onChange("emp_id", e.target.value)} />
                 </FormGroup>
                 <FormGroup>
-                  <Label>Employee Name <Required>*</Required></Label>
+                  <Label>Auditor Name <Required>*</Required></Label>
                   <Input type="text" value={formData.name} onChange={(e) => onChange("name", e.target.value)} />
                 </FormGroup>
                 <FormGroup>

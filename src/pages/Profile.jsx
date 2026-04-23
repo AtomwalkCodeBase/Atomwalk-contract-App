@@ -1126,6 +1126,8 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState("personal")
   const [profileData, setProfileData] = useState({})
   const [activeThemeTab, setActiveThemeTab] = useState("presets")
+  const jobTitle = profileData.job_title?.toLowerCase() || "";
+  const roleTitle = jobTitle.includes("retainer") ? "Retainer" :  jobTitle.includes("associate") ? "Associate" : "Employee";
   const {
     theme,
     currentTheme,
@@ -1239,7 +1241,7 @@ const Profile = () => {
             <DetailGrid>
               <DetailCard color="#4776E6">
                 <DetailLabel iconColor="#4776E6">
-                  <FaIdCard /> Employee ID
+                  <FaIdCard /> {roleTitle} ID
                 </DetailLabel>
                 <DetailValue>{profileData.emp_id || "Not specified"}</DetailValue>
               </DetailCard>
@@ -1248,7 +1250,7 @@ const Profile = () => {
                 <DetailLabel iconColor="#8E54E9">
                   <FaUserTie /> Role
                 </DetailLabel>
-                <DetailValue>{profileData.grade_name || "Not specified"}</DetailValue>
+                <DetailValue>{roleTitle || "Not specified"}</DetailValue>
               </DetailCard>
 
               {/* <DetailCard color="#38A169">
@@ -2225,7 +2227,7 @@ const Profile = () => {
 
             <ProfileInfo>
               <ProfileName>{profileData.name}</ProfileName>
-              <ProfileRole>{profileData.grade_name}</ProfileRole>
+              <ProfileRole>{roleTitle}</ProfileRole>
 
               {/* <BadgesContainer>
                 <StyledBadge variant="primary">{profileData.is_manager ? "Manager" : "Employee"}</StyledBadge>
@@ -2235,7 +2237,7 @@ const Profile = () => {
               <div>
                 <ProfileDetail>
                   <FaIdCard />
-                  <span>Employee ID: {profileData.emp_id}</span>
+                  <span>{roleTitle} ID: {profileData.emp_id}</span>
                 </ProfileDetail>
                 {/* <ProfileDetail>
                   <FaBuilding />

@@ -214,8 +214,7 @@ const RetainerScreen = () => {
     const search = searchTerm?.toLowerCase() || "";
     const matchesSearch =
       emp.name?.toLowerCase().includes(search) ||
-      emp.emp_id?.toLowerCase().includes(search) ||
-      emp.mobile_number?.includes(search);
+      emp.emp_id?.toLowerCase().includes(search) || emp.additional_ref_number?.includes(search) || emp.emp_id?.includes(search);;
 
     // ✅ Dropdown filter (Grade)
     let matchesDropdown = true;
@@ -256,7 +255,7 @@ const RetainerScreen = () => {
   const statsData = [
     {
       icon: <FaUsers />,
-      label: "Total Employee",
+      label: "Total Auditors",
       value: counts.total,
       color: "primary",
       sections: [
@@ -492,7 +491,7 @@ const RetainerScreen = () => {
           setOpenModal(true);
           setModalMode("ADD");
         }}>
-          <FaPlus /> Add Employee
+          <FaPlus /> Add New Auditor
         </Button>
       </Subtitle>
       <StatsGrid>
@@ -503,7 +502,7 @@ const RetainerScreen = () => {
 
       <Card hoverable={false}>
         <FilterRow>
-          <SearchBox type="text" placeholder="Search audits, customers, or items..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <SearchBox type="text" placeholder="Search Auditor's name, ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           <FilterSelect
             name="selectedStatus"
             value={selectedStatus}
@@ -527,7 +526,7 @@ const RetainerScreen = () => {
         <Table>
           <thead>
             <tr>
-              <th>System Ref ID<br />Emp ID</th>
+              <th>System Ref ID<br />Auditor ID</th>
               <th>Name</th>
               <th>Mobile</th>
               <th>Grade</th>
