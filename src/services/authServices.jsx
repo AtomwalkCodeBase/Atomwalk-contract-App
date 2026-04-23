@@ -8,7 +8,7 @@ export function getProfileInfo() {
 
 export async function getEmployeeInfo() {
     try {
-        const emp_id =  localStorage.getItem('empId');
+        const emp_id =  localStorage.getItem('cust_emp_id');
         let data = {};
         if (emp_id) {
             data['emp_id'] = emp_id;

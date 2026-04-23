@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { FaPlus, FaUserCheck, FaUsers, FaUserTimes } from 'react-icons/fa'
 import styled from 'styled-components';
 import { toast } from 'react-toastify';
@@ -16,6 +16,7 @@ import Badge from '../components/Badge';
 import { DateForApiFormate, formatToDDMMYYYY } from '../utils/utils';
 import EmployeeDetailModal from '../components/modal/EmployeeDetailModal';
 import { AddAndUpdateForm } from '../components/modal/AddAndUpdateForm';
+import PaginationComponent from '../components/Pagination';
 
 const StatsGrid = styled.div`
   display: grid;
@@ -53,6 +54,8 @@ const Subtitle = styled.div`
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
+  overflow-x: auto;
+  overflow-y: hidden;
 
   th {
     text-align: left;
@@ -142,7 +145,9 @@ const RetainerScreen = () => {
     emp_id: "",
     proofType: "",
     govt_id_number: "",
-    file: null
+    file: null,
+    profile_img: null,
+    newProfileFile: null
   })
 
   const [statusFileter, setStatusFilter] = useState("")
@@ -151,6 +156,8 @@ const RetainerScreen = () => {
   const [employeeDetails, setEmployeeDetails] = useState(null);
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
 
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     getEmployeeList();
@@ -181,15 +188,8 @@ const RetainerScreen = () => {
   const getCounts = (list) => {
     const counts = {
       total: list.length,
-
-      VERIFIED: {
-        TL: 0,
-        EX: 0,
-      },
-      UNVERIFIED: {
-        TL: 0,
-        EX: 0,
-      },
+      VERIFIED: { TL: 0, EX: 0 },
+      UNVERIFIED: { TL: 0, EX: 0 },
     };
 
     list.forEach((emp) => {
@@ -207,8 +207,8 @@ const RetainerScreen = () => {
   const counts = getCounts(employeeList);
 
   const filteredEmployees = employeeList.filter((emp) => {
-    const grade = getGrade(emp.grade_level); // TL / EX
-    const status = getStatus(emp.is_verified); // VERIFIED / UNVERIFIED
+    const grade = getGrade(emp.grade_level);
+    const status = getStatus(emp.is_verified);
 
     // ✅ Search filter
     const search = searchTerm?.toLowerCase() || "";
@@ -229,17 +229,29 @@ const RetainerScreen = () => {
     }
 
     let matchesStats = true;
-
     if (statusFileter?.status && status !== statusFileter.status) {
       matchesStats = false;
     }
-
     if (statusFileter?.grade && grade !== statusFileter.grade) {
       matchesStats = false;
     }
 
     return matchesSearch && matchesDropdown && matchesStats;
   });
+
+    const paginatedActivities = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredEmployees.slice(startIndex, endIndex);
+  }, [filteredEmployees,currentPage, itemsPerPage]);
+
+  const handlePageChange = (page, perPage = itemsPerPage) => {
+    setCurrentPage(page);
+    if (perPage !== itemsPerPage) {
+      setItemsPerPage(perPage);
+      setCurrentPage(1); // Reset to first page when changing items per page
+    }
+  };
 
   const statsData = [
     {
@@ -301,7 +313,7 @@ const RetainerScreen = () => {
     setFormDataFile(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e, type = "doc") => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -309,8 +321,11 @@ const RetainerScreen = () => {
       toast.error("File size must be less than 5MB");
       return;
     }
-
-    handleChangeFile("file", file);
+  if (type === "profile") {
+    handleChangeFile("newProfileFile", file); // ✅ NEW
+  } else {
+    handleChangeFile("file", file); // existing
+  }
   };
 
   const removeFile = () => { setFormDataFile((prev) => ({ ...prev, file: null, })) }
@@ -338,9 +353,14 @@ const RetainerScreen = () => {
       return;
     }
 
+    if (formData.mobile_number.length < 10) {
+      toast.error("Employee mobile number must be 10 digits");
+      return;
+    }
+
     try {
       const appointeePayload = {
-        emp_id: formData.o_emp_id,
+        emp_id: formData.o_emp_id || "",
         additional_ref_number: formData.emp_id || "",
         name: formData.name,
         gender: formData.gender,
@@ -369,52 +389,81 @@ const RetainerScreen = () => {
     }
   }
 
-  const handleUploadFile = async () => {
+  const handleUploadFile = async (uploadMode) => {
     try {
-      const hasGovtType = !!formDataFile.proofType;
-      const hasGovtId = !!formDataFile.govt_id_number?.trim();
-      const hasFile = !!formDataFile.file;
-      let call_mode = formDataFile.isExisting ? "UPDATE" : "ADD";
+      if (uploadMode === "P") {
+        let call_mode = employeeDetails?.image ? "UPDATE_IMAGE" : "ADD_IMAGE";
 
-      if (!hasGovtType) {
-        toast.error("Govt ID type is required");
-        return;
-      }
-      if (!hasGovtId) {
-        toast.error("Govt ID number is required");
+        if (!formDataFile.newProfileFile) {
+        toast.error("Please upload profile image");
         return;
       }
 
-      if (call_mode === "ADD" && !hasFile) {
-        toast.error("Please upload a file");
-        return;
-      }
+        const formdata = new FormData();
+        formdata.append("emp_id", formDataFile.emp_id);
+        formdata.append("call_mode", call_mode);
+        if (formDataFile.newProfileFile && typeof formDataFile.newProfileFile !== 'string') {
+          formdata.append("uploaded_file", formDataFile.newProfileFile);
+        }
+        // for (let [key, value] of formdata.entries()) {
+        //   console.log(key, value);
+        // }
+        const res = await postAppointeeFile(formdata);
+        // const res = { status: 200 }
 
-      if (call_mode === "UPDATE" && !hasFile) {
-        toast.error("File cannot be empty in update");
-        return;
-      }
+        if (res && res.status === 200) {
+          toast.success(call_mode === "ADD_IMAGE" ? "Profile Image successfully added!" : "Profile Image successfully updated!");
+          await getEmployeeList();
+          setOpenModal(false);
+          setModalMode("");
+          return;
+        }
+      } else {
+        const hasGovtType = !!formDataFile.proofType;
+        const hasGovtId = !!formDataFile.govt_id_number?.trim();
+        const hasFile = !!formDataFile.file;
+        let call_mode = formDataFile.isExisting ? "UPDATE" : "ADD";
 
-      const formdata = new FormData();
+        if (!hasGovtType) {
+          toast.error("Govt ID type is required");
+          return;
+        }
+        if (!hasGovtId) {
+          toast.error("Govt ID number is required");
+          return;
+        }
 
-      formdata.append("emp_id", formDataFile.emp_id);
-      formdata.append("govt_id_number", `${formDataFile.proofType}^${formDataFile.govt_id_number}`);
-      formdata.append("call_mode", call_mode);
-      if (formDataFile.file && typeof formDataFile.file !== 'string') {
-        formdata.append("uploaded_file", formDataFile.file);
-      }
-      for (let [key, value] of formdata.entries()) {
-        console.log(key, value);
-      }
-      // const res = await postAppointeeFile(formdata);
-      const res = { status: 200 }
+        if (call_mode === "ADD" && !hasFile) {
+          toast.error("Please upload a file");
+          return;
+        }
 
-      if (res && res.status === 200) {
-        toast.success(call_mode === "ADD" ? "Document successfully added!" : "Document successfully updated!");
-        await getEmployeeList();
-        setOpenModal(false);
-        setModalMode("");
-        return
+        if (call_mode === "UPDATE" && !hasFile) {
+          toast.error("File cannot be empty in update");
+          return;
+        }
+
+        const formdata = new FormData();
+
+        formdata.append("emp_id", formDataFile.emp_id);
+        formdata.append("govt_id_number", `${formDataFile.proofType}^${formDataFile.govt_id_number}`);
+        formdata.append("call_mode", call_mode);
+        if (formDataFile.file && typeof formDataFile.file !== 'string') {
+          formdata.append("uploaded_file", formDataFile.file);
+        }
+        // for (let [key, value] of formdata.entries()) {
+        //   console.log(key, value);
+        // }
+        const res = await postAppointeeFile(formdata);
+        // const res = { status: 200 }
+
+        if (res && res.status === 200) {
+          toast.success(call_mode === "ADD" ? "Document successfully added!" : "Document successfully updated!");
+          await getEmployeeList();
+          setOpenModal(false);
+          setModalMode("");
+          return;
+        }
       }
     } catch (error) {
       toast.error(error?.response?.data?.message || "Something went wrong. Please try again later!");
@@ -422,10 +471,10 @@ const RetainerScreen = () => {
   };
 
   return (
-    <Layout title="Contact Employee Screen">
+    <Layout title="Auditor Management">
       <Subtitle>
         <div>
-          <p>All Contact Employee List</p>
+          <p>View and manage all auditors</p>
         </div>
 
         <Button variant="primary" onClick={() => {
@@ -454,7 +503,6 @@ const RetainerScreen = () => {
 
       <Card hoverable={false}>
         <FilterRow>
-
           <SearchBox type="text" placeholder="Search audits, customers, or items..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           <FilterSelect
             name="selectedStatus"
@@ -482,7 +530,6 @@ const RetainerScreen = () => {
               <th>System Ref ID<br />Emp ID</th>
               <th>Name</th>
               <th>Mobile</th>
-              {/* <th>Gender</th> */}
               <th>Grade</th>
               <th>Document?</th>
               <th>Status</th>
@@ -496,18 +543,16 @@ const RetainerScreen = () => {
                   Loading...
                 </td>
               </tr>
-            ) : filteredEmployees.length ? (
-              filteredEmployees.map((employee) =>
+            ) : paginatedActivities.length ? (
+              paginatedActivities.map((employee) =>
               (<tr key={employee.id}>
                 <td>{employee.emp_id}<br /><Badge variant={employee.gender === "M" ? "settle" : "pink"}>{employee.additional_ref_number || "--"}</Badge></td>
-                {/* <td>{employee.additional_ref_number || "--"}</td> */}
                 <td>{employee.name}</td>
                 <td>{employee.mobile_number || "--"}</td>
-                {/* <td>{employee.gender === "M" ? "Male" : "Female"}</td> */}
                 <td><Badge variant={employee.grade_level <= 1 ? "info" : "forward"}>{employee.grade_level <= 1 ? "Executive" : "Team Lead"}</Badge></td>
                 <td><Badge variant={employee.ref_govt_id_number && employee.emp_file_1 ? "success" : "error"}>{employee.ref_govt_id_number && employee.emp_file_1 ? "Yes" : "No"}</Badge></td>
                 <td>
-                  <Badge variant={employee.is_verified ? 'success' : 'error'}>{employee.is_verified ? 'Verified' : 'Not verified'}</Badge>
+                  <Badge variant={employee.is_rejected ? "reject" : employee.is_verified ? 'success' : 'error'}>{employee.is_rejected ? "Rejected" : employee.is_verified ? 'Verified' : 'Not verified'}</Badge>
                 </td>
                 <td>
                   <BUttonGroup>
@@ -527,7 +572,9 @@ const RetainerScreen = () => {
                         proofType: pType,
                         govt_id_number: gNumber,
                         file: employee.emp_file_1 || null,
-                        isExisting: !!(employee.ref_govt_id_number && employee.emp_file_1)
+                        isExisting: !!(employee.ref_govt_id_number && employee.emp_file_1),
+                        profile_img: employee.image,
+                        newProfileFile: null
                       });
                       setModalMode("UPLOAD");
                       setOpenModal(true);
@@ -556,23 +603,29 @@ const RetainerScreen = () => {
                     </Button>
                   </BUttonGroup>
                 </td>
-              </tr>))) :
-              (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "1rem" }}>
-                    No data found
-                  </td>
-                </tr>
-              )}
+              </tr>))) : (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", padding: "1rem" }}>
+                  No data found
+                </td>
+              </tr>
+            )}
           </tbody>
         </Table>
+         <PaginationComponent
+                                              totalItems={filteredEmployees.length}
+                                              itemsPerPage={itemsPerPage}
+                                              currentPage={currentPage}
+                                              onPageChange={handlePageChange}
+                                              siblingCount={2}
+                                            />
       </Card>
 
       {showEmployeeDetails && <EmployeeDetailModal employee={employeeDetails} onClose={() => { setEmployeeDetails(null); setShowEmployeeDetails(false) }} />}
 
       <AddAndUpdateForm
         isOpen={openModal}
-        onClose={() => { setOpenModal(false); setModalMode(""); setEmployeeDetails("") }}
+        onClose={() => { setOpenModal(false); setModalMode(""); setEmployeeDetails(""); setFormDataFile({}) }}
         modalMode={modalMode}
         formData={formData}
         formDataFile={formDataFile}

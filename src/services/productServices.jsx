@@ -38,12 +38,12 @@ export function getCustomerDetailList(customerId) {
 
 export async function setuserpinview(o_pin, n_pin) {
   try {
-    const customerId = localStorage.getItem("empId");
+    const customerId = localStorage.getItem("custId");
     let data = {
       u_id: customerId,
       o_pin: o_pin,
       n_pin: n_pin,
-      user_type: "EMP",
+      user_type: "CUSTOMER",
     };
 
     const response = await authAxiosPost(setuserpin, data);

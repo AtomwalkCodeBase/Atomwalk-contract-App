@@ -22,6 +22,7 @@ import RetainerScreen from "./pages/ReainerScreen";
 import Logins from "./pages/Login";
 import Hello from "./pages/Hello";
 import Profile from "./pages/Profile";
+import NotFound from "./pages/NotFound";
 
 function App() {
   const url = "https://www.atomwalk.com/rest-auth/login/";
@@ -78,7 +79,8 @@ function App() {
                 </Route>
 
                 {/* Catch All */}
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {/* <Route path="*" element={<Navigate to="/" replace />} /> */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
   
             </Router>

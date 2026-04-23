@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("custId")
       localStorage.removeItem("customerUser")
       toast.success("Logout successful!");
-      window.location.href = "/retainer/login.html";
+      window.location.href = "/retainer/login";
     localStorage.removeItem("dbName")
     localStorage.removeItem("userToken")
     localStorage.removeItem("cust_emp_id")

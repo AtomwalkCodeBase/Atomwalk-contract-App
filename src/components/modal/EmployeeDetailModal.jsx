@@ -1,28 +1,13 @@
 import React from "react";
 import styled, { keyframes } from "styled-components";
-import {
-  FiX,
-  FiUser,
-  FiBriefcase,
-  FiMail,
-  FiPhone,
-  FiCalendar,
-  FiShield,
-  FiMapPin,
-  FiFileText,
-  FiCheckCircle,
-  FiAlertCircle,
-  FiImage,
-  FiEye,
-    FiExternalLink,
-} from "react-icons/fi";
+import { FiX, FiUser, FiBriefcase, FiMail, FiPhone, FiCalendar, FiShield, FiMapPin, FiFileText, FiCheckCircle, FiAlertCircle, FiImage, FiEye, FiExternalLink,} from "react-icons/fi";
 import { theme } from "../../styles/Theme";
+import { FaRegTimesCircle } from "react-icons/fa";
+import { HiOutlinePencilAlt } from "react-icons/hi";
 
-// ─── Animations ───────────────────────────────────────────────────────────────
 const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
 const slideUp = keyframes`from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); }`;
 
-// ─── Overlay ──────────────────────────────────────────────────────────────────
 const Overlay = styled.div`
   position: fixed;
   inset: 0;
@@ -53,7 +38,6 @@ const Modal = styled.div`
   }
 `;
 
-// ─── Header ───────────────────────────────────────────────────────────────────
 const ModalHeader = styled.div`
   display: flex;
   align-items: center;
@@ -124,16 +108,12 @@ const CloseBtn = styled.button`
   }
 `;
 
-// ─── Body ─────────────────────────────────────────────────────────────────────
 const ModalBody = styled.div`
   padding: ${theme.spacing.xl};
   display: flex;
   flex-direction: column;
   gap: ${theme.spacing.lg};
 `;
-
-// ─── Section ─────────────────────────────────────────────────────────────────
-const Section = styled.div``;
 
 const SectionLabel = styled.div`
   font-size: ${theme.fontSizes.xs};
@@ -156,7 +136,6 @@ const Grid = styled.div`
   }
 `;
 
-// ─── Field ────────────────────────────────────────────────────────────────────
 const Field = styled.div`
   display: flex;
   align-items: flex-start;
@@ -202,7 +181,6 @@ const FieldValue = styled.div`
   word-break: break-word;
 `;
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
 const StatusBadge = styled.div`
   display: inline-flex;
   align-items: center;
@@ -211,11 +189,10 @@ const StatusBadge = styled.div`
   border-radius: ${theme.borderRadius.xl};
   font-size: ${theme.fontSizes.xs};
   font-weight: 600;
-  background: ${({ $verified }) => $verified ? "#E6F9F0" : "#FFF4E5"};
-  color: ${({ $verified }) => $verified ? theme.colors.success : "#E67E00"};
+  background: ${({ $verified, $rejected }) => $rejected ? "#FFE6E6" : $verified ? "#E6F9F0" : "#FFF4E5" };
+  color: ${({ $verified, $rejected, theme }) => $rejected ? theme.colors.error : $verified ? theme.colors.success : "#E67E00"};
 `;
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
 const ModalFooter = styled.div`
   padding: ${theme.spacing.md} ${theme.spacing.xl};
   border-top: 1px solid ${theme.colors.border};
@@ -283,14 +260,11 @@ const NoFile = styled.div`
   font-weight: 600;
 `;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const getInitials = (name = "") =>
-  name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+// const getInitials = (name = "") => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
 const display = (val) => (val === null || val === undefined || val === "") ? "—" : String(val);
 const isEmpty = (val) => val === null || val === undefined || val === "";
 
-// ─── Component ────────────────────────────────────────────────────────────────
 const EmployeeDetailModal = ({ employee, onClose }) => {
   if (!employee) return null;
 
@@ -320,10 +294,11 @@ const GovtIDProof = proofType(employee.ref_govt_id_number)
         {/* Header */}
         <ModalHeader>
           <HeaderLeft>
-            <HeaderAvatar>{getInitials(employee.name)}</HeaderAvatar>
+            {/* <HeaderAvatar>{getInitials(employee.name)}</HeaderAvatar> */}
+            <img src={employee.image} alt="Profile" style={{ width: "42px", height: "42px", borderRadius: "50%", border: "2px solid rgb(245, 247, 214)" }} />
             <HeaderText>
               <HeaderTitle>{employee.name}</HeaderTitle>
-              <HeaderSub>{employee.emp_id} · {employee.department_name}</HeaderSub>
+              <HeaderSub>{employee.emp_id}</HeaderSub>
             </HeaderText>
           </HeaderLeft>
           <CloseBtn onClick={onClose}><FiX /></CloseBtn>
@@ -333,7 +308,7 @@ const GovtIDProof = proofType(employee.ref_govt_id_number)
         <ModalBody>
 
           {/* Personal Info */}
-          <Section>
+          <div>
             <SectionLabel>Personal Information</SectionLabel>
             <Grid>
               <Field>
@@ -382,18 +357,35 @@ const GovtIDProof = proofType(employee.ref_govt_id_number)
                 <FieldIcon><FiShield /></FieldIcon>
                 <FieldContent>
                   <FieldLabel>Verification Status</FieldLabel>
-                  <StatusBadge $verified={employee.is_verified}>
-                    {employee.is_verified
-                      ? <><FiCheckCircle /> Verified</>
-                      : <><FiAlertCircle /> Pending</>}
+                  <StatusBadge $verified={employee.is_verified} $rejected={employee.is_rejected}>
+                    {employee.is_rejected ? <><FaRegTimesCircle />Rejected</>  : employee.is_verified ? <><FiCheckCircle /> Verified</> : <><FiAlertCircle /> Pending</>}
                   </StatusBadge>
                 </FieldContent>
               </Field>
             </Grid>
-          </Section>
+          </div>
+
+          {(employee.is_verified || employee.is_rejected) && (
+          <div>
+            <SectionLabel>Finance Team Remark</SectionLabel>
+            <Grid>
+              <Field $full>
+                <FieldIcon><HiOutlinePencilAlt /></FieldIcon>
+                <FieldContent>
+                  <FieldLabel>
+                    {employee.is_verified ? "Verify Remark" : "Reject Remark"}
+                  </FieldLabel>
+                  <FieldValue $empty={isEmpty(employee.prior_experience ? employee.prior_experience : employee.prior_experience)}>
+                    {employee.prior_experience ? display(employee.prior_experience || "--") : display(employee.prior_experience || "--")}
+                  </FieldValue>
+                </FieldContent>
+              </Field>
+            </Grid>
+          </div>
+        )}
 
           {/* Contact */}
-          <Section>
+          <div>
             <SectionLabel>Contact Details</SectionLabel>
             <Grid>
               <Field>
@@ -412,56 +404,53 @@ const GovtIDProof = proofType(employee.ref_govt_id_number)
                 </FieldContent>
               </Field>
             </Grid>
-          </Section>
+          </div>
+          <div>
+            <SectionLabel>Identity</SectionLabel>
+            <Grid>
+              <Field>
+                <FieldIcon><FiFileText /></FieldIcon>
+                <FieldContent>
+                  <FieldLabel>Govt. ID Type</FieldLabel>
+                  <FieldValue>
+                    {GovtIDProof.typeName}
+                  </FieldValue>
+                </FieldContent>
+              </Field>
+              <Field>
+                <FieldIcon><FiFileText /></FieldIcon>
+                <FieldContent>
+                  <FieldLabel>Govt. ID Number</FieldLabel>
+                  <FieldValue>
+                    {GovtIDProof.number}
+                  </FieldValue>
+                </FieldContent>
+              </Field>
 
-          {/* Identity */}
-          {/* Identity */}
-<Section>
-  <SectionLabel>Identity</SectionLabel>
-  <Grid>
-    <Field>
-      <FieldIcon><FiFileText /></FieldIcon>
-      <FieldContent>
-        <FieldLabel>Govt. ID Type</FieldLabel>
-        <FieldValue>
-          {GovtIDProof.typeName}
-        </FieldValue>
-      </FieldContent>
-    </Field>
-    <Field>
-      <FieldIcon><FiFileText /></FieldIcon>
-      <FieldContent>
-        <FieldLabel>Govt. ID Number</FieldLabel>
-        <FieldValue>
-          {GovtIDProof.number}
-        </FieldValue>
-      </FieldContent>
-    </Field>
-
-    <Field $full>
-      <FieldIcon><FiImage /></FieldIcon>
-      <FieldContent>
-        <FieldLabel>Uploaded Document</FieldLabel>
-        {isEmpty(employee.emp_file_1) ? (
-          <NoFile>—</NoFile>
-        ) : isImageUrl(employee.emp_file_1) ? (
-          <FilePreviewBox>
-            <FileImage src={employee.emp_file_1} alt="ID Document" />
-          </FilePreviewBox>
-        ) : (
-          <FileDocRow href={employee.emp_file_1} target="_blank" rel="noopener noreferrer">
-            <FiEye />
-            <span>View Document</span>
-            <FiExternalLink />
-          </FileDocRow>
-        )}
-      </FieldContent>
-    </Field>
-  </Grid>
-</Section>
+              <Field $full>
+                <FieldIcon><FiImage /></FieldIcon>
+                <FieldContent>
+                  <FieldLabel>Uploaded Document</FieldLabel>
+                  {isEmpty(employee.emp_file_1) ? (
+                    <NoFile>—</NoFile>
+                  ) : isImageUrl(employee.emp_file_1) ? (
+                    <FilePreviewBox>
+                      <FileImage src={employee.emp_file_1} alt="ID Document" />
+                    </FilePreviewBox>
+                  ) : (
+                    <FileDocRow href={employee.emp_file_1} target="_blank" rel="noopener noreferrer">
+                      <FiEye />
+                      <span>View Document</span>
+                      <FiExternalLink />
+                    </FileDocRow>
+                  )}
+                </FieldContent>
+              </Field>
+            </Grid>
+          </div>
 
           {/* Address */}
-          <Section>
+          <div>
             <SectionLabel>Address</SectionLabel>
             <Grid>
               <Field $full>
@@ -479,7 +468,7 @@ const GovtIDProof = proofType(employee.ref_govt_id_number)
                 </FieldContent>
               </Field>
             </Grid>
-          </Section>
+          </div>
 
         </ModalBody>
 

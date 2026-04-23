@@ -1126,7 +1126,6 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState("personal")
   const [profileData, setProfileData] = useState({})
   const [activeThemeTab, setActiveThemeTab] = useState("presets")
-  const isFmsLogin = localStorage.getItem("fmsUser")
   const {
     theme,
     currentTheme,
@@ -1171,7 +1170,8 @@ const Profile = () => {
 
   const handleThemeChange = (themeName) => {
     changeTheme(themeName)
-    toast.success(`Theme changed to ${theme[themeName]}`)
+    const displayName = theme[themeName]?.name || themeName;
+    toast.success(`Theme changed to ${displayName }`)
   }
 
   const handlePinReset = async () => {
@@ -1251,12 +1251,12 @@ const Profile = () => {
                 <DetailValue>{profileData.grade_name || "Not specified"}</DetailValue>
               </DetailCard>
 
-              <DetailCard color="#38A169">
+              {/* <DetailCard color="#38A169">
                 <DetailLabel iconColor="#38A169">
                   <FaBuilding /> Department
                 </DetailLabel>
                 <DetailValue>{profileData.department_name || "Not specified"}</DetailValue>
-              </DetailCard>
+              </DetailCard> */}
 
               <DetailCard color="#DD6B20">
                 <DetailLabel iconColor="#DD6B20">
@@ -1279,19 +1279,19 @@ const Profile = () => {
                 <DetailValue>{profileData.email_id || "Not specified"}</DetailValue>
               </DetailCard>
 
-              <DetailCard color="#D53F8C">
+              {/* <DetailCard color="#D53F8C">
                 <DetailLabel iconColor="#D53F8C">
                   <FaBirthdayCake /> Birthday
                 </DetailLabel>
                 <DetailValue>{profileData.dob || "Not specified"}</DetailValue>
-              </DetailCard>
+              </DetailCard> */}
 
-              <DetailCard color="#2B6CB0">
+              {/* <DetailCard color="#2B6CB0">
                 <DetailLabel iconColor="#2B6CB0">
                   <FaExchangeAlt /> My Shift
                 </DetailLabel>
                 <DetailValue>{getShiftLabel(profileData.current_shift) || "Not specified"}</DetailValue>
-              </DetailCard>
+              </DetailCard> */}
             </DetailGrid>
           </>
         )
@@ -1430,7 +1430,7 @@ const Profile = () => {
           <>
             <SectionTitle>Theme Personalization</SectionTitle>
             <p style={{ marginBottom: "1.5rem", color: "#4a5568" }}>
-              Customize every aspect of your HRMS interface to match your personal preferences.
+              Customize every aspect of the interface to match your preferences.
             </p>
 
             <TabContainer>
@@ -2227,20 +2227,20 @@ const Profile = () => {
               <ProfileName>{profileData.name}</ProfileName>
               <ProfileRole>{profileData.grade_name}</ProfileRole>
 
-              <BadgesContainer>
+              {/* <BadgesContainer>
                 <StyledBadge variant="primary">{profileData.is_manager ? "Manager" : "Employee"}</StyledBadge>
                 <StyledBadge variant="secondary"> {getExperience(profileData.date_of_join)}</StyledBadge>
-              </BadgesContainer>
+              </BadgesContainer> */}
 
               <div>
                 <ProfileDetail>
                   <FaIdCard />
                   <span>Employee ID: {profileData.emp_id}</span>
                 </ProfileDetail>
-                <ProfileDetail>
+                {/* <ProfileDetail>
                   <FaBuilding />
                   <span>{profileData.department_name || "Not specified"}</span>
-                </ProfileDetail>
+                </ProfileDetail> */}
                 <ProfileDetail>
                   <FaPhone />
                   <span>{profileData.mobile_number || "Not specified"}</span>
@@ -2253,15 +2253,15 @@ const Profile = () => {
                   <FaCalendarAlt />
                   <span>Joined: {profileData.date_of_join || "Not specified"}</span>
                 </ProfileDetail>
-                <ProfileDetail>
+                {/* <ProfileDetail>
                   <FaExchangeAlt/>
                   <span>{getShiftLabel(profileData.current_shift) || "Not specified"}</span>
-                </ProfileDetail>
+                </ProfileDetail> */}
               </div>
             </ProfileInfo>
           </StyledCard>
 
-          {!isFmsLogin && 
+          {/* {!isFmsLogin && 
           <StyledCard>
             <div style={{ padding: "1.5rem" }}>
               <SectionTitle>Quick Stats</SectionTitle>
@@ -2275,7 +2275,7 @@ const Profile = () => {
                 </StatCard>
               </div>
             </div>
-          </StyledCard>}
+          </StyledCard>} */}
         </ProfileSidebar>
 
         <ProfileContent>

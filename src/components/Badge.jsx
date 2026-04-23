@@ -84,6 +84,13 @@ ${(props) =>
   background: #ffe5f2;
   color: #FF69B4;
 `}
+
+${(props) =>
+  props.variant === "reject" &&
+  `
+  background: ${props.theme.colors.error};
+  color: #f3e8fd;
+`}
 `
 
 const Badge = ({ children, variant = "primary", ...props }) => {

@@ -122,7 +122,7 @@ const defaultUIPreferences = {
   layout: {
     density: "comfortable",
     containerWidth: "standard",
-    sidebarStyle: "floating",
+    sidebarStyle: "standard",
   },
 }
 

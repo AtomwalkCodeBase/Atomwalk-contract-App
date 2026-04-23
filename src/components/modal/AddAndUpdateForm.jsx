@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import Button from '../Button';
 import { theme } from '../../styles/Theme';
 import { HiOutlinePencilAlt } from 'react-icons/hi';
 import { FaFileAlt, FaPlus, FaTimes, FaUpload } from 'react-icons/fa';
 import { RiUploadCloud2Line } from 'react-icons/ri';
-
+import Tabs from '../Tabs';
 
 const ModalOverlay = styled.div`
   position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -142,19 +142,126 @@ export const AddAndUpdateForm = ({
   isLoading = false,
   employeeDetails
 }) => {
+
+  const initialFormRef = useRef(null);
+  const initialUploadRef = useRef(null);
+  const [uploadMode, setUploadMode] = useState("D");
+  const [isChanged, setIsChanged] = useState(false);
+
+  const getFileKey = (file) => {
+    if (!file) return "";
+    if (typeof file === "string") return file;
+    return `${file.name}_${file.size}_${file.lastModified}`;
+  };
+
+   // Get initial values based on mode
+  const getInitialValues = () => {
+    if (modalMode === "UPLOAD") {
+      return {
+        proofType: formDataFile.proofType || "",
+        govt_id_number: formDataFile.govt_id_number || "",
+        fileKey: getFileKey(formDataFile.file),
+        profile_img: formDataFile.profile_img || null
+      };
+    }
+    if (modalMode === "UPDATE") {
+      return { ...formData };
+    }
+    return null;
+  };
+
+  // Check if values changed
+  const hasValuesChanged = (current, initial, fields) => {
+    if (modalMode === "UPDATE") {
+      return JSON.stringify(current) !== JSON.stringify(initial);
+    }
+    
+    if (modalMode === "UPLOAD") {
+      if (uploadMode === "D") {
+        return fields.some(field => current[field] !== initial[field]);
+      }
+      if (uploadMode === "P") {
+        return !!formDataFile.newProfileFile;
+      }
+    }
+    return true;
+  };
+
+  // Initialize refs when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const initialValues = getInitialValues();
+    if (modalMode === "UPLOAD") {
+      initialUploadRef.current = initialValues;
+    } else {
+      initialFormRef.current = initialValues;
+    }
+    setIsChanged(false);
+  }, [isOpen, modalMode]);
+
+  // Check for changes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsChanged(false);
+      return;
+    }
+
+    let changed = false;
+    const documentFields = ["proofType", "govt_id_number", "fileKey"];
+
+   if (modalMode === "UPDATE") {
+      if (initialFormRef.current) {
+        changed = hasValuesChanged(formData, initialFormRef.current);
+      }
+    } else if (modalMode === "UPLOAD") {
+      if (uploadMode === "D") {
+        const current = {
+          proofType: formDataFile.proofType || "",
+          govt_id_number: formDataFile.govt_id_number || "",
+          fileKey: getFileKey(formDataFile.file)
+        };
+        changed = hasValuesChanged(current, initialUploadRef.current || {}, documentFields);
+      }
+      if (uploadMode === "P") {
+        changed = !!formDataFile.newProfileFile;
+      }
+    } else if (modalMode === "ADD") {
+      // In ADD mode, button should be enabled when any required field has value
+      // Or you can keep it always enabled for ADD mode
+      changed = true; // Always enable in ADD mode
+      
+      // Optional: Enable only when required fields are filled
+      // const requiredFields = ['emp_id', 'name', 'gender', 'dob', 'email_id', 'grade_level', 'address_line_1'];
+      // changed = requiredFields.some(field => formData[field]?.trim());
+    }
+
+    setIsChanged(changed);
+  }, [formData, formDataFile, uploadMode, modalMode, isOpen, getFileKey]);
+
   if (!isOpen) return null;
 
   const isUploadMode = modalMode === "UPLOAD";
+    const isAddMode = modalMode === "ADD";
+
+    const isButtonDisabled = () => {
+    if (isLoading) return true;
+    if (isAddMode) return false; // Always enabled in ADD mode
+    return !isChanged;
+  };
+
+  const tabs = [
+    { key: 'D', label: "Document Upload", },
+    { key: 'P', label: "Profile Image", },
+  ].filter(Boolean);
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay onClick={() => { onClose(); setUploadMode("D")}}>
       <ModalContainer onClick={e => e.stopPropagation()}>
         <ModalHeader>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <ModalTitle>
-              {isUploadMode ? "Upload Contract Employee Document" :
-                modalMode === "UPDATE" ? "Update Contract Employee Details" :
-                  "Add Contract Employee Details"}
+              {isUploadMode ? "Upload Auditor's Document" : modalMode === "UPDATE" ? "Update Auditor's Details" : "Add Auditor's Details"}
             </ModalTitle>
 
             {employeeDetails && <ModalTitle>
@@ -162,7 +269,7 @@ export const AddAndUpdateForm = ({
             </ModalTitle>}
           </div>
 
-          <CloseButton onClick={onClose}><FaTimes /></CloseButton>
+          <CloseButton onClick={() => { onClose(); setUploadMode("D")}}><FaTimes /></CloseButton>
         </ModalHeader>
 
         <ModalBody>
@@ -197,7 +304,7 @@ export const AddAndUpdateForm = ({
                 </FormGroup>
                 <FormGroup>
                   <Label>Mobile Number</Label>
-                  <Input type="number" maxLength={10} value={formData.mobile_number} onChange={(e) => onChange("mobile_number", e.target.value)} />
+                  <Input type="tel" maxLength="10" value={formData.mobile_number} onChange={(e) => onChange("mobile_number", e.target.value)} />
                 </FormGroup>
                 <FormGroup>
                   <Label>Grade <Required>*</Required></Label>
@@ -221,64 +328,105 @@ export const AddAndUpdateForm = ({
 
           {isUploadMode && (
             <>
-              <CompactRow>
-                <FormGroup>
-                  <Label>Select Id Proof Type<Required>*</Required></Label>
-                  <FormSelect id="proofType" name="proofType" value={formDataFile.proofType} onChange={(e) => onChangeUpload("proofType", e.target.value)} required>
-                    <option value="" disabled>Select Id Proof</option>
-                    <option value="A">Aadhar Card</option>
-                    <option value="P">Pan Card</option>
-                    <option value="D">Driving license</option>
-                  </FormSelect>
-                </FormGroup>
-                <FormGroup>
-                  <Label>Enter ID Proof Number <Required>*</Required></Label>
-                  <Input
-                    type="text"
-                    value={formDataFile.govt_id_number}
-                    onChange={(e) => onChangeUpload("govt_id_number", e.target.value, true)}
-                  />
-                </FormGroup>
-              </CompactRow>
+              <Tabs tabs={tabs} activeTab={uploadMode} setActiveTab={setUploadMode} />
 
-              <FormGroup>
-                <Label>Upload ID Proof <Required>*</Required></Label>
-                <FileUploadContainer onClick={() => document.getElementById("file-upload").click()}>
-                  <input
-                    id="file-upload"
-                    type="file"
-                    onChange={onFileChange}
-                    accept="image/*,.pdf"
-                    style={{ display: 'none' }}
-                  />
-                  <FileUploadContent>
-                    <FileUploadIcon><FaUpload /></FileUploadIcon>
-                    <div>
-                      <FileUploadText>Click to upload file</FileUploadText>
-                      <FileUploadHint>JPG, PNG, PDF • Max 5MB</FileUploadHint>
-                    </div>
-                  </FileUploadContent>
-                </FileUploadContainer>
+              {uploadMode === "P" ? <>
+                <FormGroup>
+                  <Label>Upload Profile Image</Label>
+                  <FileUploadContainer onClick={() => document.getElementById("file-upload1").click()}>
+                    <input
+                      id="file-upload1"
+                      type="file"
+                      onChange={(e) => onFileChange(e, "profile")}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                    />
+                    <FileUploadContent>
+                      <FileUploadIcon><FaUpload /></FileUploadIcon>
+                      <div>
+                        <FileUploadText>Click to upload file</FileUploadText>
+                        <FileUploadHint>JPG, PNG • Max 5MB</FileUploadHint>
+                      </div>
+                    </FileUploadContent>
+                  </FileUploadContainer>
 
-                {formDataFile.file && (
-                  <UploadedFile>
-                    {formDataFile.file.type && formDataFile.file.type?.startsWith("image/") ? (
-                      <img src={URL.createObjectURL(formDataFile.file)} alt="preview" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} />
-                    ) : (
-                      <FaFileAlt color={theme.colors.text} />
+                  {(formDataFile.newProfileFile || formDataFile.profile_img) && (
+  <UploadedFile>
+    <img
+      src={
+        formDataFile.newProfileFile
+          ? URL.createObjectURL(formDataFile.newProfileFile)
+          : formDataFile.profile_img
+      } alt="preview" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} />
+                    </UploadedFile>
+                  )}
+                </FormGroup>
+              </>
+
+                :
+                <>
+                  <CompactRow>
+                    <FormGroup>
+                      <Label>Select Id Proof Type<Required>*</Required></Label>
+                      <FormSelect id="proofType" name="proofType" value={formDataFile.proofType} onChange={(e) => onChangeUpload("proofType", e.target.value)} required>
+                        <option value="" disabled>Select Id Proof</option>
+                        <option value="A">Aadhar Card</option>
+                        <option value="P">Pan Card</option>
+                        <option value="D">Driving license</option>
+                      </FormSelect>
+                    </FormGroup>
+                    <FormGroup>
+                      <Label>Enter ID Proof Number <Required>*</Required></Label>
+                      <Input
+                        type="text"
+                        value={formDataFile.govt_id_number}
+                        onChange={(e) => onChangeUpload("govt_id_number", e.target.value, true)}
+                      />
+                    </FormGroup>
+                  </CompactRow>
+
+                  <FormGroup>
+                    <Label>Upload ID Proof <Required>*</Required></Label>
+                    <FileUploadContainer onClick={() => document.getElementById("file-upload").click()}>
+                      <input
+                        id="file-upload"
+                        type="file"
+                        onChange={onFileChange}
+                        accept="image/*,.pdf"
+                        style={{ display: 'none' }}
+                      />
+                      <FileUploadContent>
+                        <FileUploadIcon><FaUpload /></FileUploadIcon>
+                        <div>
+                          <FileUploadText>Click to upload file</FileUploadText>
+                          <FileUploadHint>JPG, PNG, PDF • Max 5MB</FileUploadHint>
+                        </div>
+                      </FileUploadContent>
+                    </FileUploadContainer>
+
+                    {formDataFile.file && (
+                      <UploadedFile>
+                        {formDataFile.file.type && formDataFile.file.type?.startsWith("image/") ? (
+                          <img src={URL.createObjectURL(formDataFile.file)} alt="preview" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} />
+                        ) : (
+                          <FaFileAlt color={theme.colors.text} />
+                        )}
+                        <span title={formDataFile.file.name} style={{ color: theme.colors.text }}>{formDataFile.file.name}</span>
+                        <button type="button" onClick={removeFile}><FaTimes /></button>
+                      </UploadedFile>
                     )}
-                    <span title={formDataFile.file.name} style={{ color: theme.colors.text }}>{formDataFile.file.name}</span>
-                    <button type="button" onClick={removeFile}><FaTimes /></button>
-                  </UploadedFile>
-                )}
-              </FormGroup>
+                  </FormGroup>
+                </>
+              }
             </>
           )}
+
+
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={onSubmit} disabled={isLoading}>
+          <Button variant="outline" onClick={() => { onClose(); setUploadMode("D")}}>Cancel</Button>
+          <Button variant="primary" onClick={() => modalMode === "UPLOAD" ? onSubmit(uploadMode) : onSubmit()} disabled={isButtonDisabled()}>
             {modalMode === "ADD" && <FaPlus style={{ marginRight: 6 }} />}
             {modalMode === "UPDATE" && <HiOutlinePencilAlt style={{ marginRight: 6 }} />}
             {modalMode === "UPLOAD" && <RiUploadCloud2Line style={{ marginRight: 6 }} />}

@@ -4,6 +4,7 @@ import { FaUser, FaLock, FaBuilding } from "react-icons/fa"
 import { useAuth } from "../context/AuthContext"
 import { toast } from "react-toastify"
 import { getCompanyName } from "../services/productServices"
+import { useNavigate } from "react-router-dom"
 
 const fadeIn = keyframes`
   from {
@@ -210,14 +211,17 @@ const Logins = () => {
   const [placeholderdatas, setPlaceholderdatas] = useState("Mobile Number");
   const { customerlogin } = useAuth()
   const path = window.location.pathname;
+  const navigation = useNavigate()
+
   useEffect(() => {
     const fetchCompanyName = async () => {
       const company = await getCompanyName()
       if (company.status === 200) {
-        if (path === "/retainer/login.html") {
+        if (path === "/retainer/login") {
 
           const filter = company.data?.filter(
             (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
+            // (data) => data.ref_cust_name === "Allocation Project Management (Matrix)"
           );
 
           setCompanies(filter);
@@ -241,6 +245,9 @@ const Logins = () => {
       }
     }
     fetchCompanyName()
+    if(localStorage.getItem("customerToken")){
+        navigation("/dashboard")
+      }
   }, [])
 
   const handleChange = (e) => {
@@ -267,11 +274,8 @@ const Logins = () => {
     setTimeout(async () => {
       if (formData.mobile && formData.password) {
         const userData = {
-          id: "1",
-          name: "Ashutosh Mohapatra",
           mobile: formData.mobile,
           password: formData.password,
-          role: "HR Manager",
           company: formData?.company?.split("_").slice(1).join("_") || "Acme Inc.",
         }
         await customerlogin(userData)
@@ -288,7 +292,7 @@ const Logins = () => {
         <BannerContent>
           <BannerTitle>Welcome to Atomwalk</BannerTitle>
           <BannerText>
-            A comprehensive retainer and associate employee management portal.
+            A comprehensive retainer and associate auditors management portal.
           </BannerText>
         </BannerContent>
       </LoginBanner>

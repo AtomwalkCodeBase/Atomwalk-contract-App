@@ -536,25 +536,14 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
   return (
     <SidebarContainer isOpen={isOpen} theme={theme} uiPreferences={uiPreferences}>
       <SidebarHeader isOpen={isOpen} uiPreferences={uiPreferences}>
-        {iscoustomerLogin ? (
-          <Logo isOpen={isOpen} uiPreferences={uiPreferences}>
-            <img
-              src={profile.image || "/placeholder.svg"}
-              alt="Company Logo"
-              style={{ width: "70px", height: "70px", marginRight: "1rem", borderRadius: "50%" }}
-            />
-          </Logo>
-        ) : (
           <Logo isOpen={isOpen} uiPreferences={uiPreferences}>
             <img
               src={"https://atomwalk.com/static/office/image/Atom_walk_logo.jpg"}
               alt="Company Logo"
               style={{ width: "80px", marginRight: "1rem", borderRadius: "10px" }}
-            />{" "}
-            {/* {companyInfo.business_type === "APM" ? "PMT" : fmsdata ? "FMS" : companyInfo.business_type === "LMS" ? "LMS" : "HRMS"} */}
-            CPM
+            />
           </Logo>
-        )}
+
         <ToggleButton onClick={toggleSidebar} uiPreferences={uiPreferences}>
           {isOpen ? <FaTimes /> : <FaBars />}
         </ToggleButton>
