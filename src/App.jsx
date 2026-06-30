@@ -23,6 +23,11 @@ import Logins from "./pages/Login";
 import Hello from "./pages/Hello";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import ActivityListScreen from "./pages/ActivityListScreen";
+import ProfitabilityDashboard from "./pages/ProfitabilityDashboard";
+// import ResourceAllocationList from "./components/modal/ResourceAllocationList";
+// import ResourceAllocation from "./components/modal/ResourceAllocation";
+import ResourceAllocation from "./components/modal/ModifiedAssignedResourceModal";
 
 function App() {
   const url = "https://www.atomwalk.com/rest-auth/login/";
@@ -75,6 +80,11 @@ function App() {
                 >
 
                   <Route path="/dashboard" element={<RetainerScreen />} />
+                  <Route path="/activity" element={<ActivityListScreen />} />
+                  <Route path="/profitability-dashboard" element={<ProfitabilityDashboard />} />
+                  {/* <Route path="/resource-list" element={<ResourceAllocationList />} /> */}
+                  {/* <Route path="/resource-list" element={<ResourceAllocation />} /> */}
+                  <Route path="/resource-list" element={<ResourceAllocation />} />
                   <Route path="/profile" element={<Profile />} />
                 </Route>
 

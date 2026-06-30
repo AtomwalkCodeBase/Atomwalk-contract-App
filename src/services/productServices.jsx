@@ -1,4 +1,4 @@
-import {  processAppointee, setuserpin, getCompany, forgetPin,  profileDtlURL, getCustomerDetailListURL, processAppointeeFileUpload,} from "../services/ConstantServies";
+import {  processAppointee, setuserpin, getCompany, forgetPin,  profileDtlURL, getCustomerDetailListURL, processAppointeeFileUpload, employeeTaskAllocationData, processAllocation, contractAllocationData, processActivityAllocation,} from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosget, authAxiosPost } from "./HttpMethod";
 
 export function getCompanyName(isFms) {
@@ -58,4 +58,19 @@ export async function setuserpinview(o_pin, n_pin) {
 
 export function getemployeeLists(data) {
   return authAxios(profileDtlURL, data)
+}
+
+export function getEmpAllocationData(data) {
+  return authAxios(employeeTaskAllocationData, data)
+}
+
+export function getContractAllocationData(data) {
+  return authAxios(contractAllocationData, data)
+}
+
+export function postAllocationData(activity_data) {
+  return authAxiosFilePost(processAllocation, activity_data);
+}
+export function postActivityAllocationData(activity_data) {
+  return authAxiosFilePost(processActivityAllocation, activity_data);
 }

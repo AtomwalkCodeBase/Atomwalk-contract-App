@@ -82,8 +82,40 @@ const ButtonStyles = css`
     `
     width: 100%;
   `}
+
+   ${(props) =>
+    props.customColor && !props.variant?.includes("Ghost") && // For solid buttons
+    `
+    background: ${props.customColor};
+    color: white;
+    
+    &:hover {
+      background: ${props.customColor}dd;
+    }
+    
+    &:active {
+      background: ${props.customColor}ee;
+    }
+  `}
+ 
+  ${(props) =>
+    props.customColor && props.variant?.includes("Ghost") &&
+    `
+    background: transparent;
+    color: ${props.customColor};
+    border: 1px solid ${props.customColor};
+    
+    &:hover {
+      background: ${props.customColor}22;
+    }
+    
+    &:active {
+      background: ${props.customColor}44;
+    }
+  `}
   
   ${(props) =>
+    !props.customColor &&
     props.variant === "primary" &&
     `
     background: ${props.theme.colors.primary};
@@ -99,6 +131,7 @@ const ButtonStyles = css`
   `}
   
   ${(props) =>
+    !props.customColor &&
     props.variant === "secondary" &&
     `
     background: ${props.theme.colors.secondary};
@@ -114,6 +147,7 @@ const ButtonStyles = css`
   `}
   
   ${(props) =>
+    !props.customColor &&
     props.variant === "outline" &&
     `
     background: transparent;
@@ -129,11 +163,12 @@ const ButtonStyles = css`
     }
   `}
    ${(props) =>
+    !props.customColor &&
      props.variant === "outlines" &&
      `
     background: transparent;
     color: ${props.theme.colors.error};
-    border: 1px solid ${props.theme.colors.primary};
+    border: 1px solid ${props.theme.colors.error};
     
     &:hover {
       background: ${props.theme.colors.primaryLight};
@@ -145,6 +180,7 @@ const ButtonStyles = css`
   `}
   
   ${(props) =>
+    !props.customColor &&
     props.variant === "ghost" &&
     `
     background: transparent;
@@ -158,10 +194,48 @@ const ButtonStyles = css`
       background: ${props.theme.colors.primaryLight}aa;
     }
   `}
+
+${(props) =>
+  !props.customColor &&
+    props.variant === "success" &&
+    `
+    background: ${props.theme.colors.success};
+    color: white;
+    
+    &:hover {
+      background: ${props.theme.colors.success}dd;
+    }
+    
+    &:active {
+      background: ${props.theme.colors.success}aa;
+    }
+  `}
+
+  ${(props) =>
+    !props.customColor &&
+    props.variant === "successGhost" &&
+    `
+    background: transparent;
+    color: ${props.theme.colors.success};
+    border: 1px solid ${props.theme.colors.success};
+    
+    &:hover {
+      background: ${props.theme.colors.success}22;
+    `}
   
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
+    background-color: ${(props) => props.theme.colors.disabled || "#d0d0d0"};
+    color: ${(props) => props.theme.colors.disabledText || "#888888"};
+    border-color: ${(props) => props.theme.colors.disabled || "#d0d0d0"};
+    
+    &:hover, &:active {
+      background-color: ${(props) => props.theme.colors.disabled || "#d0d0d0"};
+      color: ${(props) => props.theme.colors.disabledText || "#888888"};
+      border-color: ${(props) => props.theme.colors.disabled || "#d0d0d0"};
+      transform: none;
+    }
   }
   
   svg {
@@ -206,6 +280,8 @@ const Button = ({
   fullWidth = false,
   iconOnly = false,
   as = "button",
+  customColor,
+  disabled = false,
   ...props
 }) => {
   const { theme, uiPreferences } = useTheme();
@@ -215,8 +291,10 @@ const Button = ({
     size,
     fullWidth,
     iconOnly,
+    disabled,
     theme,
     uiPreferences,
+    customColor,
     ...props,
   }
 

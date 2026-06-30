@@ -28,3 +28,8 @@ export const profileDtlURL = `${newhrendpoint}/get_employee_list/${db_name}/`;
 export const profileInfoURL = `${endpoint}/profile_info/${db_name}/`;
 export const processAppointee = `${newhrendpoint}/process_employee_job/${db_name}/`;
 export const processAppointeeFileUpload = `${newhrendpoint}/process_employee_file/${db_name}/`;
+
+export const employeeTaskAllocationData = `${newhrendpoint}/get_emp_allocation_data/${db_name}/`;
+export const processActivityAllocation = `${newhrendpoint}/process_emp_allocation/${db_name}/`;
+export const processAllocation = `${newhrendpoint}/process_contract_allocation/${db_name}/`;
+export const contractAllocationData = `${newhrendpoint}/get_contract_allocation_data/${db_name}/`;

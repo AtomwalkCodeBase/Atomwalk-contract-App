@@ -74,12 +74,12 @@ export const AuthProvider = ({ children }) => {
         const user = localStorage.getItem("customerUser")
         setCurrentUser(user)
         toast.success("Login successful!");
-        window.location.href = "/retainer/dashboard";
+        window.location.href = "/retainer/activity";
       }
     }
     catch (error) {
       console.log("Login error:", error.response.data.error);
-      toast.error(error.response.data.error);
+      toast.error(error.response.data.error || "Failed to login. try again later !!!");
     }
   }
 

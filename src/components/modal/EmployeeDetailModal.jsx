@@ -141,9 +141,22 @@ const Field = styled.div`
   align-items: flex-start;
   gap: 10px;
   padding: ${theme.spacing.sm} ${theme.spacing.md};
-  background: ${theme.colors.background};
+
+  background: ${({ is_verified, theme }) =>
+    is_verified === true
+      ? `${theme.colors.success}20`
+      : is_verified === false
+      ? `${theme.colors.error}20`
+      : theme.colors.background};
+
   border-radius: ${theme.borderRadius.lg};
-  border: 1px solid ${theme.colors.border};
+
+  border: 1px solid ${({ is_verified, theme }) =>
+    is_verified === true
+      ? `${theme.colors.success}40`
+      : is_verified === false
+      ? `${theme.colors.error}40`
+      : theme.colors.border};
 
   ${({ $full }) => $full && `grid-column: 1 / -1;`}
 `;
@@ -152,8 +165,15 @@ const FieldIcon = styled.div`
   width: 28px;
   height: 28px;
   border-radius: ${theme.borderRadius.md};
-  background: ${theme.colors.primaryLight};
-  color: ${theme.colors.primary};
+  background: ${({ is_verified, theme }) =>
+    is_verified === true
+      ? theme.colors.success
+      : is_verified === false
+      ? theme.colors.error
+      : theme.colors.primaryLight};
+  /* color: ${theme.colors.primary}; */
+  color: ${({ is_verified, theme }) => is_verified === true || is_verified === false ? theme.colors.card : theme.colors.primary};
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -369,8 +389,8 @@ const GovtIDProof = proofType(employee.ref_govt_id_number)
           <div>
             <SectionLabel>Finance Team Remark</SectionLabel>
             <Grid>
-              <Field $full>
-                <FieldIcon><HiOutlinePencilAlt /></FieldIcon>
+              <Field $full is_verified={employee.is_verified}>
+                <FieldIcon is_verified={employee.is_verified}><HiOutlinePencilAlt /></FieldIcon>
                 <FieldContent>
                   <FieldLabel>
                     {employee.is_verified ? "Verify Remark" : "Reject Remark"}

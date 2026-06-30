@@ -544,7 +544,8 @@ const RetainerScreen = () => {
               </tr>
             ) : paginatedActivities.length ? (
               paginatedActivities.map((employee) =>
-              (<tr key={employee.id}>
+              (
+              <tr key={employee.id}>
                 <td>{employee.emp_id}<br /><Badge variant={employee.gender === "M" ? "settle" : "pink"}>{employee.additional_ref_number || "--"}</Badge></td>
                 <td>{employee.name}</td>
                 <td>{employee.mobile_number || "--"}</td>
@@ -602,7 +603,8 @@ const RetainerScreen = () => {
                     </Button>
                   </BUttonGroup>
                 </td>
-              </tr>))) : (
+              </tr>
+               ))) : (
               <tr>
                 <td colSpan={7} style={{ textAlign: "center", padding: "1rem" }}>
                   No data found

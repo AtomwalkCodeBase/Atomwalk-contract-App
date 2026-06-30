@@ -26,6 +26,8 @@ import {
   FaTasks,
   FaList,
   FaFileInvoiceDollar,
+  FaListUl,
+  FaMoneyBillWaveAlt,
 } from "react-icons/fa"
 import { SiGooglecalendar } from "react-icons/si"
 import { PiListPlusFill } from "react-icons/pi"
@@ -494,7 +496,8 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
         name: "Customer Portal",
         icon: <FaUserCircle />,
         items: [
-          { path: "/dashboard", name: "Retainer Dashboard", icon: <FaHome /> },
+          { path: "/activity", name: "Activity List", icon: <FaHome /> },
+          { path: "/dashboard", name: "Retainer Dashboard", icon: <FaListUl /> },
           // { path: "/finance_user", name: "Approve Dashboard", icon: <FaHome /> },
         ],
       },
@@ -529,7 +532,9 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
     }, 100)
   }
   const menuItems =  [
-      { path: "/dashboard", name: "Retainer Dashboard", icon: <FaHome /> },
+    { path: "/activity", name: "Activity List", icon: <FaHome /> },
+      { path: "/dashboard", name: "Retainer Dashboard", icon: <FaListUl /> },
+      { path: "/profitability-dashboard", name: "Profitability Dashboard", icon: <FaMoneyBillWaveAlt /> },
     ]
    
 
