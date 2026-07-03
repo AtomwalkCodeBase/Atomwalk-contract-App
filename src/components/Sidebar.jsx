@@ -28,6 +28,7 @@ import {
   FaFileInvoiceDollar,
   FaListUl,
   FaMoneyBillWaveAlt,
+  FaMoneyBill,
 } from "react-icons/fa"
 import { SiGooglecalendar } from "react-icons/si"
 import { PiListPlusFill } from "react-icons/pi"
@@ -534,6 +535,7 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
   const menuItems =  [
     { path: "/activity", name: "Activity List", icon: <FaHome /> },
       { path: "/dashboard", name: "Retainer Dashboard", icon: <FaListUl /> },
+      { path: "/clam-list", name: "clams", icon: <FaMoneyBill /> },
       { path: "/profitability-dashboard", name: "Profitability Dashboard", icon: <FaMoneyBillWaveAlt /> },
     ]
    

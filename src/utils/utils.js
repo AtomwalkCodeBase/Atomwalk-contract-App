@@ -192,6 +192,38 @@ export const getMonthRange = ({ type = "current", mode = "month", offset = 0, we
   };
 };
 
+export const formatDate2 = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+
+  return `${y}-${m}-${d}`;
+};
+
+export const getWeekRange = (weekValue) => {
+  const [year, week] = weekValue.split("-W").map(Number);
+
+  const firstDay = new Date(year, 0, 1);
+
+  const days = (week - 1) * 7;
+
+  const start = new Date(firstDay.getTime() + days * 86400000);
+
+  const day = start.getDay();
+
+  const diff = day === 0 ? -6 : 1 - day;
+
+  start.setDate(start.getDate() + diff);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    start: formatDate(start),
+    end: formatDate(end),
+  };
+};
+
 export const buildActivityGroupMap = (apiData = []) => {
   if (!Array.isArray(apiData) || apiData.length === 0) return [];
 
@@ -696,50 +728,50 @@ export const splitAllocationForEdit = (row, targetDate) => {
     return rows;
 };
 
-export const buildPayloads = (workingAllocations) => {
-    const addPayload = [];
-    const updatePayload = [];
-    const deletePayload = [];
+// export const buildPayloads = (workingAllocations) => {
+//     const addPayload = [];
+//     const updatePayload = [];
+//     const deletePayload = [];
 
-    workingAllocations.forEach(row => {
+//     workingAllocations.forEach(row => {
       
-      // ADD
-        if (row.action === "ADD") {
-            addPayload.push({
-                emp_id: row.emp_id,
-                emp_type: row.emp_type,
-                start_date: DateForApiFormate(row.start_date),
-                end_date: DateForApiFormate(row.end_date),
-                remarks: row.remarks || "",
-                contract_rate:Number(row.contract_rate) || 0
-            });
+//       // ADD
+//         if (row.action === "ADD") {
+//             addPayload.push({
+//                 emp_id: row.emp_id,
+//                 emp_type: row.emp_type,
+//                 start_date: DateForApiFormate(row.start_date),
+//                 end_date: DateForApiFormate(row.end_date),
+//                 remarks: row.remarks || "",
+//                 contract_rate:Number(row.contract_rate) || 0
+//             });
         
-          }
+//           }
            
-          // UPDATE
-        else if ( row.action === "UPDATE" && row.id) {
-            updatePayload.push({
-                id: row.id,
-                emp_id: row.emp_id,
-                emp_type: row.emp_type,
-                start_date: DateForApiFormate(row.start_date),
-                end_date: DateForApiFormate(row.end_date),
-                remarks: row.remarks || "",
-                contract_rate:Number(row.contract_rate) || 0,
-                is_updated: true
-            });
-        }
+//           // UPDATE
+//         else if ( row.action === "UPDATE" && row.id) {
+//             updatePayload.push({
+//                 id: row.id,
+//                 emp_id: row.emp_id,
+//                 emp_type: row.emp_type,
+//                 start_date: DateForApiFormate(row.start_date),
+//                 end_date: DateForApiFormate(row.end_date),
+//                 remarks: row.remarks || "",
+//                 contract_rate:Number(row.contract_rate) || 0,
+//                 is_updated: true
+//             });
+//         }
 
-            // DELETE
-        else if (row.action === "DELETE" && row.id) {
-            deletePayload.push({
-                id: row.id,
-                is_deleted: true
-            });
-        }
-    });
-    return { addPayload, updatePayload, deletePayload };
-};
+//             // DELETE
+//         else if (row.action === "DELETE" && row.id) {
+//             deletePayload.push({
+//                 id: row.id,
+//                 is_deleted: true
+//             });
+//         }
+//     });
+//     return { addPayload, updatePayload, deletePayload };
+// };
 
 export const mergeAllocations = (allocations = []) => {
 
@@ -878,3 +910,291 @@ export const groupDatesIntoRanges = (dates = []) => {
   return ranges;
 
 };
+
+const parseComparable = (s) => {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+ 
+const formatComparable = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+};
+ 
+/** Local, timezone-safe replacement for generateDatesBetween that stays in YYYY-MM-DD. */
+export const datesBetweenComparable = (startStr, endStr) => {
+  if (!startStr || !endStr) return [];
+  const dates = [];
+  let cur = parseComparable(startStr);
+  const end = parseComparable(endStr);
+  while (cur <= end) {
+    dates.push(formatComparable(cur));
+    cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+  }
+  return dates;
+};
+ 
+/**
+ * SINGLE SOURCE OF TRUTH MODEL
+ * -----------------------------------------------------------------------
+ * workingAllocations  -> current UI state, NO action/status flags on it.
+ * originalAllocations -> frozen snapshot of what's actually in the DB,
+ *                         loaded once per loadAllData() call.
+ *
+ * ADD / UPDATE / DELETE are computed by diffing the two, never stored.
+ * A row's id === null means "never existed in DB" -> always becomes ADD
+ * or simply disappears if removed (no DELETE payload possible for it).
+ * A row's id !== null means "tied to a DB record" -> UPDATE if changed,
+ * DELETE if its id is missing from workingAllocations entirely.
+ * -----------------------------------------------------------------------
+ */
+ 
+const addDays = (dateStr, n) => {
+  const d = parseComparable(dateStr);
+  d.setDate(d.getDate() + n);
+  return formatComparable(d);
+};
+ 
+const isNextDay = (a, b) => {
+  const diff = (parseComparable(b) - parseComparable(a)) / (1000 * 60 * 60 * 24);
+  return diff === 1;
+};
+ 
+/** Map: emp_id -> { 'YYYY-MM-DD': original_db_id } based on the DB snapshot. */
+export const buildOwnershipMap = (originalAllocations) => {
+  const map = {};
+  originalAllocations.forEach((row) => {
+    if (!map[row.emp_id]) map[row.emp_id] = {};
+    datesBetweenComparable(row.start_date, row.end_date).forEach((d) => {
+      map[row.emp_id][d] = row.id;
+    });
+  });
+  return map;
+};
+ 
+/**
+ * Given the full set of dates an employee should be active on, rebuilds
+ * their rows as contiguous ranges, cutting at any date whose "owner id"
+ * (per the DB snapshot) changes. This is what keeps ids attached to the
+ * correct portion of a range no matter how many times it's been toggled.
+ */
+export const recomputeEmployeeRows = ({
+  empId,
+  activeDates,
+  ownershipMap,
+  employeeMeta,
+  existingRowsForEmp,
+}) => {
+  const sortedDates = [...new Set(activeDates)].sort();
+  if (sortedDates.length === 0) return [];
+ 
+  const ownerOf = (d) => ownershipMap[empId]?.[d] ?? null;
+ 
+  const byId = {};
+  existingRowsForEmp.forEach((r) => {
+    if (r.id != null) byId[r.id] = r;
+  });
+  const fallback = existingRowsForEmp[0] || employeeMeta;
+ 
+  const rows = [];
+  let segStart = sortedDates[0];
+  let segOwner = ownerOf(segStart);
+  let prev = segStart;
+ 
+  const pushSeg = (start, end, owner) => {
+    const base = (owner != null && byId[owner]) || fallback;
+    rows.push({
+      rowKey: owner != null ? `existing_${owner}` : crypto.randomUUID(),
+      id: owner,
+      emp_id: empId,
+      employee_name: base.employee_name || employeeMeta.employee_name,
+      emp_type: base.emp_type || employeeMeta.emp_type,
+      remarks: base.remarks || "",
+      contract_rate: base.contract_rate ?? employeeMeta.contract_rate ?? 0,
+      start_date: start,
+      end_date: end,
+      is_approved: !!base.is_approved,
+    });
+  };
+ 
+  for (let i = 1; i < sortedDates.length; i++) {
+    const d = sortedDates[i];
+    const owner = ownerOf(d);
+    if (isNextDay(prev, d) && owner === segOwner) {
+      prev = d;
+      continue;
+    }
+    pushSeg(segStart, prev, segOwner);
+    segStart = d;
+    segOwner = owner;
+    prev = d;
+  }
+  pushSeg(segStart, prev, segOwner);
+ 
+  return rows;
+};
+ 
+/**
+ * Splits a single row at targetDate.
+ * mode 'EDIT'   -> isolates targetDate into its own editable row.
+ * mode 'DELETE' -> drops targetDate entirely.
+ *
+ * Rule (Option B, per spec): ONLY the portion before targetDate can keep
+ * the original id and becomes an UPDATE. Everything from targetDate
+ * onward is treated as new (id:null) and becomes an ADD. If nothing is
+ * before targetDate, the id simply vanishes from workingAllocations,
+ * which buildPayloads() will correctly turn into a DELETE.
+ */
+export const splitRangeAtDate = (row, targetDate, mode) => {
+  const segments = [];
+  const hasBefore = targetDate > row.start_date;
+  const hasAfter = targetDate < row.end_date;
+ 
+  if (hasBefore) {
+    segments.push({
+      ...row,
+      id: row.id,
+      rowKey: row.id != null ? `existing_${row.id}` : crypto.randomUUID(),
+      end_date: addDays(targetDate, -1),
+    });
+  }
+ 
+  if (mode === "EDIT") {
+    segments.push({
+      ...row,
+      id: null,
+      rowKey: crypto.randomUUID(),
+      start_date: targetDate,
+      end_date: targetDate,
+      __isEditTarget: true,
+    });
+  }
+  // mode === 'DELETE': targetDate is simply omitted, no segment pushed.
+ 
+  if (hasAfter) {
+    segments.push({
+      ...row,
+      id: null,
+      rowKey: crypto.randomUUID(),
+      start_date: addDays(targetDate, 1),
+    });
+  }
+ 
+  return segments;
+};
+ 
+/**
+ * Auto-merge pass: run after any mutation so adjacent same-employee rows
+ * with identical fields collapse back into one continuous range.
+ * Only one row per employee-run can carry a real id.
+ */
+export const mergeAdjacentRows = (allocations) => {
+  const byEmp = {};
+  allocations.forEach((r) => {
+    if (!byEmp[r.emp_id]) byEmp[r.emp_id] = [];
+    byEmp[r.emp_id].push(r);
+  });
+ 
+  const merged = [];
+  Object.values(byEmp).forEach((rows) => {
+    const sorted = [...rows].sort((a, b) => a.start_date.localeCompare(b.start_date));
+    let current = null;
+    sorted.forEach((row) => {
+      const sameFields =
+        current &&
+        isNextDay(current.end_date, row.start_date) &&
+        current.emp_type === row.emp_type &&
+        (current.remarks || "") === (row.remarks || "") &&
+        (current.id == null || row.id == null || current.id === row.id);
+ 
+      if (sameFields) {
+        const keepId = current.id ?? row.id;
+        current = {
+          ...current,
+          id: keepId,
+          end_date: row.end_date,
+          rowKey: keepId != null ? `existing_${keepId}` : current.rowKey,
+        };
+      } else {
+        if (current) merged.push(current);
+        current = { ...row };
+      }
+    });
+    if (current) merged.push(current);
+  });
+  return merged;
+};
+ 
+/** Status is only ever used for UI badges — never stored. */
+export const getRowStatus = (row, originalById) => {
+  if (row.id == null) return "ADD";
+  const original = originalById[row.id];
+  if (!original) return "ADD";
+  const changed =
+    row.start_date !== original.start_date ||
+    row.end_date !== original.end_date ||
+    row.emp_type !== original.emp_type ||
+    (row.remarks || "") !== (original.remarks || "");
+  return changed ? "UPDATE" : "ORIGINAL";
+};
+ 
+/** The actual diff. This is the only place ADD/UPDATE/DELETE get decided. */
+export const buildPayloads = (workingAllocations, originalAllocations) => {
+  const originalById = {};
+  originalAllocations.forEach((r) => {
+    originalById[r.id] = r;
+  });
+ 
+  const addPayload = [];
+  const updatePayload = [];
+  const seenIds = new Set();
+ 
+  workingAllocations.forEach((row) => {
+    const rateNum = row.contract_rate ? parseFloat(row.contract_rate) : 0;
+ 
+    if (row.id == null) {
+      addPayload.push({
+        emp_id: row.emp_id,
+        emp_type: row.emp_type,
+        start_date: DateForApiFormate(row.start_date),
+        end_date: DateForApiFormate(row.end_date),
+        remarks: row.remarks || "",
+        contract_rate: rateNum,
+      });
+      return;
+    }
+ 
+    seenIds.add(row.id);
+    const original = originalById[row.id];
+    if (!original) return; // defensive: id present but not in snapshot
+ 
+    const changed =
+      row.start_date !== original.start_date ||
+      row.end_date !== original.end_date ||
+      row.emp_type !== original.emp_type ||
+      (row.remarks || "") !== (original.remarks || "") ||
+      String(row.contract_rate ?? "") !== String(original.contract_rate ?? "");
+ 
+    if (changed) {
+      updatePayload.push({
+        id: row.id,
+        emp_id: row.emp_id,
+        emp_type: row.emp_type,
+        start_date: DateForApiFormate(row.start_date),
+        end_date: DateForApiFormate(row.end_date),
+        remarks: row.remarks || "",
+        contract_rate: rateNum,
+        is_updated: true,
+      });
+    }
+  });
+ 
+  const deletePayload = originalAllocations
+    .filter((o) => !seenIds.has(o.id))
+    .map((o) => ({ id: o.id, is_deleted: true }));
+ 
+  return { addPayload, updatePayload, deletePayload };
+};
+ 

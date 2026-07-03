@@ -11,6 +11,7 @@ import { theme } from '../styles/Theme'
 import Badge from '../components/Badge'
 import OrderDetailModal from '../components/modal/OrderDetailModal'
 import Card from '../components/Card'
+import { useNavigate } from 'react-router-dom'
 
 const StatsGrid = styled.div`
   display: grid;
@@ -82,6 +83,7 @@ const stats_card = [
 const column = [<>Customer<br />Order Item ID</>, "No of resource", "Order status", "Payment Status", "Payout Amount", "OPE Amount", "Actions"]
 
 const ProfitabilityDashboard = () => {
+  const navigate = useNavigate();
     const [isOpeModalOpen, setIsOpeModalOpen] = useState(false);
     
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -91,7 +93,7 @@ const ProfitabilityDashboard = () => {
       const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(data, 10)
 
   return (
-    <Layout title="Profitability Dashboard">
+    <Layout title="Receivable Dashboard">
         <StatsGrid>
 
         {stats_card.map((stats) => (
@@ -116,13 +118,13 @@ const ProfitabilityDashboard = () => {
                       <ResourceCount variant="primary">{orders?.planned_ex || 0}</ResourceCount> EX
                     </ResourcesValue>
                   </ResourcesRow>
-                  <ResourcesRow variant="success">
+                  {/* <ResourcesRow variant="success">
                     <ResourcesLabel variant="success">A:</ResourcesLabel>
                     <ResourcesValue>
                       <ResourceCount variant="success">{orders?.actual_tl || 0}</ResourceCount> TL /
                       <ResourceCount variant="success">{orders?.actual_ex || 0}</ResourceCount> EX
                     </ResourcesValue>
-                  </ResourcesRow>
+                  </ResourcesRow> */}
                  </Td>
                 <Td>
                     <Badge variant={orders?.order_status === "Completed" ? "success" : orders?.order_status === "Pending" ? "warning" : "info"}>{orders?.order_status}</Badge>
@@ -133,7 +135,9 @@ const ProfitabilityDashboard = () => {
                 <Td>{orders?.payout_amount}</Td>
                 <Td>{orders?.ope_amount}</Td>
                 <Td>
-                    <Button onClick={() => { setIsOpeModalOpen(true)}}>View</Button>
+                    <Button onClick={() => navigate("/clamDetails", { state: { data: orders },})}>
+                  View
+                </Button>
                 </Td>
                 </>
 
@@ -151,11 +155,11 @@ const ProfitabilityDashboard = () => {
         />
 </Card>
 
-        <OrderDetailModal
+        {/* <OrderDetailModal
   isOpen={isOpeModalOpen}
   onClose={() => setIsOpeModalOpen(false)}
   data={profitabilityDashboard.order_detail_page}
-/>
+/> */}
 
 
 

@@ -192,7 +192,7 @@ export const ResourceAvailability = ({
   }, [dayWindow]);
 
   return (
-    <Card
+    <Card hoverable={false}
       title={`Resource Availability (${formatDate(activityStart)} – ${formatDate(activityEnd)}})`}
     >
       <InfoStrip>
@@ -289,8 +289,9 @@ export const ResourceAvailability = ({
                 const isAssigned = !!employeeDateMap[emp.emp_id]?.[dStr];
 
                 const isBusy = !!busyDateMap[emp.emp_id]?.[dStr];
-                // console.log("busyDateMap", busyDateMap)
-                // console.log("dStr", dStr)
+                console.log("busyDateMap", busyDateMap)
+                console.log("employeeDateMap", JSON.stringify(employeeDateMap))
+                console.log("dStr", dStr)
 
                 const disabled = isBusy && !isAssigned;
                 const isAfterEnd = activityEnd ? (dStr > DateForApiFormate(activityEnd, true)) : false;
@@ -301,11 +302,10 @@ export const ResourceAvailability = ({
                     {/* {isBusy ? '❌' : '✅' } */}
                     <input
                       type="checkbox"
-                      checked={isAssigned}
-                      // checked={true}
-                      disabled={disabled}
+                      checked={isAssigned || isBusy}
+                      disabled={isBusy}
                       onChange={(e) => handleToggleAllocation(emp, dStr, e.target.checked)}
-                      style={{ width: 16, height: 16, accentColor: '#6C5CE7', cursor: disabled ? 'not-allowed' : 'pointer' }}
+                      style={{ width: 16, height: 16, accentColor: '#6C5CE7', cursor: isBusy ? 'not-allowed' : 'pointer' }}
                       title={isAssigned ? 'Already assigned on this date' : (isBusy ? 'Not available on this date' : (isAfterEnd ? 'After activity end date' : 'Click to select'))}
                     />
                   </Td>

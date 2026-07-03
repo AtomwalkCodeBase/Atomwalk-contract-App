@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import styled from 'styled-components';
 import Card from '../components/Card';
-import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, formatWeekLabel } from '../utils/utils';
+import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, formatWeekLabel, getWeekRange, formatDate2 } from '../utils/utils';
 import { getEmpAllocationData } from '../services/productServices';
 import { toast } from 'react-toastify';
 import Button from '../components/Button';
@@ -21,6 +21,7 @@ import { AssignEmployee } from '../components/modal/Assignemployee';
 import { useNavigate } from 'react-router-dom';
 import { FaClipboardList, FaUserCheck, FaUsers, FaUserTimes } from 'react-icons/fa';
 import StatsCard from '../components/StatsCard';
+import Tabs from '../components/Tabs';
 
 const Tagline = styled.p`
  color: ${({ theme }) => theme.colors.textLight};
@@ -267,9 +268,9 @@ const StatsGrid = styled.div`
 `;
 
 
-const parseDateSafe = (dateStr) => {
-  if (!dateStr) return null;
-  return parse(dateStr, "dd-MMM-yyyy", new Date());
+const parseDate = (dateStr) => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
 };
 
 const activityColumn = [<>Customer<br />Order Item ID</>, "Audit Type", "Planned Date", "Resources", "Status", "Actions"]
@@ -291,6 +292,7 @@ function getMatchingRetainerList(original_P = {}) {
 }
 
 const ActivityListScreen = () => {
+  const today = new Date();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState(null);
@@ -301,16 +303,116 @@ const ActivityListScreen = () => {
   const [filter, setFilter] = useState({ search: "", status: "" })
 
   const [assignedActivity, setAssignedActivity] = useState([]);
+  const [tab, setTab] = useState("month")
   const [activeRangeType, setActiveRangeType] = useState("month");
   const [offset, setOffset] = useState(0);
   const emp_id = localStorage.getItem("cust_emp_id");
   const [dateRange, setDateRange] = useState(() => getMonthRange({ type: "current", mode: "month" }));
+  const [selectedDate, setSelectedDate] = useState(today.toISOString().split("T")[0]);
 
   useEffect(() => {
     if (emp_id) {
       fetchEmpAllocationData()
     }
   }, [emp_id]);
+
+
+  const getCurrentMonth = () =>
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+  const getCurrentWeek = () => {
+    const date = new Date(today);
+    const day = date.getDay() || 7;
+    date.setDate(date.getDate() + 4 - day);
+
+    const yearStart = new Date(date.getFullYear(), 0, 1);
+    const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+
+    return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
+  };
+
+const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
+
+const handleMonthChange = (e) => {
+  const value = e.target.value;
+
+  setSelectedMonth(value);
+
+  const [year, month] = value.split("-").map(Number);
+
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+
+  const range = {
+    start: formatDate2(start),
+    end: formatDate2(end),
+  };
+
+  setDateRange(range);
+  fetchEmpAllocationData(range.start, range.end);
+};
+
+const handleWeekChange = (e) => {
+  const value = e.target.value;
+
+  setSelectedWeek(value);
+
+  const range = getWeekRange(value);
+  
+  const formattedRange = {
+    start: formatDate2(new Date(range.start)),
+    end: formatDate2(new Date(range.end)),
+  };
+
+  setDateRange(formattedRange);
+  fetchEmpAllocationData(formattedRange.start, formattedRange.end);
+};
+
+const handleDateChange = (e) => {
+  const value = e.target.value;
+  setSelectedDate(value);
+
+  const start = new Date(value);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const range = {
+    start: formatDate2(start),
+    end: formatDate2(end),
+  };
+
+  setDateRange(range);
+  fetchEmpAllocationData(range.start, range.end);
+};
+const handleRangeChange = (type) => {
+  setActiveRangeType(type);
+
+  if (type === "month") {
+    const [year, month] = selectedMonth.split("-").map(Number);
+
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+
+    const range = {
+      start: formatDate2(start),
+      end: formatDate2(end),
+    };
+
+    setDateRange(range);
+    fetchEmpAllocationData(range.start, range.end);
+  } else {
+    const range = getWeekRange(selectedWeek);
+    
+    const formattedRange = {
+      start: formatDate2(new Date(range.start)),
+      end: formatDate2(new Date(range.end)),
+    };
+
+    setDateRange(formattedRange);
+    fetchEmpAllocationData(formattedRange.start, formattedRange.end);
+  }
+};
 
   const fetchEmpAllocationData = async (startOverride, endOverride) => {
     const emp_id = localStorage.getItem("cust_emp_id")
@@ -360,7 +462,7 @@ const ActivityListScreen = () => {
 
   const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(FilteredData, 10)
 
-  console.log("filteredActivities", filteredActivities)
+  // console.log("filteredActivities", filteredActivities)
 
   const handleViewOPE = (employee, e) => {
     e.stopPropagation();
@@ -392,13 +494,13 @@ const ActivityListScreen = () => {
   console.log("filteredActivities", filteredActivities)
   // console.log("expandedRowId", expandedRowId)
 
-  const handleRangeChange = (type) => {
-    setActiveRangeType(type);
-    setOffset(0);
-    const range = getMonthRange({ type: "current", mode: type, offset: 0 });
-    setDateRange(range);
-    fetchEmpAllocationData(range.start, range.end);
-  };
+  // const handleRangeChange = (type) => {
+  //   setActiveRangeType(type);
+  //   setOffset(0);
+  //   const range = getMonthRange({ type: "current", mode: type, offset: 0 });
+  //   setDateRange(range);
+  //   fetchEmpAllocationData(range.start, range.end);
+  // };
 
   const handleNavigate = (direction) => {
     const newOffset = offset + direction;
@@ -410,30 +512,52 @@ const ActivityListScreen = () => {
 
   const getStatusCount = (arr, status) => {
     return arr.filter(item => item.statusDisplay === status).length;
-  };
+  }
 
-  const assignedCount = getStatusCount(filteredActivities, "Completed");
+
   const notAssignedCount = getStatusCount(filteredActivities, "Not Assigned");
+  // const assignedCount = getStatusCount(filteredActivities, "Not Started", "Completed");
+  const notStartedCount = getStatusCount(filteredActivities, "Not Started");
+  const completedCount = getStatusCount(filteredActivities, "Completed");
 
   const statsData = [
+      // value={filter.status}
+      //       onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
     {
       icon: <FaClipboardList />,
       label: "Total Activity",
       value: filteredActivities.length,
       color: "primary",
+      onClick: (prev) => setFilter({ ...prev, status: "ALL" }),
     },
     {
       icon: <FaUserTimes />,
       label: "Not Assigned",
       value: notAssignedCount,
       color: "error",
+      onClick: (prev) => setFilter({ ...prev, status: "NA" }),
     },
     {
       icon: <FaUserCheck />,
-      label: "Activity Completed",
-      value: assignedCount,
+      label: "Assigned",
+      value: notStartedCount + completedCount,
       color: "success",
+      sections: [
+        {
+          items: [
+            { label: "Not Started", value: notStartedCount, status: "warning", subStatus: "NS" },
+            { label: "Completed", value: completedCount, status: "success", subStatus: "C" }
+          ]
+        },
+      ],
+      onClick: (prev) => setFilter({ ...prev, status: "VERIFIED" }),
+      onItemClick: (item) => setFilter({ ...item, status: item.subStatus }),
     },
+  ]
+
+  const TABS = [
+    {key: "month", label: "Monthly view"},
+    {key: "week", label: "Weekly view"}
   ]
 
   return (
@@ -442,7 +566,7 @@ const ActivityListScreen = () => {
         <Tagline>Track and manage your assigned audit tasks</Tagline>
         <div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: "flex-end" }}>
+          {/* <div style={{ display: 'flex', gap: '0.5rem', justifyContent: "flex-end" }}>
             <Button
               variant={activeRangeType === 'month' ? 'primary' : 'outline'}
               onClick={() => handleRangeChange('month')}
@@ -467,19 +591,45 @@ const ActivityListScreen = () => {
             <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(1)}>
               Next &gt;
             </Button>
-          </div>
+          </div> */}
 
         </div>
       </ClaimsHeader>
 
       <StatsGrid>
         {statsData.map((stats) =>
-          <StatsCard icon={stats.icon} label={stats.label} value={stats.value} color={stats.color} />)}
+          <StatsCard icon={stats.icon} label={stats.label} value={stats.value} color={stats.color}
+            sections={stats?.sections} onClick={() => { stats?.onClick(); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); }} onItemClick={(item) => { stats.onItemClick(item); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) }}
+          />)}
       </StatsGrid>
 
       <Card>
-        <FilterRow>
+        <Tabs tabs={TABS} activeTab={tab}  setActiveTab={(value) => {
+    setTab(value);
+    handleRangeChange(value);
+  }} />
+         {/* {tab === "week" && 
+       <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.1rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(-1)}>
+              &lt; Prev
+            </Button>
+            <span>
+              {activeRangeType === 'month' ? formatMonthLabel(dateRange.start) : formatWeekLabel(dateRange.start, dateRange.end)}
+            </span>
+            <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(1)}>
+              Next &gt;
+            </Button>
+          </div>
+       
+       } */}
+
+        
+        <FilterRow style={{marginBottom: "1rem"}}>
           <SearchBox type="text" placeholder="Search Auditor's name, ID..." value={filter.search} onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value, }))} />
+          {tab === "month" && ( <DateInput type="month" value={selectedMonth} onChange={handleMonthChange}/>)}
+
+          {tab === "week" && ( <DateInput type="week" value={selectedWeek} onChange={handleWeekChange} />)}
+            
           <FilterSelect
             name="status"
             value={filter.status}
@@ -503,6 +653,7 @@ const ActivityListScreen = () => {
         <DataTable
           columns={activityColumn}
           data={paginatedData.reverse()}
+          isLoading={isLoading}
           renderRow={(employee) => {
             const displayPlannedDate = () => {
               if (employee.planned_start_date === employee.planned_end_date) {
@@ -549,7 +700,8 @@ const ActivityListScreen = () => {
                       {isResourceAssigned ? "Planned" : "Assign"} Resources
                     </Button> */}
                     <Button variant={`${isResourceAssigned ? 'outline' : 'primary'}`} onClick={(e) => handleAssignResources1(employee, e)}>
-                      {isResourceAssigned ? "Planned" : "Assign"} Resources
+                      {/* {isResourceAssigned ? "Planned" : "Assign"} Resources */}
+                      {isResourceAssigned ? "View" : "Assign"} Resources
                       {/* Assign Resources */}
                     </Button>
                   </ButtonGroup>
@@ -557,32 +709,32 @@ const ActivityListScreen = () => {
               </>
             )
           }}
-          rowAction={(row) => setExpandedRowId(expandedRowId === row.p_id ? null : row.p_id)}
-          expandedRow={expandedRowId}
-          renderExpandedRow={(employee) => {
-            const isResourceAssigned = employee?.original_A?.resource_list
-            return (
-              <div style={{ padding: '1rem', backgroundColor: '#f9f9f9' }}>
-                <ActivityLogs
-                  activity={employee}
-                  logs={employee.day_logs}
-                  isOpen={true}
-                  onToggle={() => { }}
-                />
+          // rowAction={(row) => setExpandedRowId(expandedRowId === row.p_id ? null : row.p_id)}
+          // expandedRow={expandedRowId}
+          // renderExpandedRow={(employee) => {
+          //   const isResourceAssigned = employee?.original_A?.resource_list
+          //   return (
+          //     <div style={{ padding: '1rem', backgroundColor: '#f9f9f9' }}>
+          //       <ActivityLogs
+          //         activity={employee}
+          //         logs={employee.day_logs}
+          //         isOpen={true}
+          //         onToggle={() => { }}
+          //       />
 
-                {isResourceAssigned &&
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
-                    <Button variant='primary' onClick={(e) => handleAddOPE(employee, e)}>
-                      Add OPE
-                    </Button>
-                    <Button variant='outline' onClick={(e) => handleViewOPE(employee, e)}>
-                      View OPE
-                    </Button>
-                  </div>
-                }
-              </div>
-            )
-          }}
+          //       {isResourceAssigned &&
+          //         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+          //           <Button variant='primary' onClick={(e) => handleAddOPE(employee, e)}>
+          //             Add OPE
+          //           </Button>
+          //           <Button variant='outline' onClick={(e) => handleViewOPE(employee, e)}>
+          //             View OPE
+          //           </Button>
+          //         </div>
+          //       }
+          //     </div>
+          //   )
+          // }}
 
         />
         <PaginationComponent

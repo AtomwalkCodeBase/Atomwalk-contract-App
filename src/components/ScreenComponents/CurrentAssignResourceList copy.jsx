@@ -1,26 +1,23 @@
+import React, { useState } from "react";
 import styled from "styled-components";
 import { formatToApiDate, DateForApiFormate } from "../../utils/utils";
 import Card from "../Card";
 import DataTable, { Td } from "../DataTable";
 import Button from "../Button";
 import Badge from "../Badge";
-import { FaEdit, FaTrash } from "react-icons/fa";
-
-/* ---------------------------------- */
-/* Styled                              */
-/* ---------------------------------- */
+import { FaCalendarAlt, FaEdit, FaFileAlt, FaMapMarkerAlt, FaTrash, FaUser, FaUserTie } from "react-icons/fa";
+import { toast } from "react-toastify";
 
 const ScrollableTableWrapper = styled.div`
   max-height: 800px;
   overflow-y: auto;
-  border: 1px solid #e5e7eb;
+
   border-radius: 8px;
-  padding: 1.5rem;
 `;
 
 const DateBlock = styled.div`
   margin-bottom: 1.5rem;
-  border: 1px solid #e0e0e0;
+  border: 1px solid ${({ theme }) => theme.colors?.primary || '#e0e0e0'}88;
   border-radius: 8px;
   overflow: hidden;
 `;
@@ -214,6 +211,14 @@ const GrandTotalBar = styled.div`
   color: ${({ theme }) => theme.colors?.primary || '#0E7A91'};
 `;
 
+const ButtonRows = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  margin-top: ${({ theme }) => theme.spacings?.md || '0.5rem'};
+  margin-bottom: ${({ theme }) => theme.spacings?.md || '0.5rem'};
+  gap: ${({ theme }) => theme.spacings?.md || '0.5rem'};
+`;
+
 /* ---------------------------------- */
 /* Helpers                             */
 /* ---------------------------------- */
@@ -256,183 +261,292 @@ const CurrentAssignments = ({
   activityStart,
   activityEnd,
   activityData,
+  employees = [],
 }) => {
+  const [allAEntries, setAllAEntries] = useState(activityData?.allAEntries || []);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalDate, setModalDate] = useState("");
+  const [selectedEmpId, setSelectedEmpId] = useState("");
+  const [noOfItems, setNoOfItems] = useState("");
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+
+  const handleOpenActualModal = (dStr) => {
+    const existing = allAEntries.find((entry) => entry.start_date === dStr);
+    setModalDate(dStr);
+    if (existing) {
+      setIsUpdateMode(true);
+      setNoOfItems(existing.no_of_items || "");
+      const resList = parseActualResources(existing);
+      if (resList.length > 0) {
+        setSelectedEmpId(resList[0].emp_id);
+      } else {
+        setSelectedEmpId("");
+      }
+    } else {
+      setIsUpdateMode(false);
+      setNoOfItems("");
+      setSelectedEmpId("");
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSaveActual = () => {
+    if (!selectedEmpId) {
+      toast.error("Please select a resource");
+      return;
+    }
+    if (noOfItems === "" || isNaN(noOfItems) || Number(noOfItems) < 0) {
+      toast.error("Please enter a valid number of items audited");
+      return;
+    }
+
+    const selectedEmp = employees.find((emp) => emp.emp_id === selectedEmpId);
+    if (!selectedEmp) {
+      toast.error("Selected employee not found");
+      return;
+    }
+
+    const empType = Number(selectedEmp.grade_level) > 1 ? "T" : "E";
+    const resourceStr = `${selectedEmp.emp_id}^${selectedEmp.name}^${noOfItems}^${empType}`;
+
+    if (isUpdateMode) {
+      setAllAEntries((prev) =>
+        prev.map((entry) =>
+          entry.start_date === modalDate
+            ? { ...entry, no_of_items: Number(noOfItems), resource_list: [resourceStr] }
+            : entry
+        )
+      );
+      toast.success("Actual updated successfully");
+    } else {
+      const newEntry = {
+        id: `temp_${Date.now()}`,
+        start_date: modalDate,
+        no_of_items: Number(noOfItems),
+        resource_list: [resourceStr],
+      };
+      setAllAEntries((prev) => [...prev, newEntry]);
+      toast.success("Actual added successfully");
+    }
+
+    setIsModalOpen(false);
+  };
+
+  const plannedDates = dayWindow.filter((d) => {
+    const dStr = formatToApiDate(d);
+    return (dateWiseAssignments[dStr] || []).length > 0;
+  });
+
+  console.log("activityData", activityData)
   return (
-    <Card title="Current Assignments">
-      <ScrollableTableWrapper>
-        {dayWindow.length === 0 ? (
-          <EmptyRow>No dates in range</EmptyRow>
-        ) : (
-          dayWindow.map((d) => {
-            const dStr = formatToApiDate(d);
-            const planAssignments = dateWiseAssignments[dStr] || [];
-            const tlCount = planAssignments.filter((a) => a.emp_type === 'T').length;
-            const exCount = planAssignments.filter((a) => a.emp_type === 'E').length;
+    <>
 
-            const actualEntry = findActualEntryForDate(activityData, dStr);
-            const actualResources = parseActualResources(actualEntry);
-            const planEmpIds = new Set(planAssignments.map((a) => a.emp_id));
 
-            const planTotal = planAssignments.reduce(
-              (sum, r) => sum + (Number(r.contract_rate) || 0),
-              0
-            );
-            const actualTotal = actualResources.reduce(
-              (sum, r) => sum + (Number(r.rate) || 0),
-              0
-            );
+      <Card title="Current Assignments" hoverable={false}>
+        <ScrollableTableWrapper>
+          {plannedDates.length === 0 ? (
+            <EmptyRow style={{ fontSize: "1rem", padding: "2rem" }}>
+              No resource allocated
+            </EmptyRow>
+          ) : (
+            plannedDates.map((d) => {
+              const dStr = formatToApiDate(d);
+              const planAssignments = dateWiseAssignments[dStr] || [];
+              const tlCount = planAssignments.filter((a) => a.emp_type === 'T').length;
+              const exCount = planAssignments.filter((a) => a.emp_type === 'E').length;
 
-            const claims = getDummyClaims(dStr);
-            const claimsTotal = claims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-            const grandTotal = planTotal + claimsTotal;
+              const actualEntry = allAEntries.find((entry) => entry.start_date === dStr) || null;
+              const actualResources = parseActualResources(actualEntry);
+              const planEmpIds = new Set(planAssignments.map((a) => a.emp_id));
 
-            return (
-              <DateBlock key={dStr}>
-                {/* Date header */}
-                <DateHeader>
-                  <HeaderDate>
-                    {d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' }).toUpperCase()}
-                  </HeaderDate>
-                  <CountPill>
-                    TL: <strong>{tlCount}</strong> &nbsp;&nbsp; EX: <strong>{exCount}</strong>
-                  </CountPill>
-                </DateHeader>
+              const planTotal = planAssignments.reduce(
+                (sum, r) => sum + (Number(r.contract_rate) || 0),
+                0
+              );
+              const actualTotal = actualResources.reduce(
+                (sum, r) => sum + (Number(r.rate) || 0),
+                0
+              );
 
-                {/* Plan / Actual */}
-                <Section>
-                  <SectionTitle>Resource Details</SectionTitle>
-                  <PlanActualGrid>
-                    {/* PLAN */}
-                    <SubPanel>
-                      <SubPanelHeader $variant="plan">Plan</SubPanelHeader>
-                      {planAssignments.length === 0 ? (
-                        <EmptyRow>No resources planned</EmptyRow>
-                      ) : (
-                        planAssignments.map((row) => {
-                          const disableAction = row.is_approved || activityData?.allAEntries?.length;
-                          const isEditing = editingId === row.rowKey;
+              const claims = getDummyClaims(dStr);
+              const claimsTotal = claims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+              const grandTotal = planTotal + claimsTotal;
 
-                          console.log("isEditing", isEditing)
+              const hasActual = allAEntries.some((entry) => entry.start_date === dStr);
 
-                          if (isEditing) {
+              return (
+                <DateBlock key={dStr}>
+                  {/* Date header */}
+                  <DateHeader>
+                    <HeaderDate>
+                      {d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' }).toUpperCase()}
+                    </HeaderDate>
+                    <CountPill>
+                      TL: <strong>{tlCount}</strong> &nbsp;&nbsp; EX: <strong>{exCount}</strong>
+                    </CountPill>
+                  </DateHeader>
+
+                  {/* Plan / Actual */}
+                  <Section>
+                    <SectionTitle>Resource Details</SectionTitle>
+                    <PlanActualGrid>
+                      {/* PLAN */}
+                      <SubPanel>
+                        <SubPanelHeader $variant="plan">Plan</SubPanelHeader>
+                        {planAssignments.length === 0 ? (
+                          <EmptyRow>No resources planned</EmptyRow>
+                        ) : (
+                          planAssignments.map((row) => {
+                            const disableAction = row.is_approved || activityData?.allAEntries?.length;
+                            const isEditing = editingId === row.rowKey;
+
+                            // console.log("isEditing", isEditing)
+
+                            if (isEditing) {
+                              return (
+                                <InlineEditForm
+                                  key={row.rowKey}
+                                  row={row}
+                                  onChange={handleFieldChange}
+                                  onConfirm={handleConfirmUpdate}
+                                  onCancel={handleCancelEdit}
+                                  activityStart={activityStart}
+                                  activityEnd={activityEnd}
+                                />
+                              );
+                            }
+
                             return (
-                              <InlineEditForm
-                                key={row.rowKey}
-                                row={row}
-                                onChange={handleFieldChange}
-                                onConfirm={handleConfirmUpdate}
-                                onCancel={handleCancelEdit}
-                                activityStart={activityStart}
-                                activityEnd={activityEnd}
-                              />
+                              <ResourceRow key={row.rowKey}>
+                                <ResourceInfo>
+                                  <ResourceName>
+                                    {row.employee_name || row.emp_id}
+                                    {row.action === "ADD" && <Badge variant="warning" style={{ fontSize: '0.58rem' }}>New</Badge>}
+                                    {row.action === "UPDATE" && <Badge variant="info" style={{ fontSize: '0.58rem' }}>Updated</Badge>}
+                                    {row.is_approved && <Badge variant="success" style={{ fontSize: '0.58rem' }}>Approved</Badge>}
+                                  </ResourceName>
+                                  <ResourceMeta>
+                                    <Badge variant={row.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
+                                      {formatEmpType(row.emp_type)}
+                                    </Badge>
+                                    <span>{row.start_date || '—'} to {row.end_date || '—'}</span>
+                                    {row.remarks && <span>· {row.remarks}</span>}
+                                  </ResourceMeta>
+                                </ResourceInfo>
+                                <RateActionsCol>
+                                  <RateTag>{row.contract_rate != null ? `₹${row.contract_rate}` : '—'}</RateTag>
+                                  <RowActions onClick={(e) => e.stopPropagation()}>
+                                    <Button iconOnly variant="primary" title="Edit" disabled={disableAction} onClick={() => handleEditDate(row, dStr)}>
+                                      <FaEdit size={11} />
+                                    </Button>
+                                    <Button iconOnly variant="outlines" title="Remove" disabled={disableAction} onClick={() => handleDeleteDate(row, dStr)}>
+                                      <FaTrash size={11} />
+                                    </Button>
+                                  </RowActions>
+                                </RateActionsCol>
+                              </ResourceRow>
                             );
-                          }
+                          })
+                        )}
+                      </SubPanel>
 
-                          return (
-                            <ResourceRow key={row.rowKey}>
-                              <ResourceInfo>
-                                <ResourceName>
-                                  {row.employee_name || row.emp_id}
-                                  {row.action === "ADD" && <Badge variant="warning" style={{ fontSize: '0.58rem' }}>New</Badge>}
-                                  {row.action === "UPDATE" && <Badge variant="info" style={{ fontSize: '0.58rem' }}>Updated</Badge>}
-                                  {row.is_approved && <Badge variant="success" style={{ fontSize: '0.58rem' }}>Approved</Badge>}
-                                </ResourceName>
-                                <ResourceMeta>
-                                  <Badge variant={row.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
-                                    {formatEmpType(row.emp_type)}
-                                  </Badge>
-                                  <span>{row.start_date || '—'} to {row.end_date || '—'}</span>
-                                  {row.remarks && <span>· {row.remarks}</span>}
-                                </ResourceMeta>
-                              </ResourceInfo>
-                              <RateActionsCol>
-                                <RateTag>{row.contract_rate != null ? `₹${row.contract_rate}` : '—'}</RateTag>
-                                <RowActions onClick={(e) => e.stopPropagation()}>
-                                  <Button iconOnly variant="primary" title="Edit" disabled={disableAction} onClick={() => handleEditDate(row, dStr)}>
-                                    <FaEdit size={11} />
-                                  </Button>
-                                  <Button iconOnly variant="outlines" title="Remove" disabled={disableAction} onClick={() => handleDeleteDate(row, dStr)}>
-                                    <FaTrash size={11} />
-                                  </Button>
-                                </RowActions>
-                              </RateActionsCol>
-                            </ResourceRow>
-                          );
-                        })
-                      )}
-                    </SubPanel>
+                      {/* ACTUAL */}
+                      <SubPanel>
+                        <SubPanelHeader $variant="actual">Actual</SubPanelHeader>
+                        {actualResources.length === 0 ? (
+                          <EmptyRow>No actual data recorded</EmptyRow>
+                        ) : (
+                          actualResources.map((res, idx) => {
+                            const isReplaced = !planEmpIds.has(res.emp_id);
+                            return (
+                              <ResourceRow key={`${res.emp_id}-${idx}`}>
+                                <ResourceInfo>
+                                  <ResourceName>
+                                    {res.name || res.emp_id}
+                                    {isReplaced && <Badge variant="warning" style={{ fontSize: '0.58rem' }}>Replaced</Badge>}
+                                  </ResourceName>
+                                  <ResourceMeta>
+                                    <Badge variant={res.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
+                                      {formatEmpType(res.emp_type)}
+                                    </Badge>
+                                  </ResourceMeta>
+                                </ResourceInfo>
+                                <RateActionsCol>
+                                  <RateTag>{res.rate != null ? `₹${res.rate}` : '—'}</RateTag>
+                                </RateActionsCol>
+                              </ResourceRow>
+                            );
+                          })
+                        )}
+                      </SubPanel>
+                    </PlanActualGrid>
 
-                    {/* ACTUAL */}
-                    <SubPanel>
-                      <SubPanelHeader $variant="actual">Actual</SubPanelHeader>
-                      {actualResources.length === 0 ? (
-                        <EmptyRow>No actual data recorded</EmptyRow>
-                      ) : (
-                        actualResources.map((res, idx) => {
-                          const isReplaced = !planEmpIds.has(res.emp_id);
-                          return (
-                            <ResourceRow key={`${res.emp_id}-${idx}`}>
-                              <ResourceInfo>
-                                <ResourceName>
-                                  {res.name || res.emp_id}
-                                  {isReplaced && <Badge variant="warning" style={{ fontSize: '0.58rem' }}>Replaced</Badge>}
-                                </ResourceName>
-                                <ResourceMeta>
-                                  <Badge variant={res.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
-                                    {formatEmpType(res.emp_type)}
-                                  </Badge>
-                                </ResourceMeta>
-                              </ResourceInfo>
-                              <RateActionsCol>
-                                <RateTag>{res.rate != null ? `₹${res.rate}` : '—'}</RateTag>
-                              </RateActionsCol>
-                            </ResourceRow>
-                          );
-                        })
-                      )}
-                    </SubPanel>
-                  </PlanActualGrid>
+                    <TotalsBar style={{ marginTop: 10 }}>
+                      <span>Plan Total: ₹{planTotal}</span>
+                      <span>Actual Total: ₹{actualTotal}</span>
+                    </TotalsBar>
+                  </Section>
 
-                  <TotalsBar style={{ marginTop: 10 }}>
-                    <span>Plan Total: ₹{planTotal}</span>
-                    <span>Actual Total: ₹{actualTotal}</span>
-                  </TotalsBar>
-                </Section>
+                  <ButtonRows>
+                    {hasActual &&
+                      <>
+                        <Button>Add claims</Button>
+                        <Button>View claims</Button>
+                      </>
+                    }
 
-                {/* Claims */}
-                <Section>
-                  <SectionTitle>Claim Items</SectionTitle>
-                  {claims.length === 0 ? (
-                    <EmptyRow>No claims submitted</EmptyRow>
-                  ) : (
-                    <ClaimsTable>
-                      <ClaimsHeaderRow>
-                        <span>Category</span>
-                        <span>ID</span>
-                        <span>Amount</span>
-                        <span>File</span>
-                      </ClaimsHeaderRow>
-                      {claims.map((c) => (
-                        <ClaimsRow key={c.id}>
-                          <span>{c.category}</span>
-                          <span>{c.id}</span>
-                          <span>₹{c.amount}</span>
-                          <FileLink href={c.file} target="_blank" rel="noreferrer">View</FileLink>
-                        </ClaimsRow>
-                      ))}
-                    </ClaimsTable>
-                  )}
+                    {planAssignments.length !== 0 && activityData.activityStatus === "C" && <Button onClick={() => handleOpenActualModal(dStr)}>
+                      {hasActual ? "Update Actual" : "Add Actual"}
+                    </Button>}
+                  </ButtonRows>
+                </DateBlock>
+              );
+            })
+          )}
+        </ScrollableTableWrapper>
+      </Card>
 
-                  <GrandTotalBar>
-                    <span>Contract Rate + Claims: ₹{grandTotal}</span>
-                  </GrandTotalBar>
-                </Section>
-              </DateBlock>
-            );
-          })
-        )}
-      </ScrollableTableWrapper>
-    </Card>
+      {isModalOpen && (
+        <ActualModalOverlay onClick={() => setIsModalOpen(false)}>
+          <ActualModalContent onClick={(e) => e.stopPropagation()}>
+            <ActualModalHeader>{isUpdateMode ? "Update Actual" : "Add Actual"}</ActualModalHeader>
+            <ActualFormGroup>
+              <ActualLabel>Date</ActualLabel>
+              <ActualInput type="text" value={modalDate} readOnly />
+            </ActualFormGroup>
+            <ActualFormGroup>
+              <ActualLabel>Resource Name</ActualLabel>
+              <ActualSelect value={selectedEmpId} onChange={(e) => setSelectedEmpId(e.target.value)}>
+                <option value="">Select Resource</option>
+                {employees.map((emp) => (
+                  <option key={emp.emp_id} value={emp.emp_id}>
+                    {emp.name} ({emp.emp_id})
+                  </option>
+                ))}
+              </ActualSelect>
+            </ActualFormGroup>
+            <ActualFormGroup>
+              <ActualLabel>Number of Items Audited</ActualLabel>
+              <ActualInput
+                type="number"
+                min="0"
+                value={noOfItems}
+                onChange={(e) => setNoOfItems(e.target.value)}
+                placeholder="Enter number of items"
+              />
+            </ActualFormGroup>
+            <ActualButtonGroup>
+              <Button variant="outlines" onClick={() => setIsModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleSaveActual}>
+                Save
+              </Button>
+            </ActualButtonGroup>
+          </ActualModalContent>
+        </ActualModalOverlay>
+      )}
+    </>
   );
 };
 
@@ -544,3 +658,62 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
     </EditRowContainer>
   );
 };
+
+const ActualModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const ActualModalContent = styled.div`
+  background: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+`;
+
+const ActualModalHeader = styled.h3`
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #333;
+`;
+
+const ActualFormGroup = styled.div`
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const ActualLabel = styled.label`
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+`;
+
+const ActualInput = styled.input`
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+`;
+
+const ActualSelect = styled.select`
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+`;
+
+const ActualButtonGroup = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+`;
