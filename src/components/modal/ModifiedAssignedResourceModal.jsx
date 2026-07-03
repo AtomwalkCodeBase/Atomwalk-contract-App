@@ -293,19 +293,11 @@ const handleToggleAllocation = ( emp, targetDate, checked )=>{
  if (checked) {
   // const prevDates = Object.keys(employeeDateMap[emp.emp_id] || {});
   const prevDates = generateDatesBetween(
-    ...workingAllocations
-        .filter(
-            x =>
-                x.emp_id === emp.emp_id &&
-                x.action !== "DELETE"
-        )
-        .reduce(
-            (acc, row) => {
+    ...workingAllocations.filter(x => x.emp_id === emp.emp_id && x.action !== "DELETE").
+    reduce((acc, row) => {
                 acc.push(...generateDatesBetween(row.start_date, row.end_date));
                 return acc;
-            },
-            []
-        )
+            },[])
 );
 
   const allDates = [...prevDates, targetDate ];
@@ -330,8 +322,8 @@ const handleToggleAllocation = ( emp, targetDate, checked )=>{
       is_active: true,
       action: "ADD"
     }));
-
-    return [ ...withoutEmp, ...newRows ];
+    const newState = [...withoutEmp, ...newRows];
+    return normalizeOverlappingAllocations(newState);
   });
 }
     else{
@@ -362,7 +354,7 @@ const handleConfirmUpdate = rowKey => {
                 action: currentRow.id ? "UPDATE" : "ADD"
             };
         });
-        return updatedRows;
+        return normalizeOverlappingAllocations(updatedRows);
     });
     setEditingId(null);
 };
@@ -378,6 +370,7 @@ const handleConfirmUpdate = rowKey => {
 		const targetDateComparable = DateForApiFormate(targetDate, true);
 		const splitRows = splitAllocationByDate( row, targetDateComparable, "DELETE");
     // console.log("splitRows", splitRows)
+
 
 		return [
 		...prev.filter( x => x.rowKey !== row.rowKey), ...splitRows
@@ -472,20 +465,14 @@ const handleSubmit = async () => {
             fd.append("call_mode", "DELETE");
             fd.append("p_id", p_id);
 
-            const deletePayloadList = mergedAllocations.map(s => ({
-                id: s.id,
-                ...(s.action === "DELETE" ? { is_deleted: true } : {
-                    emp_id: s.emp_id,
-                    emp_type: s.emp_type,
-                    start_date: DateForApiFormate(s.start_date),
-                    end_date: DateForApiFormate(s.end_date),
-                    remarks: s.remarks || '',
-                    contract_rate: s.contract_rate ? parseFloat(s.contract_rate) : 0
-                })
-            }));
-            fd.append("c_emp_list", JSON.stringify(deletePayloadList));
-            await postAllocationData(fd);
-        }
+            const deletePayloadList = deletedRows.map(s => ({
+                  id: s.id,
+                  is_deleted: true
+              }));
+
+              fd.append("c_emp_list", JSON.stringify(deletePayloadList));
+              await postAllocationData(fd);
+          }
 
         // 2. Send ADD/UPDATE if there are new or updated items
         if (hasNew || hasUpdate) {
@@ -664,32 +651,19 @@ const actualDateWiseAssignments = useMemo(() => {
 
   return (
 	<Layout>
-    <div style={{marginLeft: "92rem"}}>
-
-        <Button size="md" onClick={() => window.history.back()} style={{marginLeft: "auto"}}>
-  <FaArrowLeft />Back
-</Button>
-    </div>
+<div style={{ display: "flex", justifyContent: "flex-end" }}>
+  <Button size="md" onClick={() => window.history.back()}>
+    <FaArrowLeft />Back
+  </Button>
+</div>
 	  <Card hoverable={false} style={{marginTop: "1rem"}}>
 		{/* <Tabs tabs={TABS} activeTab={tab} setActiveTab={setTab} /> */}
-
-		{tab === "PLAN" && (
+{/* 
+		{tab === "PLAN" && ( */}
 		  <>
-		{activityData.activityStatus !== "C" && <ResourceAvailability
-			  employees={employees}
-			  dayWindow={dayWindow}
-			  activityData={activityData}
-			  activityDates={activityDates}
-			  activityStart={activityStart}
-			  activityEnd={activityEnd}
-			  busyDateMap={busyDateMap}
-			  employeeDateMap={employeeDateMap}
-			  handleToggleAllocation={handleToggleAllocation}
-			  workingAllocations={workingAllocations}
-			  handleAutoAssign={handleAutoAssign}
-			/>}
+		{/* {activityData.activityStatus !== "C" &&  */}
 
-			<CurrentAssignments
+    <CurrentAssignments
 			  dateWiseAssignments={dateWiseAssignments}
 			  dayWindow={dayWindow}
 			  editingId={editingId}
@@ -703,10 +677,28 @@ const actualDateWiseAssignments = useMemo(() => {
 			  activityData={activityData}
 			  isActual={false}
 			/>
-		  </>
-		)}
+    
+    
+    <ResourceAvailability
+			  employees={employees}
+			  dayWindow={dayWindow}
+			  activityData={activityData}
+			  activityDates={activityDates}
+			  activityStart={activityStart}
+			  activityEnd={activityEnd}
+			  busyDateMap={busyDateMap}
+			  employeeDateMap={employeeDateMap}
+			  handleToggleAllocation={handleToggleAllocation}
+			  workingAllocations={workingAllocations}
+			  handleAutoAssign={handleAutoAssign}
+			/>
+      
+      {/* } */}
 
-		{tab === "ACTUAL" && (
+		  </>
+		{/* )} */}
+
+		{/* {tab === "ACTUAL" && (
 		  <CurrentAssignments
 			dateWiseAssignments={actualDateWiseAssignments}
 			dayWindow={dayWindow}
@@ -721,7 +713,7 @@ const actualDateWiseAssignments = useMemo(() => {
 			activityData={activityData}
 			isActual={true}
 		  />
-		)}
+		)} */}
 
 		{pendingCount > 0 && (
 		  <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

@@ -471,140 +471,75 @@ export const normalizeApiAllocations = (data=[])=>{
 export const normalizeOverlappingAllocations = (rows = []) => {
 
     // ignore deleted rows
-    const activeRows = rows.filter(
-        r => r.action !== "DELETE"
-    );
+    const activeRows = rows.filter(r => r.action !== "DELETE");
 
     // sort by employee and start date
     activeRows.sort((a, b) => {
-
-        if (a.emp_id !== b.emp_id)
-            return a.emp_id.localeCompare(b.emp_id);
-
+      if (a.emp_id !== b.emp_id) return a.emp_id.localeCompare(b.emp_id);
         return new Date(a.start_date) - new Date(b.start_date);
-
     });
 
     const result = [];
 
     activeRows.forEach(current => {
 
-        if (!result.length) {
+        // if (!result.length) {
 
-            result.push({ ...current });
-            return;
+        //     result.push({ ...current });
+        //     return;
 
-        }
+        // }
 
-        let overlapFound = false;
+        let inserted = false;
 
         for (let i = 0; i < result.length; i++) {
-
             const prev = result[i];
-
-            if (prev.emp_id !== current.emp_id)
-                continue;
+            if (prev.emp_id !== current.emp_id)continue;
 
             const prevStart = new Date(prev.start_date);
             const prevEnd = new Date(prev.end_date);
-
             const curStart = new Date(current.start_date);
             const curEnd = new Date(current.end_date);
 
-            /*
-                overlap exists
-            */
-
-            if (
-                curStart <= prevEnd &&
-                curEnd >= prevStart
-            ) {
-
-                overlapFound = true;
-
-                /*
-                    current row wins
-                */
-
+                // overlap exists
+            if (curStart <= prevEnd && curEnd >= prevStart) {
                 // left part
                 if (curStart > prevStart) {
-
                     const leftEnd = new Date(curStart);
                     leftEnd.setDate(leftEnd.getDate() - 1);
-
                     result[i] = {
-
                         ...prev,
-
                         end_date: formatToApiDate(leftEnd),
-
-                        action:
-                            prev.id
-                                ? "UPDATE"
-                                : "ADD"
-
+                        action:prev.id ? "UPDATE" : "ADD"
                     };
-
-                }
-                else {
-
+                } else {
                     // remove previous completely
                     result.splice(i, 1);
                     i--;
                 }
-
-                /*
-                    right part
-                */
-
+                    // right part
                 if (curEnd < prevEnd) {
-
                     const rightStart = new Date(curEnd);
-                    rightStart.setDate(
-                        rightStart.getDate() + 1
-                    );
-
+                    rightStart.setDate(rightStart.getDate() + 1);
                     result.push({
-
                         ...prev,
-
                         rowKey: crypto.randomUUID(),
-
                         id: null,
-
                         parent_id: prev.id,
-
-                        start_date:
-                            formatToApiDate(rightStart),
-
+                        start_date:formatToApiDate(rightStart),
                         action: "ADD"
-
                     });
-
                 }
-
+                inserted = true;
             }
-
         }
-
-        result.push({ ...current });
-
+        if (!inserted) {
+            result.push({ ...current });
+        }
     });
-
-    /*
-        add deleted rows back
-    */
-
-    rows
-        .filter(
-            x => x.action === "DELETE"
-        )
-        .forEach(
-            x => result.push(x)
-        );
+    rows.filter(x => x.action === "DELETE").forEach(x => result.push(x));
 
     return result;
-
 };
 
 export const splitAllocationByDate = (
