@@ -19,7 +19,7 @@ import { theme } from '../styles/Theme';
 import { useFilter } from '../hooks/useFilter';
 import { AssignEmployee } from '../components/modal/Assignemployee';
 import { useNavigate } from 'react-router-dom';
-import { FaClipboardList, FaUserCheck, FaUsers, FaUserTimes } from 'react-icons/fa';
+import { FaCheck, FaClipboardList, FaMinusCircle, FaUserCheck, FaUsers, FaUserTimes } from 'react-icons/fa';
 import StatsCard from '../components/StatsCard';
 import Tabs from '../components/Tabs';
 
@@ -267,6 +267,18 @@ const StatsGrid = styled.div`
   }
 `;
 
+const ACTIVITY_LIST_STORAGE_KEY = 'activityListSelection';
+
+const getStoredActivityListSelection = () => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const storedValue = window.sessionStorage.getItem(ACTIVITY_LIST_STORAGE_KEY);
+    return storedValue ? JSON.parse(storedValue) : null;
+  } catch {
+    return null;
+  }
+};
 
 const parseDate = (dateStr) => {
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -294,6 +306,7 @@ function getMatchingRetainerList(original_P = {}) {
 const ActivityListScreen = () => {
   const today = new Date();
   const navigate = useNavigate();
+  const storedSelection = getStoredActivityListSelection();
   const [isLoading, setIsLoading] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState(null);
   const [assignEmployeeModal, setAssignEmployeeModal] = useState(false);
@@ -303,19 +316,18 @@ const ActivityListScreen = () => {
   const [filter, setFilter] = useState({ search: "", status: "" })
 
   const [assignedActivity, setAssignedActivity] = useState([]);
-  const [tab, setTab] = useState("month")
-  const [activeRangeType, setActiveRangeType] = useState("month");
+  const [tab, setTab] = useState(storedSelection?.tab || "month")
+  const [activeRangeType, setActiveRangeType] = useState(storedSelection?.activeRangeType || "month");
   const [offset, setOffset] = useState(0);
   const emp_id = localStorage.getItem("cust_emp_id");
-  const [dateRange, setDateRange] = useState(() => getMonthRange({ type: "current", mode: "month" }));
-  const [selectedDate, setSelectedDate] = useState(today.toISOString().split("T")[0]);
-
-  useEffect(() => {
-    if (emp_id) {
-      fetchEmpAllocationData()
+  const [dateRange, setDateRange] = useState(() => {
+    const savedRange = storedSelection?.dateRange;
+    if (savedRange?.start && savedRange?.end) {
+      return savedRange;
     }
-  }, [emp_id]);
-
+    return getMonthRange({ type: "current", mode: "month" });
+  });
+  const [selectedDate, setSelectedDate] = useState(today.toISOString().split("T")[0]);
 
   const getCurrentMonth = () =>
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
@@ -331,8 +343,29 @@ const ActivityListScreen = () => {
     return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
   };
 
-const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
-const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
+const [selectedMonth, setSelectedMonth] = useState(storedSelection?.selectedMonth || getCurrentMonth());
+const [selectedWeek, setSelectedWeek] = useState(storedSelection?.selectedWeek || getCurrentWeek());
+
+useEffect(() => {
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.setItem(
+      ACTIVITY_LIST_STORAGE_KEY,
+      JSON.stringify({
+        tab,
+        activeRangeType,
+        selectedMonth,
+        selectedWeek,
+        dateRange,
+      })
+    );
+  }
+}, [tab, activeRangeType, selectedMonth, selectedWeek, dateRange]);
+
+useEffect(() => {
+  if (emp_id) {
+    fetchEmpAllocationData(dateRange.start, dateRange.end)
+  }
+}, [emp_id]);
 
 const handleMonthChange = (e) => {
   const value = e.target.value;
@@ -525,34 +558,32 @@ const handleRangeChange = (type) => {
       //       onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
     {
       icon: <FaClipboardList />,
-      label: "Total Activity",
+      label: "Total Audit Item",
       value: filteredActivities.length,
       color: "primary",
       onClick: (prev) => setFilter({ ...prev, status: "ALL" }),
     },
     {
       icon: <FaUserTimes />,
-      label: "Not Assigned",
+      label: "Resource Not Assigned",
       value: notAssignedCount,
       color: "error",
       onClick: (prev) => setFilter({ ...prev, status: "NA" }),
     },
     {
-      icon: <FaUserCheck />,
-      label: "Assigned",
-      value: notStartedCount + completedCount,
+      icon: <FaCheck />,
+      label: "Audit Completed",
+      value: completedCount,
       color: "success",
-      sections: [
-        {
-          items: [
-            { label: "Not Started", value: notStartedCount, status: "warning", subStatus: "NS" },
-            { label: "Completed", value: completedCount, status: "success", subStatus: "C" }
-          ]
-        },
-      ],
-      onClick: (prev) => setFilter({ ...prev, status: "VERIFIED" }),
-      onItemClick: (item) => setFilter({ ...item, status: item.subStatus }),
+      onClick: (prev) => setFilter({ ...prev, status: "C" }),
     },
+    {
+      icon: <FaMinusCircle />,
+      label: "Not Stared",
+      value: notStartedCount,
+      color: "warning",
+      onClick: (prev) => setFilter({ ...prev, status: "NS" }),
+    }
   ]
 
   const TABS = [

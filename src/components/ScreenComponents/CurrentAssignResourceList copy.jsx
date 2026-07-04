@@ -269,6 +269,99 @@ const CurrentAssignments = ({
   const [selectedEmpId, setSelectedEmpId] = useState("");
   const [noOfItems, setNoOfItems] = useState("");
   const [isUpdateMode, setIsUpdateMode] = useState(false);
+  const [actualDraftsByDate, setActualDraftsByDate] = useState({});
+
+const handleCopyActual = (dStr, planAssignments) => {
+  setActualDraftsByDate((prev) => ({
+    ...prev,
+    [dStr]: {
+      confirmed: false,
+      rows: planAssignments.map((row) => ({
+        rowKey: crypto.randomUUID(),
+        original_emp_id: row.emp_id,   // used to detect "Replaced"
+        emp_id: row.emp_id,
+        employee_name: row.employee_name,
+        emp_type: row.emp_type,
+        remarks: row.remarks || "",
+        contract_rate: row.contract_rate,
+      })),
+    },
+  }));
+};
+
+const handleCopyAllActual = () => {
+  setActualDraftsByDate((prev) => {
+    const next = { ...prev };
+    plannedDates.forEach((d) => {
+      const dStr = formatToApiDate(d);
+      if (next[dStr]) return; // don't clobber an existing draft for that date
+      const planAssignments = dateWiseAssignments[dStr] || [];
+      if (planAssignments.length === 0) return;
+      next[dStr] = {
+        confirmed: false,
+        rows: planAssignments.map((row) => ({
+          rowKey: crypto.randomUUID(),
+          original_emp_id: row.emp_id,
+          emp_id: row.emp_id,
+          employee_name: row.employee_name,
+          emp_type: row.emp_type,
+          remarks: row.remarks || "",
+          contract_rate: row.contract_rate,
+        })),
+      };
+    });
+    return next;
+  });
+};
+
+const handleActualFieldChange = (dStr, rowKey, field, value) => {
+  setActualDraftsByDate((prev) => {
+    const draft = prev[dStr];
+    if (!draft) return prev;
+    return {
+      ...prev,
+      [dStr]: {
+        ...draft,
+        rows: draft.rows.map((r) => (r.rowKey === rowKey ? { ...r, [field]: value } : r)),
+      },
+    };
+  });
+};
+
+const handleActualEmployeeChange = (dStr, rowKey, emp_id) => {
+  const emp = employees.find((e) => e.emp_id === emp_id);
+  setActualDraftsByDate((prev) => {
+    const draft = prev[dStr];
+    if (!draft) return prev;
+    return {
+      ...prev,
+      [dStr]: {
+        ...draft,
+        rows: draft.rows.map((r) =>
+          r.rowKey === rowKey ? { ...r, emp_id, employee_name: emp?.name || r.employee_name } : r
+        ),
+      },
+    };
+  });
+};
+
+const handleRemoveActualRow = (dStr, rowKey) => {
+  setActualDraftsByDate((prev) => {
+    const draft = prev[dStr];
+    if (!draft) return prev;
+    return { ...prev, [dStr]: { ...draft, rows: draft.rows.filter((r) => r.rowKey !== rowKey) } };
+  });
+};
+
+const handleConfirmActual = (dStr) => {
+  setActualDraftsByDate((prev) => ({ ...prev, [dStr]: { ...prev[dStr], confirmed: true } }));
+  // TODO: call your save API here with actualDraftsByDate[dStr].rows, e.g.:
+  // onConfirmActual?.(dStr, actualDraftsByDate[dStr]?.rows || []);
+};
+
+const handleEditActualAgain = (dStr) => {
+  setActualDraftsByDate((prev) => ({ ...prev, [dStr]: { ...prev[dStr], confirmed: false } }));
+};
 
   const handleOpenActualModal = (dStr) => {
     const existing = allAEntries.find((entry) => entry.start_date === dStr);
@@ -343,6 +436,11 @@ const CurrentAssignments = ({
 
 
       <Card title="Current Assignments" hoverable={false}>
+        <ButtonRows>
+    <Button variant="primary" onClick={handleCopyAllActual}>
+      Copy Actual (All Dates)
+    </Button>
+  </ButtonRows>
         <ScrollableTableWrapper>
           {plannedDates.length === 0 ? (
             <EmptyRow style={{ fontSize: "1rem", padding: "2rem" }}>
@@ -355,18 +453,19 @@ const CurrentAssignments = ({
               const tlCount = planAssignments.filter((a) => a.emp_type === 'T').length;
               const exCount = planAssignments.filter((a) => a.emp_type === 'E').length;
 
-              const actualEntry = allAEntries.find((entry) => entry.start_date === dStr) || null;
-              const actualResources = parseActualResources(actualEntry);
+              // const actualEntry = allAEntries.find((entry) => entry.start_date === dStr) || null;
+              // const actualResources = parseActualResources(actualEntry);
+
+              const actualDraft = actualDraftsByDate[dStr];
+              const actualRows = actualDraft?.rows || [];
               const planEmpIds = new Set(planAssignments.map((a) => a.emp_id));
 
               const planTotal = planAssignments.reduce(
                 (sum, r) => sum + (Number(r.contract_rate) || 0),
                 0
               );
-              const actualTotal = actualResources.reduce(
-                (sum, r) => sum + (Number(r.rate) || 0),
-                0
-              );
+              // const actualTotal = actualResources.reduce((sum, r) => sum + (Number(r.rate) || 0),0);
+              const actualTotal = actualRows.reduce((sum, r) => sum + (Number(r.contract_rate) || 0), 0);
 
               const claims = getDummyClaims(dStr);
               const claimsTotal = claims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
@@ -451,7 +550,7 @@ const CurrentAssignments = ({
                       </SubPanel>
 
                       {/* ACTUAL */}
-                      <SubPanel>
+                      {/* <SubPanel>
                         <SubPanelHeader $variant="actual">Actual</SubPanelHeader>
                         {actualResources.length === 0 ? (
                           <EmptyRow>No actual data recorded</EmptyRow>
@@ -478,7 +577,53 @@ const CurrentAssignments = ({
                             );
                           })
                         )}
-                      </SubPanel>
+                      </SubPanel> */}
+                      <SubPanel>
+  <SubPanelHeader
+    $variant="actual"
+    style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+  >
+    <span>Actual</span>
+    {!actualDraft && planAssignments.length > 0 && (
+      <Button size="small" variant="outlines" onClick={() => handleCopyActual(dStr, planAssignments)}>
+        Copy Actual
+      </Button>
+    )}
+  </SubPanelHeader>
+ 
+  {!actualDraft && <EmptyRow>No actual data recorded</EmptyRow>}
+ 
+  {actualDraft &&
+    actualDraft.rows.map((row) => (
+      <ActualEditRow
+        key={row.rowKey}
+        row={row}
+        employees={employees}
+        readOnly={actualDraft.confirmed}
+        isReplaced={row.emp_id !== row.original_emp_id}
+        onFieldChange={(field, value) => handleActualFieldChange(dStr, row.rowKey, field, value)}
+        onEmployeeChange={(emp_id) => handleActualEmployeeChange(dStr, row.rowKey, emp_id)}
+        onRemove={() => handleRemoveActualRow(dStr, row.rowKey)}
+      />
+    ))}
+ 
+  {actualDraft && !actualDraft.confirmed && actualDraft.rows.length > 0 && (
+    <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 10px" }}>
+      <Button size="small" variant="successGhost" onClick={() => handleConfirmActual(dStr)}>
+        Confirm
+      </Button>
+    </div>
+  )}
+ 
+  {actualDraft?.confirmed && (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px" }}>
+      <Badge variant="success" style={{ fontSize: "0.6rem" }}>Confirmed</Badge>
+      <Button size="small" variant="outlines" onClick={() => handleEditActualAgain(dStr)}>
+        Edit
+      </Button>
+    </div>
+  )}
+</SubPanel>
                     </PlanActualGrid>
 
                     <TotalsBar style={{ marginTop: 10 }}>
@@ -717,3 +862,71 @@ const ActualButtonGroup = styled.div`
   gap: 12px;
   margin-top: 20px;
 `;
+
+const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove }) => {
+  if (readOnly) {
+    return (
+      <ResourceRow>
+        <ResourceInfo>
+          <ResourceName>
+            {row.employee_name || row.emp_id}
+            {isReplaced && <Badge variant="warning" style={{ fontSize: '0.58rem' }}>Replaced</Badge>}
+          </ResourceName>
+          <ResourceMeta>
+            <Badge variant={row.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
+              {row.emp_type === 'T' ? 'TL' : 'EX'}
+            </Badge>
+            {row.remarks && <span>· {row.remarks}</span>}
+          </ResourceMeta>
+        </ResourceInfo>
+        <RateActionsCol>
+          <RateTag>{row.contract_rate != null ? `₹${row.contract_rate}` : '—'}</RateTag>
+        </RateActionsCol>
+      </ResourceRow>
+    );
+  }
+ 
+  return (
+    <EditRowContainer>
+      <FormField>
+        <FormLabel>Resource {isReplaced && <Badge variant="warning" style={{ fontSize: '0.55rem' }}>Replaced</Badge>}</FormLabel>
+        {employees.length > 0 ? (
+          <FormSelect value={row.emp_id} onChange={(e) => onEmployeeChange(e.target.value)}>
+            {employees.map((emp) => (
+              <option key={emp.emp_id} value={emp.emp_id}>{emp.name}</option>
+            ))}
+          </FormSelect>
+        ) : (
+          <FormInput
+            type="text"
+            value={row.employee_name}
+            onChange={(e) => onFieldChange("employee_name", e.target.value)}
+          />
+        )}
+      </FormField>
+ 
+      <FormField>
+        <FormLabel>Employee Type</FormLabel>
+        <FormSelect value={row.emp_type} onChange={(e) => onFieldChange("emp_type", e.target.value)}>
+          <option value="E">Executive (EX)</option>
+          <option value="T">Team Lead (TL)</option>
+        </FormSelect>
+      </FormField>
+ 
+      <FormField style={{ gridColumn: "span 2" }}>
+        <FormLabel>Remarks</FormLabel>
+        <FormInput
+          type="text"
+          value={row.remarks}
+          placeholder="Remarks"
+          onChange={(e) => onFieldChange("remarks", e.target.value)}
+        />
+      </FormField>
+ 
+      <div style={{ display: "flex", alignItems: "flex-end" }}>
+        <Button size="small" variant="outlines" onClick={onRemove}>Remove</Button>
+      </div>
+    </EditRowContainer>
+  );
+};
+ 

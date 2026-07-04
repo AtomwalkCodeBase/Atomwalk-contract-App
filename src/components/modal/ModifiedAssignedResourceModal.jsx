@@ -56,6 +56,8 @@ const formatDate = (dateStr) => {
 const ResourceAllocation = () => {
   const location = useLocation();
   const activityData = location.state?.data;
+
+  console.log("activityData", activityData)
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const { start, end } = getMonthRange();
 
@@ -513,7 +515,7 @@ const ResourceAllocation = () => {
         </InfoPill>
       </Card>
 
-      <Card hoverable={false} style={{ marginTop: "1rem" }}>
+      {/* <Card hoverable={false} style={{ marginTop: "1rem" }}> */}
         <CurrentAssignments
           dateWiseAssignments={dateWiseAssignments}
           dayWindow={dayWindow}
@@ -531,12 +533,12 @@ const ResourceAllocation = () => {
         />
 
         {activityData.activityStatus !== "C" &&
-          <>
+          <div style={{display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem"}}>
 
             <Button onClick={() => setShowResourceAvailability(true)}>Add Resources</Button>
             {showResourceAvailability &&
               <Button variant="outline" onClick={() => setShowResourceAvailability(false)}>Close</Button>}
-          </>
+          </div>
 
 
         }
@@ -562,7 +564,7 @@ const ResourceAllocation = () => {
             <Button onClick={handleSubmit} color="primary" style={{ marginLeft: "auto" }}>{saveLabel}</Button>
           </div>
         )}
-      </Card>
+      {/* </Card> */}
     </Layout>
   );
 };

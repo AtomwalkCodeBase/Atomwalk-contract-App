@@ -14,10 +14,11 @@ const Tab = styled.button`
   border: none;
   border-bottom: 2px solid ${(props) => (props.active ? props.theme.colors.primary : "transparent")};
   color: ${(props) => (props.active ? props.theme.colors.primary : props.theme.colors.text)};
-  font-weight: ${(props) => (props.active ? "600" : "400")};
+  font-weight: ${(props) => (props.active ? "600" : "500")};
   cursor: pointer;
   transition: all 0.3s ease;
   white-space: nowrap;
+  font-size: ${(props) => (props.active ? props.theme.fontSizes.md : props.theme.fontSizes.sm)};
   
   &:hover {
     color: ${({ theme }) => theme.colors.primary};
