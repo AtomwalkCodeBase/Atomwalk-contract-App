@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import Modal from '../Modal'
 import { toast } from 'react-toastify';
 import styled from 'styled-components';
-import { FaFileAlt, FaUpload } from 'react-icons/fa';
+import { FaCalendarAlt, FaFileAlt, FaListUl, FaRupeeSign, FaTimes, FaUpload } from 'react-icons/fa';
 import { FiFileText } from 'react-icons/fi';
+import { getExpenseItem, postClaim } from '../../services/productServices';
+import { DateForApiFormate } from '../../utils/utils';
 
 const FormGroup = styled.div`
   margin-bottom: 1rem;
@@ -22,6 +24,19 @@ const Label = styled.label`
 const Required = styled.span`
   color: ${props => props.theme.colors.error};
 `;
+
+const FormSelect = styled.select`
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: 4px;
+  
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primaryLight};
+  }
+`
 
 const Input = styled.input`
   width: 100%;
@@ -162,39 +177,196 @@ const UploadedFile = styled.div`
 `;
 
 
-const AddOPEModal = ({ isOpen, onClose }) => {
-       const [formData, setFormData] = useState({
-      ope_amount: "",
-      claim_remarks: "",
-      file: null
-    })
+const AddOPEModal = ({ isOpen, onClose, claimData = null, fetchProfileAndClaims }) => {
+  const loggedEmpId = localStorage.getItem("cust_emp_id");
 
-       const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-      };
-    
-      const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-    
-        if (file.size > 5 * 1024 * 1024) {
-          toast.error("File size must be less than 5MB");
-          return;
-        }
-    
-        handleChange("file", file);
-      };
-    
-      const removeFile = () => { setFormData((prev) => ({ ...prev, file: null, })) }
+  const [ isLoading, setIsLoading ] = useState(false);
+  const [ isFileError, setIsFileError ] = useState(false);
+  const [expenseItemList, setExpenseItemList] = useState([]);
 
+  const initialFormData = {
+    type: "",
+    amount: "",
+    date: "",
+    claim_remarks: "",
+    file: null,
+    emp_id: loggedEmpId,
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
+
+  const selectedItem = expenseItemList.find(item => item.id === formData.type);
+  const isReceiptRequired = Boolean(selectedItem?.is_exp_bill_required);
+
+  const resetForm = useCallback(() => {
+    setFormData(initialFormData);
+    setIsFileError(false);
+  }, []);
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const fetchClaimItemList = async () => {
+    try {
+      const response = await getExpenseItem();
+      setExpenseItemList(response?.data || []);
+    } catch (error) {
+      console.error("Error fetching expense items:", error);
+      toast.error("Failed to load expense items");
+    }
+  }
+
+  const populateEditForm = useCallback((data) => {
+    if (!data?.item_id) return;
+    setFormData({
+      type: data.item_id || "",
+      amount: data.expense_amt || "",
+      date: DateForApiFormate(data.expense_date, true),
+      claim_remarks: data.remarks || "",
+      file: data.submitted_file_1 
+        ? { uri: data.submitted_file_1, name: data.submitted_file_1.split("/").pop().split("?")[0] }
+        : null,
+      emp_id: loggedEmpId,
+    });
+  }, [loggedEmpId]);
+
+  useEffect(() => {
+    fetchClaimItemList();
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (claimData?.item_id) {
+        populateEditForm(claimData);
+      } else {
+        resetForm();
+      }
+    }
+  }, [isOpen, claimData, populateEditForm, resetForm]);
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+    
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      e.target.value = "";
+      return;
+    }
+
+    setIsFileError(false);
+    handleChange("file", file);
+  };
+    
+  const removeFile = () => {handleChange("file", null)};
+
+    const handleSubmit = async () => {
+    if (!formData.type) return toast.error("Please select an expense item");
+    if (!formData.date) return toast.error("Please select expense date");
+    if (!formData.amount || Number(formData.amount) <= 0) {
+      return toast.error("Please enter a valid OPE amount");
+    }
+    if (isReceiptRequired && !formData.file) {
+      setIsFileError(true);
+      return;
+    }
+
+    setIsLoading(true);
+    setIsFileError(false);
+
+  try {
+      const masterClaimId = claimData?.master_data?.master_claim_id;
+      const dateObj = new Date(formData.date)
+      const expense_date = `${dateObj.getDate().toString().padStart(2, '0')}-${(dateObj.getMonth() + 1).toString().padStart(2, '0')}-${dateObj.getFullYear()}`
+      const formDatas = new FormData() 
+
+      if (formData.file) {
+        formDatas.append("file_1", formData.file);
+      }
+      formDatas.append("remarks", formData.claim_remarks || "")
+      formDatas.append("item", formData.type)
+      formDatas.append("quantity", "1")
+      formDatas.append("expense_amt", formData.amount)
+      formDatas.append("expense_date", expense_date)
+      formDatas.append("emp_id", formData.emp_id)
+      formDatas.append("quantity", 1)
+      // if (value === "save") {
+      //   if (claimupdate?.substatusText === "Back To Claimant") {
+      //     formDatas.append("call_mode", "CLAIM_RESUBMIT");
+      //   } else {
+      //     formDatas.append("call_mode", claimupdate?.item_id ? "CLAIM_UPDATE" : "CLAIM_SAVE");
+      //   }
+      // }
+      formDatas.append("call_mode", claimData?.item_id ? "CLAIM_UPDATE" : "CLAIM_SAVE");
+      
+      if(masterClaimId) {
+          formDatas.append('m_claim_id', masterClaimId);
+      }
+      if( claimData?.item_id) {
+        formDatas.append("claim_id", claimData.id)
+      }
+      for (let [key, value] of formDatas.entries()) {
+        console.log(key, value);
+      }
+      // const res = await postClaim(formDatas)
+
+      const res = {status: 200}
+      if (res.status === 200) {
+        setIsLoading(false)
+        handleClose();
+        toast.success(claimData?.item_id ? "Update claim successfully" : "Add claim successfully")
+        setIsFileError(false)
+        await fetchProfileAndClaims();
+      } else {
+        toast.error("Claim Submission Error", "Failed to claim. Unexpected response.")
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || "Submission failed")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title='Add OPE' >
+        <Modal isOpen={isOpen} onClose={handleClose} title={claimData?.item_id ? `Edit OPE (${claimData?.master_data?.master_claim_id})` : "Add OPE"} saveButtonText={claimData?.item_id ? "Update OPE" : "Add OPE"} onSave={handleSubmit} saveDisabled={isLoading}>
             <div style={{ padding: "0.2rem" }}>
-                {/* <h4 style={{ textAlign: "left", marginBottom: "1rem" }}>ADD OPE </h4> */}
+              <FormGroup>
+              <Label htmlFor="type"><FaListUl />Expense Item</Label>
+              <FormSelect id="type" name="type" value={formData.type} onChange={(e) => handleChange("type", e.target.value)} required>
+                <option value="">Select Expense Item</option>
+                {expenseItemList.map((value, index) => (
+                  <option key={index} value={value.id}>
+                    {value.name}
+                  </option>
+                ))}
+              </FormSelect>
+              </FormGroup>
+
+              <FormGroup>
+              <Label htmlFor="date"><FaCalendarAlt /> Date of Expense</Label>
+              <div style={{ position: "relative" }}>
+                <Input
+                  id="date"
+                  name="date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => handleChange("date", e.target.value)}
+                  required
+                  // style={{ paddingLeft: "2rem" }}
+                />
+                {/* <FaCalendarAlt style={{ position: "absolute", left: "0.75rem", top: "0.75rem", color: "#666" }} /> */}
+              </div>
+            </FormGroup>
+
                 <FormGroup>
-                    <Label>OPE Amount <Required>*</Required></Label>
-                    <Input type="number" min={0} value={formData.ope_amount} onChange={(e) => handleChange("ope_amount", e.target.value)} placeholder="Enter OPE Amount" />
+                    <Label> <FaRupeeSign />OPE Amount <Required>*</Required></Label>
+                    <Input type="number" min={0} value={formData.amount} onChange={(e) => handleChange("amount", e.target.value)} placeholder="Enter OPE Amount" />
                 </FormGroup>
 
                 <FormGroup>
@@ -211,7 +383,7 @@ const AddOPEModal = ({ isOpen, onClose }) => {
 
                 <FormGroup>
                     <Label>
-                        Receipts/Attachments
+                        Receipts/Attachments {isReceiptRequired && <Required>*</Required>}
                     </Label>
                     <FileUploadContainer onClick={() => document.getElementById("file-upload").click()}>
                         <FileInput
@@ -233,20 +405,25 @@ const AddOPEModal = ({ isOpen, onClose }) => {
                             </FileUploadTextWrapper>
                         </FileUploadContent>
                     </FileUploadContainer>
+                    {isFileError && (
+                        <span style={{ color: "red", fontSize: "0.75rem", marginTop: "0.3rem", display: "block",}}>
+                          Please upload a receipt/attachment
+                        </span>
+                      )}
 
                     {formData.file && (
                         <UploadedFile>
-                            {formData.file.type.startsWith("image/") ? (
+                            {formData.file?.type?.startsWith("image/") ? (
                                 <img
                                     src={URL.createObjectURL(formData.file)}
                                     alt="preview"
                                     style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }}
                                 />
                             ) : (
-                                <FaFileAlt color={(theme) => theme.color.text} />
+                                <FaFileAlt color={(theme) => theme.colors.text} />
                             )}
-                            <span title={formData.file.name}>{formData.file.name}</span>
-                            <button type="button" onClick={() => removeFile(1)}>
+                            <span title={formData?.file?.name}>{formData?.file?.name}</span>
+                            <button type="button" onClick={(e) => {e.stopPropagation(); removeFile()}}>
                                 <FaTimes />
                             </button>
                         </UploadedFile>

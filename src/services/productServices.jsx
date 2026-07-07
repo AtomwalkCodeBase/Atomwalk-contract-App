@@ -1,4 +1,4 @@
-import {  processAppointee, setuserpin, getCompany, forgetPin,  profileDtlURL, getCustomerDetailListURL, processAppointeeFileUpload, employeeTaskAllocationData, processAllocation, contractAllocationData, processActivityAllocation,} from "../services/ConstantServies";
+import {  processAppointee, setuserpin, getCompany, forgetPin,  profileDtlURL, getCustomerDetailListURL, processAppointeeFileUpload, employeeTaskAllocationData, processAllocation, contractAllocationData, processActivityAllocation, addClaim, processClaim, getEmpClaimdata, getExpenseItemList,} from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosget, authAxiosPost } from "./HttpMethod";
 
 export function getCompanyName(isFms) {
@@ -73,4 +73,34 @@ export function postAllocationData(activity_data) {
 }
 export function postActivityAllocationData(activity_data) {
   return authAxiosFilePost(processActivityAllocation, activity_data);
+}
+
+export function postClaim(claim_data) {
+  return authAxiosFilePost(addClaim, claim_data)
+}
+
+export function postClaimAction(claim_type) {
+  let data = {};
+  if (claim_type) {
+    data['claim_data'] = claim_type;
+  }
+  return authAxiosPost(processClaim, data)
+}
+
+export function getEmpClaim(call_type, emp_id, period) {
+  let data = {};
+  if (call_type) {
+    data['call_mode'] = call_type;
+  }
+  if (emp_id) {
+    data['emp_id'] = emp_id;
+  }
+  if (period){
+    data['period'] = period;
+  }
+  return authAxios(getEmpClaimdata, data)
+}
+
+export function getExpenseItem() {
+  return authAxios(getExpenseItemList)
 }

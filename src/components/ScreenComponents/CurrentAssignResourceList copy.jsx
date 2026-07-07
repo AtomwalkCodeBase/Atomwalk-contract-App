@@ -5,8 +5,10 @@ import Card from "../Card";
 import DataTable, { Td } from "../DataTable";
 import Button from "../Button";
 import Badge from "../Badge";
-import { FaCalendarAlt, FaEdit, FaFileAlt, FaMapMarkerAlt, FaTrash, FaUser, FaUserTie } from "react-icons/fa";
+import { FaCalendarAlt, FaEdit, FaFileAlt, FaMapMarkerAlt, FaPlus, FaTrash, FaUser, FaUserCheck, FaUserPlus, FaUserSlash, FaUserTie } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { LuCopy, LuCopyPlus } from "react-icons/lu";
+import { postAllocationData } from "../../services/productServices";
 
 const ScrollableTableWrapper = styled.div`
   max-height: 800px;
@@ -245,6 +247,39 @@ const getDummyClaims = (dStr) => [
   { category: "Food", id: `CLM-${dStr}-02`, amount: 450, file: "#" },
 ];
 
+
+const toLocalDateOnly = (value) => {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return new Date(
+      value.getFullYear(),
+      value.getMonth(),
+      value.getDate()
+    );
+  }
+
+  // supports YYYY-MM-DD
+  const [year, month, day] = String(value)
+    .split("T")[0]
+    .split("-")
+    .map(Number);
+
+  return new Date(year, month - 1, day);
+};
+
+const toInputDate = (date) => {
+  if (!date) return "";
+
+  const d = date instanceof Date ? date : toLocalDateOnly(date);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 /* ---------------------------------- */
 /* Main Component                      */
 /* ---------------------------------- */
@@ -263,6 +298,8 @@ const CurrentAssignments = ({
   activityData,
   employees = [],
 }) => {
+  const loggedEmpId = localStorage.getItem("cust_emp_id");
+
   const [allAEntries, setAllAEntries] = useState(activityData?.allAEntries || []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDate, setModalDate] = useState("");
@@ -270,6 +307,62 @@ const CurrentAssignments = ({
   const [noOfItems, setNoOfItems] = useState("");
   const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [actualDraftsByDate, setActualDraftsByDate] = useState({});
+  const [isActualRangeModalOpen, setIsActualRangeModalOpen] = useState(false);
+  const [actualStartDate, setActualStartDate] = useState("");
+  const [actualEndDate, setActualEndDate] = useState("");
+
+  const a_id = activityData?.original_A?.id || activityData?.a_id || null;
+  const [activityStarted, setActivityStarted] = useState(!!a_id);
+
+  const handleStartActivity = () => {
+    // TODO: call your START activity API here if required, then:
+    setActivityStarted(true);
+    toast.success("Activity started. You can now record actuals.");
+  };
+
+  const handleCancelCopyAllActual = () => {
+    setActualDraftsByDate((prev) => {
+      const next = {};
+      Object.entries(prev).forEach(([dStr, draft]) => {
+        if (draft.confirmed) next[dStr] = draft; // keep confirmed ones
+      });
+      return next;
+    });
+  };
+
+  const hasUnconfirmedDrafts = Object.values(actualDraftsByDate).some((d) => !d.confirmed);
+
+  const handleCancelCopyActual = (dStr) => {
+    setActualDraftsByDate((prev) => {
+      const next = { ...prev };
+      delete next[dStr];
+      return next;
+    });
+  };
+
+  const handleAddActualRow = (dStr) => {
+    setActualDraftsByDate((prev) => {
+      const draft = prev[dStr] || { confirmed: false, rows: [] };
+      return {
+        ...prev,
+        [dStr]: {
+          ...draft,
+          rows: [
+            ...draft.rows,
+            {
+              rowKey: crypto.randomUUID(),
+              original_emp_id: null, // brand-new resource → always "Replaced"/new
+              emp_id: employees[0]?.emp_id || "",
+              employee_name: employees[0]?.name || "",
+              emp_type: Number(employees[0]?.grade_level) > 1 ? "T" : "E",
+              remarks: "",
+              contract_rate: 0,
+            },
+          ],
+        },
+      };
+    });
+  };
 
 const handleCopyActual = (dStr, planAssignments) => {
   setActualDraftsByDate((prev) => ({
@@ -289,14 +382,39 @@ const handleCopyActual = (dStr, planAssignments) => {
   }));
 };
 
+const handleOpenActualRangeModal = () => {
+  setActualStartDate(minActualDate);
+  setActualEndDate(maxActualDate);
+  setIsActualRangeModalOpen(true);
+};
+
 const handleCopyAllActual = () => {
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+
   setActualDraftsByDate((prev) => {
     const next = { ...prev };
+
     plannedDates.forEach((d) => {
+      const currentDate = new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate()
+      );
+
+      // Skip future dates
+      if (currentDate > todayDate) return;
+
       const dStr = formatToApiDate(d);
-      if (next[dStr]) return; // don't clobber an existing draft for that date
-      const planAssignments = dateWiseAssignments[dStr] || [];
+
+      // Don't overwrite existing actual
+      if (next[dStr]) return;
+
+      const planAssignments =
+        dateWiseAssignments[dStr] || [];
+
       if (planAssignments.length === 0) return;
+
       next[dStr] = {
         confirmed: false,
         rows: planAssignments.map((row) => ({
@@ -310,6 +428,7 @@ const handleCopyAllActual = () => {
         })),
       };
     });
+
     return next;
   });
 };
@@ -353,11 +472,47 @@ const handleRemoveActualRow = (dStr, rowKey) => {
   });
 };
 
-const handleConfirmActual = (dStr) => {
+const handleConfirmActual = async (dStr) => {
   setActualDraftsByDate((prev) => ({ ...prev, [dStr]: { ...prev[dStr], confirmed: true } }));
-  // TODO: call your save API here with actualDraftsByDate[dStr].rows, e.g.:
-  // onConfirmActual?.(dStr, actualDraftsByDate[dStr]?.rows || []);
-};
+  }
+const handleConfirmFinalActual = async (dStr) => {
+    const draft = actualDraftsByDate[dStr];
+    if (!draft || draft.rows.length === 0) {
+      toast.error("No resources to save");
+      return;
+    }
+
+    try {
+      const actualId = a_id || activityData?.original_P?.id;
+
+      const c_emp_list = draft.rows.map((r) => ({
+        emp_id: r.emp_id,
+        emp_type: r.emp_type,
+        start_date: dStr,
+        end_date: dStr,
+        remarks: r.remarks || "",
+        contract_rate: r.contract_rate || 0,
+      }));
+
+      const fd = new FormData();
+      fd.append("emp_id", loggedEmpId);
+      fd.append("p_id", actualId); // for actual → pass a_id in p_id
+      const hasExistingActual = allAEntries.some((e) => e.start_date === dStr);
+      fd.append("call_mode", hasExistingActual ? "UPDATE" : "ADD");
+      fd.append("c_emp_list", JSON.stringify(c_emp_list));
+
+      await postAllocationData(fd);
+
+      for (let [key, value] of fd.entries()) {
+        console.log(key, value);
+      }
+
+      setActualDraftsByDate((prev) => ({ ...prev, [dStr]: { ...prev[dStr], confirmed: true } }));
+      toast.success("Actual saved successfully");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save actual");
+    }
+  }
 
 const handleEditActualAgain = (dStr) => {
   setActualDraftsByDate((prev) => ({ ...prev, [dStr]: { ...prev[dStr], confirmed: false } }));
@@ -430,17 +585,47 @@ const handleEditActualAgain = (dStr) => {
     return (dateWiseAssignments[dStr] || []).length > 0;
   });
 
+  const today = new Date();
+today.setHours(0, 0, 0, 0);
+
+const activityStartDate = toLocalDateOnly(activityStart);
+const activityEndDate = toLocalDateOnly(activityEnd);
+
+// End date should never exceed today
+const maxAllowedActualDate =
+  activityEndDate && activityEndDate < today
+    ? activityEndDate
+    : today;
+
+const minActualDate = activityStartDate
+  ? toInputDate(activityStartDate)
+  : "";
+
+const maxActualDate = toInputDate(maxAllowedActualDate);
+
   console.log("activityData", activityData)
+  
   return (
     <>
-
-
-      <Card title="Current Assignments" hoverable={false}>
-        <ButtonRows>
+  <Card
+    title="Current Assignments"
+    hoverable={false}
+    headerAction={
+      <RenderButton
+        activityStarted={activityStarted}
+        handleStartActivity={handleStartActivity}
+        handleCopyAllActual={handleCopyAllActual}
+        handleCancelCopyAllActual={handleCancelCopyAllActual}
+        hasUnconfirmedDrafts={hasUnconfirmedDrafts}
+        handleOpenActualRangeModal={handleOpenActualRangeModal}
+      />
+    }
+  >  
+      {/* <ButtonRows>
     <Button variant="primary" onClick={handleCopyAllActual}>
       Copy Actual (All Dates)
     </Button>
-  </ButtonRows>
+  </ButtonRows> */}
         <ScrollableTableWrapper>
           {plannedDates.length === 0 ? (
             <EmptyRow style={{ fontSize: "1rem", padding: "2rem" }}>
@@ -491,7 +676,20 @@ const handleEditActualAgain = (dStr) => {
                     <PlanActualGrid>
                       {/* PLAN */}
                       <SubPanel>
-                        <SubPanelHeader $variant="plan">Plan</SubPanelHeader>
+                        <SubPanelHeader $variant="plan"  style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>Plan</span>
+
+                           {!actualDraft && planAssignments.length > 0 && (
+                              <Button size="sm" variant="outline" onClick={() => handleCopyActual(dStr, planAssignments)}>
+                                <LuCopy /> Copy Actual
+                              </Button>
+                            )}
+
+                            {activityStarted && actualDraft && !actualDraft.confirmed && (
+                              <Button size="sm" variant="outlines" onClick={() => handleCancelCopyActual(dStr)}>
+                                Cancel Copy Actual
+                              </Button>
+                            )}
+                        </SubPanelHeader>
                         {planAssignments.length === 0 ? (
                           <EmptyRow>No resources planned</EmptyRow>
                         ) : (
@@ -584,14 +782,18 @@ const handleEditActualAgain = (dStr) => {
     style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
   >
     <span>Actual</span>
-    {!actualDraft && planAssignments.length > 0 && (
-      <Button size="small" variant="outlines" onClick={() => handleCopyActual(dStr, planAssignments)}>
+    {/* {!actualDraft && planAssignments.length > 0 && (
+      <Button size="sm" variant="outlines" onClick={() => handleCopyActual(dStr, planAssignments)}>
         Copy Actual
       </Button>
-    )}
+    )} */}
   </SubPanelHeader>
  
   {!actualDraft && <EmptyRow>No actual data recorded</EmptyRow>}
+
+  {actualDraft && actualDraft.rows.length === 0 && (
+    <EmptyRow>No resources added. Click &quot;Add Resource&quot; to add one.</EmptyRow>
+  )}
  
   {actualDraft &&
     actualDraft.rows.map((row) => (
@@ -600,25 +802,29 @@ const handleEditActualAgain = (dStr) => {
         row={row}
         employees={employees}
         readOnly={actualDraft.confirmed}
-        isReplaced={row.emp_id !== row.original_emp_id}
+        // isReplaced={row.emp_id !== row.original_emp_id}
+        isReplaced={row.original_emp_id != null && row.emp_id !== row.original_emp_id}
         onFieldChange={(field, value) => handleActualFieldChange(dStr, row.rowKey, field, value)}
         onEmployeeChange={(emp_id) => handleActualEmployeeChange(dStr, row.rowKey, emp_id)}
         onRemove={() => handleRemoveActualRow(dStr, row.rowKey)}
       />
     ))}
  
-  {actualDraft && !actualDraft.confirmed && actualDraft.rows.length > 0 && (
-    <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 10px" }}>
-      <Button size="small" variant="successGhost" onClick={() => handleConfirmActual(dStr)}>
-        Confirm
+  {actualDraft && !actualDraft.confirmed && (
+    <div style={{ display: "flex",gap: "0.5rem" , justifyContent: "flex-end", padding: "8px 10px" }}>
+      <Button size="sm" variant="outline" onClick={() => handleAddActualRow(dStr)}>
+        <FaUserPlus /> Add resource
       </Button>
+     {actualDraft.rows.length > 0 && ( <Button size="sm" variant="success" onClick={() => handleConfirmActual(dStr)}>
+       <FaUserCheck /> Confirm
+      </Button> )}
     </div>
   )}
  
   {actualDraft?.confirmed && (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px" }}>
       <Badge variant="success" style={{ fontSize: "0.6rem" }}>Confirmed</Badge>
-      <Button size="small" variant="outlines" onClick={() => handleEditActualAgain(dStr)}>
+      <Button size="sm" variant="outlines" onClick={() => handleEditActualAgain(dStr)}>
         Edit
       </Button>
     </div>
@@ -639,10 +845,13 @@ const handleEditActualAgain = (dStr) => {
                         <Button>View claims</Button>
                       </>
                     }
-
+{/* 
                     {planAssignments.length !== 0 && activityData.activityStatus === "C" && <Button onClick={() => handleOpenActualModal(dStr)}>
                       {hasActual ? "Update Actual" : "Add Actual"}
-                    </Button>}
+                    </Button>} */}
+                     <Button onClick={() => handleConfirmFinalActual(dStr)}>
+                      Add Actual for all Dates
+                    </Button>
                   </ButtonRows>
                 </DateBlock>
               );
@@ -656,9 +865,42 @@ const handleEditActualAgain = (dStr) => {
           <ActualModalContent onClick={(e) => e.stopPropagation()}>
             <ActualModalHeader>{isUpdateMode ? "Update Actual" : "Add Actual"}</ActualModalHeader>
             <ActualFormGroup>
-              <ActualLabel>Date</ActualLabel>
-              <ActualInput type="text" value={modalDate} readOnly />
+              <ActualLabel>Start Date</ActualLabel>
+                <ActualInput
+          type="date"
+          value={actualStartDate}
+          min={minActualDate}
+          max={maxActualDate}
+          onChange={(e) => {
+            const value = e.target.value;
+
+            setActualStartDate(value);
+
+            // If end date becomes smaller than start date,
+            // automatically move end date
+            if (
+              actualEndDate &&
+              value > actualEndDate
+            ) {
+              setActualEndDate(value);
+            }
+          }}
+        />
             </ActualFormGroup>
+                  <ActualFormGroup>
+        <ActualLabel>End Date</ActualLabel>
+
+        <ActualInput
+          type="date"
+          value={actualEndDate}
+          min={actualStartDate || minActualDate}
+          max={maxActualDate}
+          onChange={(e) =>
+            setActualEndDate(e.target.value)
+          }
+        />
+      </ActualFormGroup>
+
             <ActualFormGroup>
               <ActualLabel>Resource Name</ActualLabel>
               <ActualSelect value={selectedEmpId} onChange={(e) => setSelectedEmpId(e.target.value)}>
@@ -684,9 +926,36 @@ const handleEditActualAgain = (dStr) => {
               <Button variant="outlines" onClick={() => setIsModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" onClick={handleSaveActual}>
+              {/* <Button variant="primary" onClick={handleSaveActual}>
                 Save
-              </Button>
+              </Button> */}
+                      <Button
+          variant="primary"
+          onClick={() => {
+            if (!actualStartDate || !actualEndDate) {
+              toast.error(
+                "Please select start date and end date"
+              );
+              return;
+            }
+
+            if (actualStartDate > actualEndDate) {
+              toast.error(
+                "Start date cannot be after end date"
+              );
+              return;
+            }
+
+            console.log("Selected actual range:", {
+              start_date: actualStartDate,
+              end_date: actualEndDate,
+            });
+
+            setIsActualRangeModalOpen(false);
+          }}
+        >
+          Continue
+        </Button>
             </ActualButtonGroup>
           </ActualModalContent>
         </ActualModalOverlay>
@@ -924,9 +1193,41 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
       </FormField>
  
       <div style={{ display: "flex", alignItems: "flex-end" }}>
-        <Button size="small" variant="outlines" onClick={onRemove}>Remove</Button>
+        <Button size="sm" variant="outlines" onClick={onRemove}> <FaUserSlash /> Remove</Button>
       </div>
     </EditRowContainer>
   );
 };
- 
+
+const RenderButton = ({ activityStarted, handleStartActivity, handleCopyAllActual, handleCancelCopyAllActual, hasUnconfirmedDrafts, handleOpenActualRangeModal}) => {
+
+  if (!activityStarted) {
+    return (
+      <ButtonRows>
+        <Button size="sm" variant="primary" onClick={handleStartActivity}>
+          Start Activity
+        </Button>
+      </ButtonRows>
+    );
+  }
+
+  return(
+    <ButtonRows>
+     <Button size="sm" variant="primary" onClick={() => handleCopyAllActual()}>
+      <LuCopyPlus /> Copy Actual (All Dates)
+    </Button> 
+
+    {hasUnconfirmedDrafts && (
+        <Button size="sm" variant="outlines" onClick={() => handleCancelCopyAllActual()}>
+          Cancel Copy Actual
+        </Button>
+      )}
+
+     <Button size="sm" variant="outline" onClick={() => handleOpenActualRangeModal()}>
+        {/* {hasActual ? "Update Actual" : "Add Actual"} */}
+        <FaPlus /> Add Actual
+      </Button>
+    
+    </ButtonRows>
+  )
+}

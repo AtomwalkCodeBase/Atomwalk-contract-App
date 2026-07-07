@@ -33,3 +33,8 @@ export const employeeTaskAllocationData = `${newhrendpoint}/get_emp_allocation_d
 export const processActivityAllocation = `${newhrendpoint}/process_emp_allocation/${db_name}/`;
 export const processAllocation = `${newhrendpoint}/process_contract_allocation/${db_name}/`;
 export const contractAllocationData = `${newhrendpoint}/get_contract_allocation_data/${db_name}/`;
+
+export const addClaim = `${newhrendpoint}/add_claim/${db_name}/`;
+export const processClaim = `${newhrendpoint}/process_claim/${db_name}/`;
+export const getEmpClaimdata = `${newhrendpoint}/get_claim_list/${db_name}/`;
+export const getExpenseItemList = `${newhrendpoint}/expense_item_list/${db_name}/`;

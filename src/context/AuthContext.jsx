@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
     const fetchcustomerProfile = async () => {
       const custId = localStorage.getItem("custId");
 
-              if (!custId) {
+        if (!custId) {
           setLoading(false); // ✅ no user → stop loading
           return;
         }

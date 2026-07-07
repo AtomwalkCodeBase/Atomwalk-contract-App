@@ -14,7 +14,8 @@ export async function getEmployeeInfo() {
             data['emp_id'] = emp_id;
         }
 
-        return authAxios(profileDtlURL, data);
+        const response = await authAxios(profileDtlURL, data);
+        return response;
     } catch (error) {
         console.error("Error fetching profile info:", error);
         throw error;

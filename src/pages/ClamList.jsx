@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
 import styled from 'styled-components';
 import { theme } from '../styles/Theme';
@@ -6,7 +6,7 @@ import StatsCard from '../components/StatsCard';
 import Button from '../components/Button';
 import { formatDate, formatMonthLabel, formatRetainerActivities, formatToDDMMYYYY, formatWeekLabel, getMonthRange, getStatusVariant } from '../utils/utils';
 import { toast } from 'react-toastify';
-import { getEmpAllocationData } from '../services/productServices';
+import { getEmpAllocationData, getEmpClaim, getemployeeLists } from '../services/productServices';
 import DataTable, { Td } from '../components/DataTable';
 import { useFilter } from '../hooks/useFilter';
 // import { formatDate } from 'date-fns';
@@ -249,13 +249,7 @@ const SearchBox = styled.input`
 
 const activityColumn = [<>Customer<br />Order Item ID</>, "Audit Type", "Planned Date", "Clam Approved", "Activity Status", "Actions"]
 
-
-const stats_card = [
-  { label: "Total Order Items", value: 20, color: "primary", icon: <FaBoxes /> },
-  { label: "Total Cost", value: "120,000", color: "warning", icon: <FaWallet /> },
-  { label: "Total OPE", value: "15,000", color: "success", icon: <FaFileInvoice /> },
-  { label: "AMOUNT TO BE PAID", value: "135,000", color: "error", icon: <FaHandHoldingUsd /> }
-]
+const currency = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 function getMatchingRetainerList(original_P = {}) {
   const {
@@ -279,13 +273,15 @@ const ClamList = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [assignedActivity, setAssignedActivity] = useState([]);
+  const [claimList, setClaimList] = useState([]);
   const [activeRangeType, setActiveRangeType] = useState("month");
   const [offset, setOffset] = useState(0);
   const emp_id = localStorage.getItem("cust_emp_id");
   const [dateRange, setDateRange] = useState(() => getMonthRange({ type: "current", mode: "month" }));
   useEffect(() => {
     if (emp_id) {
-      fetchEmpAllocationData()
+      fetchEmpAllocationData();
+      fetchProfileAndClaims();
     }
   }, [emp_id]);
 
@@ -321,6 +317,57 @@ const ClamList = () => {
     }
   }
 
+    const fetchProfileAndClaims = useCallback(async () => {
+      if (!emp_id) return;
+  
+      try {
+        const profileRes = await getemployeeLists({ emp_id: emp_id });
+        const profile = profileRes?.data?.[0] || {};
+  
+        if (profile.id) {
+          const claimRes = await getEmpClaim("GET", profile.id, "CY");
+          setClaimList(claimRes?.data || []);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Failed to load profile or claims");
+        setClaimList([]);
+      }
+    }, [emp_id]);
+
+    const filteredClaimsByDate = useMemo(() => {
+      if (!Array.isArray(claimList)) return [];
+
+      const startDate = new Date(`${dateRange.start}T00:00:00`);
+      const endDate = new Date(`${dateRange.end}T23:59:59`);
+
+      return claimList.filter((claim) => {
+        if (!claim?.claim_date) return false;
+
+        // claim_date format: 07-Jul-2026
+        const claimDate = new Date(claim.claim_date);
+
+        return claimDate >= startDate && claimDate <= endDate;
+      });
+    }, [claimList, dateRange.start, dateRange.end]);
+
+    const activitiesWithClaims = useMemo(() => {
+    if (!Array.isArray(assignedActivity)) return [];
+
+    return assignedActivity.map((activity) => {
+
+      const activityOrderItemId = activity?.order_item_id ?? activity?.original_P?.order_item_id;
+      const matchedClaims = filteredClaimsByDate.filter((claim) => String(claim?.order_item_id) === String(activityOrderItemId));
+
+      return {
+        ...activity,
+        claims: matchedClaims,
+        hasClaim: matchedClaims.length > 0,
+      };
+    });
+  }, [assignedActivity, filteredClaimsByDate]);
+
+  console.log("activitiesWithClaims", activitiesWithClaims)
 
   const handleRangeChange = (type) => {
     setActiveRangeType(type);
@@ -343,6 +390,53 @@ const ClamList = () => {
   };
 
   const filteredActivities = getFilteredAndSortedActivities();
+
+  const claimStats = useMemo(() => {
+  return filteredClaimsByDate.reduce(
+    (acc, claim) => {
+      acc.totalOPE += Number(claim?.expense_amt || 0);
+      acc.totalSettlement += Number(claim?.settlement_amt || 0);
+
+      return acc;
+    },
+    {
+      totalOPE: 0,
+      totalSettlement: 0,
+    }
+  );
+}, [filteredClaimsByDate]);
+
+const amountToBePaid = claimStats.totalOPE - claimStats.totalSettlement;
+
+const stats_card = useMemo(
+  () => [
+    {
+      label: "Total Order Items",
+      value: activitiesWithClaims.length,
+      color: "primary",
+      icon: <FaBoxes />,
+    },
+    {
+      label: "Total OPE",
+      value: currency(claimStats.totalOPE),
+      color: "success",
+      icon: <FaFileInvoice />,
+    },
+    {
+      label: "Total Settlement",
+      value: currency(claimStats.totalSettlement),
+      color: "warning",
+      icon: <FaWallet />,
+    },
+    {
+      label: "AMOUNT TO BE PAID",
+      value: currency(amountToBePaid),
+      color: "error",
+      icon: <FaHandHoldingUsd />,
+    },
+  ],
+  [activitiesWithClaims.length, claimStats.totalSettlement, claimStats.totalOPE, amountToBePaid,]
+);
 
   const FilteredData = useFilter({
     data: filteredActivities, fields: ["customer_name", "order_item_key", "store_name", "audit_type"],
@@ -457,15 +551,15 @@ const ClamList = () => {
                 </Td>
                 <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
                 <Td>
-                  {employee.activityStatus !== "C" && <Button disabled={true}>not able to clam yet</Button>}
+                  {/* {employee.activityStatus !== "C" && <Button disabled={true}>not able to clam yet</Button>} */}
 
-                  {employee.activityStatus === "C" &&
+                  {/* {employee.activityStatus === "C" && */}
                     <ButtonGroup>
-                      <Button onClick={() => navigate('/clamDetails')}>Clam</Button>
+                      <Button onClick={() => navigate('/clamDetails', { state: { data: employee } })}>Clam</Button>
 
                       {/* <Button>View Clam</Button> */}
                     </ButtonGroup>
-                  }
+                  {/* } */}
 
                 </Td>
               </>

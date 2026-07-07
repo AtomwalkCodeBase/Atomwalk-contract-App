@@ -343,86 +343,36 @@ const ActivityListScreen = () => {
     return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
   };
 
-const [selectedMonth, setSelectedMonth] = useState(storedSelection?.selectedMonth || getCurrentMonth());
-const [selectedWeek, setSelectedWeek] = useState(storedSelection?.selectedWeek || getCurrentWeek());
+  const [selectedMonth, setSelectedMonth] = useState(storedSelection?.selectedMonth || getCurrentMonth());
+  const [selectedWeek, setSelectedWeek] = useState(storedSelection?.selectedWeek || getCurrentWeek());
 
-useEffect(() => {
-  if (typeof window !== 'undefined') {
-    window.sessionStorage.setItem(
-      ACTIVITY_LIST_STORAGE_KEY,
-      JSON.stringify({
-        tab,
-        activeRangeType,
-        selectedMonth,
-        selectedWeek,
-        dateRange,
-      })
-    );
-  }
-}, [tab, activeRangeType, selectedMonth, selectedWeek, dateRange]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(
+        ACTIVITY_LIST_STORAGE_KEY,
+        JSON.stringify({
+          tab,
+          activeRangeType,
+          selectedMonth,
+          selectedWeek,
+          dateRange,
+        })
+      );
+    }
+  }, [tab, activeRangeType, selectedMonth, selectedWeek, dateRange]);
 
-useEffect(() => {
-  if (emp_id) {
-    fetchEmpAllocationData(dateRange.start, dateRange.end)
-  }
-}, [emp_id]);
+  useEffect(() => {
+    if (emp_id) {
+      fetchEmpAllocationData(dateRange.start, dateRange.end)
+    }
+  }, [emp_id]);
 
-const handleMonthChange = (e) => {
-  const value = e.target.value;
+  const handleMonthChange = (e) => {
+    const value = e.target.value;
 
-  setSelectedMonth(value);
+    setSelectedMonth(value);
 
-  const [year, month] = value.split("-").map(Number);
-
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0);
-
-  const range = {
-    start: formatDate2(start),
-    end: formatDate2(end),
-  };
-
-  setDateRange(range);
-  fetchEmpAllocationData(range.start, range.end);
-};
-
-const handleWeekChange = (e) => {
-  const value = e.target.value;
-
-  setSelectedWeek(value);
-
-  const range = getWeekRange(value);
-  
-  const formattedRange = {
-    start: formatDate2(new Date(range.start)),
-    end: formatDate2(new Date(range.end)),
-  };
-
-  setDateRange(formattedRange);
-  fetchEmpAllocationData(formattedRange.start, formattedRange.end);
-};
-
-const handleDateChange = (e) => {
-  const value = e.target.value;
-  setSelectedDate(value);
-
-  const start = new Date(value);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-
-  const range = {
-    start: formatDate2(start),
-    end: formatDate2(end),
-  };
-
-  setDateRange(range);
-  fetchEmpAllocationData(range.start, range.end);
-};
-const handleRangeChange = (type) => {
-  setActiveRangeType(type);
-
-  if (type === "month") {
-    const [year, month] = selectedMonth.split("-").map(Number);
+    const [year, month] = value.split("-").map(Number);
 
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 0);
@@ -434,9 +384,15 @@ const handleRangeChange = (type) => {
 
     setDateRange(range);
     fetchEmpAllocationData(range.start, range.end);
-  } else {
-    const range = getWeekRange(selectedWeek);
-    
+  };
+
+  const handleWeekChange = (e) => {
+    const value = e.target.value;
+
+    setSelectedWeek(value);
+
+    const range = getWeekRange(value);
+
     const formattedRange = {
       start: formatDate2(new Date(range.start)),
       end: formatDate2(new Date(range.end)),
@@ -444,8 +400,52 @@ const handleRangeChange = (type) => {
 
     setDateRange(formattedRange);
     fetchEmpAllocationData(formattedRange.start, formattedRange.end);
-  }
-};
+  };
+
+  const handleDateChange = (e) => {
+    const value = e.target.value;
+    setSelectedDate(value);
+
+    const start = new Date(value);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+
+    const range = {
+      start: formatDate2(start),
+      end: formatDate2(end),
+    };
+
+    setDateRange(range);
+    fetchEmpAllocationData(range.start, range.end);
+  };
+  const handleRangeChange = (type) => {
+    setActiveRangeType(type);
+
+    if (type === "month") {
+      const [year, month] = selectedMonth.split("-").map(Number);
+
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0);
+
+      const range = {
+        start: formatDate2(start),
+        end: formatDate2(end),
+      };
+
+      setDateRange(range);
+      fetchEmpAllocationData(range.start, range.end);
+    } else {
+      const range = getWeekRange(selectedWeek);
+
+      const formattedRange = {
+        start: formatDate2(new Date(range.start)),
+        end: formatDate2(new Date(range.end)),
+      };
+
+      setDateRange(formattedRange);
+      fetchEmpAllocationData(formattedRange.start, formattedRange.end);
+    }
+  };
 
   const fetchEmpAllocationData = async (startOverride, endOverride) => {
     const emp_id = localStorage.getItem("cust_emp_id")
@@ -554,8 +554,8 @@ const handleRangeChange = (type) => {
   const completedCount = getStatusCount(filteredActivities, "Completed");
 
   const statsData = [
-      // value={filter.status}
-      //       onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
+    // value={filter.status}
+    //       onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
     {
       icon: <FaClipboardList />,
       label: "Total Audit Item",
@@ -587,8 +587,8 @@ const handleRangeChange = (type) => {
   ]
 
   const TABS = [
-    {key: "month", label: "Monthly view"},
-    {key: "week", label: "Weekly view"}
+    { key: "month", label: "Monthly view" },
+    { key: "week", label: "Weekly view" }
   ]
 
   return (
@@ -635,11 +635,11 @@ const handleRangeChange = (type) => {
       </StatsGrid>
 
       <Card>
-        <Tabs tabs={TABS} activeTab={tab}  setActiveTab={(value) => {
-    setTab(value);
-    handleRangeChange(value);
-  }} />
-         {/* {tab === "week" && 
+        <Tabs tabs={TABS} activeTab={tab} setActiveTab={(value) => {
+          setTab(value);
+          handleRangeChange(value);
+        }} />
+        {/* {tab === "week" && 
        <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.1rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
             <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(-1)}>
               &lt; Prev
@@ -654,13 +654,13 @@ const handleRangeChange = (type) => {
        
        } */}
 
-        
-        <FilterRow style={{marginBottom: "1rem"}}>
-          <SearchBox type="text" placeholder="Search Auditor's name, ID..." value={filter.search} onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value, }))} />
-          {tab === "month" && ( <DateInput type="month" value={selectedMonth} onChange={handleMonthChange}/>)}
 
-          {tab === "week" && ( <DateInput type="week" value={selectedWeek} onChange={handleWeekChange} />)}
-            
+        <FilterRow style={{ marginBottom: "1rem" }}>
+          <SearchBox type="text" placeholder="Search Auditor's name, ID..." value={filter.search} onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value, }))} />
+          {tab === "month" && (<DateInput type="month" value={selectedMonth} onChange={handleMonthChange} />)}
+
+          {tab === "week" && (<DateInput type="week" value={selectedWeek} onChange={handleWeekChange} />)}
+
           <FilterSelect
             name="status"
             value={filter.status}
@@ -740,32 +740,32 @@ const handleRangeChange = (type) => {
               </>
             )
           }}
-          // rowAction={(row) => setExpandedRowId(expandedRowId === row.p_id ? null : row.p_id)}
-          // expandedRow={expandedRowId}
-          // renderExpandedRow={(employee) => {
-          //   const isResourceAssigned = employee?.original_A?.resource_list
-          //   return (
-          //     <div style={{ padding: '1rem', backgroundColor: '#f9f9f9' }}>
-          //       <ActivityLogs
-          //         activity={employee}
-          //         logs={employee.day_logs}
-          //         isOpen={true}
-          //         onToggle={() => { }}
-          //       />
+        // rowAction={(row) => setExpandedRowId(expandedRowId === row.p_id ? null : row.p_id)}
+        // expandedRow={expandedRowId}
+        // renderExpandedRow={(employee) => {
+        //   const isResourceAssigned = employee?.original_A?.resource_list
+        //   return (
+        //     <div style={{ padding: '1rem', backgroundColor: '#f9f9f9' }}>
+        //       <ActivityLogs
+        //         activity={employee}
+        //         logs={employee.day_logs}
+        //         isOpen={true}
+        //         onToggle={() => { }}
+        //       />
 
-          //       {isResourceAssigned &&
-          //         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
-          //           <Button variant='primary' onClick={(e) => handleAddOPE(employee, e)}>
-          //             Add OPE
-          //           </Button>
-          //           <Button variant='outline' onClick={(e) => handleViewOPE(employee, e)}>
-          //             View OPE
-          //           </Button>
-          //         </div>
-          //       }
-          //     </div>
-          //   )
-          // }}
+        //       {isResourceAssigned &&
+        //         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+        //           <Button variant='primary' onClick={(e) => handleAddOPE(employee, e)}>
+        //             Add OPE
+        //           </Button>
+        //           <Button variant='outline' onClick={(e) => handleViewOPE(employee, e)}>
+        //             View OPE
+        //           </Button>
+        //         </div>
+        //       }
+        //     </div>
+        //   )
+        // }}
 
         />
         <PaginationComponent
