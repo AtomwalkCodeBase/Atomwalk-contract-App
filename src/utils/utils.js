@@ -357,6 +357,35 @@ const buildDayLogsFromAEntriesForRetainer = (allAEntries = []) => {
   }, {});
 };
 
+export const getActivityOrderItemId = (activity) => {
+  const raw = activity?.order_item_id ?? activity?.original_P?.order_item_id ?? activity?.key?.split("_")?.slice(1)?.join("_") ?? "";
+
+  if (!raw) return "";
+
+  const parts = String(raw).split("_");
+  const id = parts.length > 1 ? parts[1] : parts[0];
+
+  return String(id).replace(/^0+/, "");
+};
+
+export const matchClaimsToActivity = (claims = [], activity) => {
+  const activityOrderItemId = getActivityOrderItemId(activity);
+
+  if (!activityOrderItemId) return [];
+  
+  return claims.map((claim) => {
+    const matchedItems = (claim?.claim_items || []).filter((item) => {
+      const itemId = String(item?.o_item_id).replace(/^0+/, "");
+        return itemId === activityOrderItemId;
+      });
+
+      if (matchedItems.length === 0) return null;
+
+      return { ...claim, claim_items: matchedItems };
+    })
+    .filter(Boolean);
+};
+
 export const formatRetainerActivities = (apiData = []) => {
   const grouped = buildActivityGroupMap(apiData);
 

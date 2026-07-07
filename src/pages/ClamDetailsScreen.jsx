@@ -7,7 +7,7 @@ import Badge from "../components/Badge";
 import Button from "../components/Button";
 import AddOPEModal from "../components/modal/AddOPEModal";
 import { useLocation, useNavigate } from "react-router-dom";
-import { DateForApiFormate } from "../utils/utils";
+import { DateForApiFormate, matchClaimsToActivity } from "../utils/utils";
 import { getContractAllocationData, getEmpClaim, getemployeeLists, postClaimAction } from "../services/productServices";
 import { toast } from "react-toastify";
 import DataTable, { Td } from "../components/DataTable";
@@ -126,6 +126,7 @@ const StatBox = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  cursor: ${({ pointer }) => pointer ? "pointer" : "default"};
 `;
 
 const StatLabel = styled.span`
@@ -202,11 +203,15 @@ const ClaimsRow = styled.div`
 `;
 
 const FileLink = styled.a`
-  color: ${({ theme }) => theme.colors?.primary || "#6C5CE7"};
-  font-weight: 600;
+  color: ${({ theme, disabled }) => disabled ? '#999' : (theme.colors?.primary || "#6C5CE7")};
+  font-weight: ${({ disabled }) => disabled ? '400' : '600'};
   text-decoration: none;
   gap: 0.3rem;
-  &:hover { text-decoration: underline; }
+  cursor: ${({ disabled }) => disabled ? 'default' : 'pointer'};
+  pointer-events: ${({ disabled }) => disabled ? 'none' : 'auto'};
+  &:hover { 
+    text-decoration: ${({ disabled }) => disabled ? 'none' : 'underline'}; 
+  }
 `;
 
 const EmptyRow = styled.div`
@@ -241,40 +246,46 @@ const ClaimGrandTotalBar = styled.div`
 const ClamDetailsScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
-  const loggedEmpId = localStorage.getItem("cust_emp_id");
   const activityData = location.state?.data;
+  const loggedEmpId = localStorage.getItem("cust_emp_id");
+  const ViewMode = activityData.mode;
 
   const [loading, setLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [openOpeModal, setOpenOpeModal] = useState(false);
   const [openSubmitAllModal, setOpenSubmitAllModal] = useState(false);
 
-  const [profileInfo, setProfileInfo] = useState({});
-  const [claimList, setClaimList] = useState([]);
+  const [claimList, setClaimList] = useState(() => activityData?.claims || []);
   const [resourceList, setResourceList] = useState([]);
   const [expandedDate, setExpandedDate] = useState(null);
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [selectedMasterClaimId, setSelectedMasterClaimId] = useState(null);
 
-  console.log("claimList", claimList)
-  
+  const fetchClaimsForActivity = useCallback(async () => {
+    if (!loggedEmpId || !activityData) return;
 
-  const claimsByDate = useMemo(() => {
-    const map = {};
-    claimList.forEach((c) => {
-      const dateKey = c.date || c.submitted_date?.split("T")[0]; // Flexible date key
-      if (!dateKey) return;
-      if (!map[dateKey]) map[dateKey] = [];
-      map[dateKey].push(c);
-    });
-    return map;
-  }, [claimList]);
+    try {
+      setIsLoading(true);
+      const profileRes = await getemployeeLists({ emp_id: loggedEmpId });
+      const profile = profileRes?.data?.[0] || {};
+
+      if (!profile.id) {
+        setClaimList([]);
+        return;
+      }
+
+      const claimRes = await getEmpClaim("GET", profile.id, "CY");
+      setClaimList(matchClaimsToActivity(claimRes?.data || [], activityData));
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load claims");
+      setClaimList([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loggedEmpId, activityData]);
 
   const dateRows = useMemo(() => groupResourcesByDate(resourceList),[resourceList]);
-
-  // console.log("resourceList", resourceList)
-  // console.log("dateRows", dateRows)
 
   const totals = useMemo(() => 
     dateRows.reduce((acc, row) => ({
@@ -320,9 +331,7 @@ const ClamDetailsScreen = () => {
             })
           )
         );
-
-        const mergedData = Array.isArray(responses?.data) ? responses.data : []
-
+        const mergedData = responses.flatMap((response) => Array.isArray(response?.data) ? response.data : []);
         setResourceList(mergedData);
       } catch (error) {
         console.error("Failed to fetch resource data:", error);
@@ -333,44 +342,17 @@ const ClamDetailsScreen = () => {
       }
     }, [activityData, loggedEmpId]);
 
-  const fetchProfileAndClaims = useCallback(async () => {
-    if (!loggedEmpId) return;
-
-    try {
-      const profileRes = await getemployeeLists({ emp_id: loggedEmpId });
-      const profile = profileRes?.data?.[0] || {};
-      setProfileInfo(profile);
-
-      if (profile.id) {
-        const claimRes = await getEmpClaim("GET", profile.id, "CY");
-        setClaimList(claimRes?.data || []);
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to load profile or claims");
-      setProfileInfo({});
-      setClaimList([]);
-    }
-  }, [loggedEmpId]);
-
   useEffect(() => {
     fetchResourceData();
   }, [fetchResourceData]);
 
   useEffect(() => {
-    fetchProfileAndClaims();
-  }, [fetchProfileAndClaims]);
-
-  const matchedOrderClaim = useMemo(() => {
-  const orderItemId = activityData?.order_item_id;
-  if (!orderItemId || !Array.isArray(claimList)) {
-    return null;
-  }
-
-  return (
-    claimList.find((claim) => String(claim.order_item_id) === String(orderItemId)) || null
-  );
-}, [claimList, activityData?.order_item_id]);
+    if (activityData?.claims?.length) {
+      setClaimList(activityData.claims);
+    } else {
+      fetchClaimsForActivity();
+    }
+  }, [activityData, fetchClaimsForActivity]);
 
   const toggleDate = (date) => {
     setExpandedDate((prev) => (prev === date ? null : date));
@@ -381,12 +363,14 @@ const ClamDetailsScreen = () => {
     setOpenOpeModal(true);
   };
 
+  // const handleAddClaim = () => {
+  //   const existingClaim = claimList?.[0] || null || claimList.length === 0;
+  //   handleOpenClaimModal(existingClaim ? {...activityData, master_data: existingClaim}: null);
+  // };
+
   const handleAddClaim = () => {
-  if (matchedOrderClaim) {
-    handleOpenClaimModal({...matchedOrderClaim, master_data: matchedOrderClaim});
-  } else {
-    handleOpenClaimModal(null);
-  }
+  const existingClaim = claimList?.[0] || null;
+  handleOpenClaimModal({ activityData, ...(existingClaim && {master_data: existingClaim,}),});
 };
 
 const handleSubmitAll = async(masterClaimId) => {
@@ -398,14 +382,9 @@ const handleSubmitAll = async(masterClaimId) => {
     const res = await postClaimAction(payload);
     if(res.status === 200){
       toast.success("All claim items submitted successfully");
-      setSelectedMasterClaimId(null);
-      setOpenSubmitAllModal(false);
-      await fetchProfileAndClaims();
     }
   } catch (error) {
     toast.error(error.data.message || error.data || "Failed to submit the claims. Please try again later !!!");
-    setSelectedMasterClaimId(null);
-    setOpenSubmitAllModal(false);
   }finally{
     setSelectedMasterClaimId(null);
     setOpenSubmitAllModal(false);
@@ -461,16 +440,16 @@ const handleSubmitAll = async(masterClaimId) => {
       <Card hoverable={false} style={{ marginTop: "1rem" }} title={
         <>
           <FaFileInvoiceDollar size={12} style={{ marginRight: "0.4rem" }} />
-          Claims ({claimList.length})
+          Claims ({claimList[0]?.claim_items?.length})
         </>
       }
-        headerAction={<Button variant="primary" onClick={handleAddClaim}>
+        headerAction={ViewMode !== "VIEW" && <Button variant="primary" onClick={handleAddClaim}>
           <FaPlus size={11} style={{ marginRight: "0.35rem" }} />
           Add Claim
         </Button>}
       >
         {claimList.length > 0 && (
-        <InfoPill style={{marginBottom: "0.8rem"}}>
+        <InfoPill style={{marginBottom: "0.8rem", fontSize: "1rem"}}>
           <FaFileInvoiceDollar size={12} style={{ marginRight: "0.4rem" }} />
           <span>Master Clam Id:</span>
           {claimList[0].master_claim_id}
@@ -483,41 +462,48 @@ const handleSubmitAll = async(masterClaimId) => {
           <DataTable
           emptyMessage="No claims submitted yet"
           isLoading={isLoading}
-          columns={["Claim ID", "Date", "Category", "Amount", "Remarks", "File", "Action"]}
-          data={claimList}
-          renderRow={(claim) => 
-              (claim.claim_items || []).map((item) => (
+          columns={[ "Claim ID", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" ? "Action" : ""}`]}
+            data={claimList.flatMap((claim) =>
+            (claim?.claim_items || []).map((item) => ({
+              ...item,
+              master_data: claim,
+            }))
+          )}
+          renderRow={((item) => {
+                const {variant, label} = getStatusVariant(item.expense_status)
+                return(
               <>
                 <Td>{item.claim_id}</Td>
-                <Td>{item.submitted_date}</Td>
                 <Td><Badge variant="info" style={{ fontSize: "0.62rem" }}>{item.item_name}</Badge></Td>
+                <Td>{item.expense_date}</Td>
                 <Td>{currency(item.expense_amt)}</Td>
+                <Td><Badge variant={variant}>{label}</Badge></Td>
                 <Td>
                   <RemarkField title={item.remarks || "--"}>
                     {item.remarks || "--"}
                   </RemarkField>
                 </Td>
-                <Td><FileLink href={item.submitted_file_1} target="_blank" rel="noreferrer">View</FileLink></Td>
-                <Td><Button size="sm" onClick={() => handleOpenClaimModal({...item, master_data: claim})}>Update</Button></Td>
+                <Td><FileLink href={item.submitted_file_1} target="_blank" rel="noreferrer" disabled={!item.submitted_file_1}>{item.submitted_file_1 ? "View" : "Not Submitted"}</FileLink></Td>
+                {ViewMode !== "VIEW" && <Td><Button size="sm" onClick={() => handleOpenClaimModal(item)}>Update</Button></Td>}
               </>
-        ))}
+        )})}
           
           />
         )}
 
          <ClaimGrandTotalBar>
-            <span>Total settled Amount: {currency(totalClaim.totalSettlement)}</span>
+            {/* <span>Total settled Amount: {currency(totalClaim.totalSettlement)}</span> */}
             <span>Total Claim Amount: {currency(totalClaim.totalOPE)}</span>
         </ClaimGrandTotalBar>
 
 
 
-        <div style={{display: "flex", justifyContent: "flex-end"}}>
+       {claimList.length > 0 && ViewMode !== "VIEW" && <div style={{display: "flex", justifyContent: "flex-end", marginTop: "1rem"}}>
           <Button  onClick={() => {
               setSelectedMasterClaimId(claimList?.[0]?.master_claim_id || null);
               setOpenSubmitAllModal(true);
             }}>Submit All Claims</Button>
-        </div>
+        </div>}
       </Card>
 
           <Card hoverable={false} style={{ marginTop: "1rem" }} title="Resource & Claim Summary (Date-wise)">
@@ -530,14 +516,13 @@ const handleSubmitAll = async(masterClaimId) => {
             const dayTotal = tlTotal + exTotal + claimTotal;
             
             const isOpen = expandedDate === row.date;
-            const dayClaims = claimsByDate[row.date] || [];
 
             return (
               <DateBlock key={row.date}>
                 {/* <DateHeader onClick={() => toggleDate(row.date)}> */}
-                <DateHeader  onClick={() => navigate("/resource-list", {state: { data: activityData },}) }>
+                <DateHeader onClick={(e) => {e.stopPropagation();  toggleDate(row.date)}}>
                   <HeaderDate>{formatDayLabel(row.date)}</HeaderDate>
-                  <HeaderSummary onClick={(e) => {e.stopPropagation();  toggleDate(row.date)}}>
+                  <HeaderSummary>
                     <Badge variant="forward" style={{ fontSize: "0.72rem", fontWeight: "600" }}>TL {row.tl_count}</Badge>
                     <Badge variant="info" style={{ fontSize: "0.72rem", fontWeight: "600" }}>EX {row.ex_count}</Badge>
                     <span>Total: <strong>{currency(dayTotal)}</strong></span>
@@ -548,7 +533,7 @@ const handleSubmitAll = async(masterClaimId) => {
                 {isOpen && (
                   <>
                     <DateBody>
-                      <StatBox>
+                      <StatBox pointer={true} onClick={() => navigate("/resource-list", {state: { data: activityData },}) } >
                         <StatLabel>Total TL</StatLabel>
                         {/* <StatValue>{row.tl_count} × {currency(row.tl_rate)}</StatValue> */}
                         <StatValue>{row.tl_count} Resources</StatValue>
@@ -557,7 +542,7 @@ const handleSubmitAll = async(masterClaimId) => {
                         <StatLabel>TL Total Amount</StatLabel>
                         <StatValue>{currency(tlTotal)}</StatValue>
                       </StatBox>
-                      <StatBox>
+                      <StatBox pointer={true} onClick={() => navigate("/resource-list", {state: { data: activityData },}) }>
                         <StatLabel>Total EX</StatLabel>
                         <StatValue>{row.ex_count} Resources</StatValue>
                       </StatBox>
@@ -589,14 +574,16 @@ const handleSubmitAll = async(masterClaimId) => {
         </GrandTotalBar>
       </Card>
 
+     {openOpeModal &&
       <AddOPEModal
         isOpen={openOpeModal}
         onClose={() => setOpenOpeModal(false)}
         claimData={selectedClaim}
-        fetchProfileAndClaims={fetchProfileAndClaims}
-      />
+        onSaved={fetchClaimsForActivity}
+      />}
 
-      <ConfirmPopup
+     {openSubmitAllModal && 
+     <ConfirmPopup
         isOpen={openSubmitAllModal}
         title="Confirmation"
         message="Are you sure you want to submit the claim items?"
@@ -606,12 +593,24 @@ const handleSubmitAll = async(masterClaimId) => {
           setSelectedMasterClaimId(null);
         }}
         confirmLabel="Yes"
-      />
+      />}
     </Layout>
   );
 };
 
 export default ClamDetailsScreen;
+
+const getStatusVariant = (expense_status) => {
+  const statusMap = {
+    'N': { variant: 'warning', label: 'Not Submitted' },
+    'S': { variant: 'success', label: 'Submitted' },
+    'A': { variant: 'info', label: 'Approved' },
+    'R': { variant: 'error', label: 'Rejected' },
+    // 'P': { variant: 'info', label: 'Pending' },
+  };
+
+  return statusMap[expense_status] || { variant: 'default', label: 'Unknown' };
+};
 
 const groupResourcesByDate = (list = []) => {
   const grouped = list.reduce((acc, item) => {

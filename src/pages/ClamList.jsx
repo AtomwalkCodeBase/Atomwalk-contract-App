@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { theme } from '../styles/Theme';
 import StatsCard from '../components/StatsCard';
 import Button from '../components/Button';
-import { formatDate, formatMonthLabel, formatRetainerActivities, formatToDDMMYYYY, formatWeekLabel, getMonthRange, getStatusVariant } from '../utils/utils';
+import { DateForApiFormate, formatDate, formatMonthLabel, formatRetainerActivities, formatToDDMMYYYY, formatWeekLabel, getMonthRange, getStatusVariant, matchClaimsToActivity } from '../utils/utils';
 import { toast } from 'react-toastify';
 import { getEmpAllocationData, getEmpClaim, getemployeeLists } from '../services/productServices';
 import DataTable, { Td } from '../components/DataTable';
@@ -247,7 +247,7 @@ const SearchBox = styled.input`
 `;
 
 
-const activityColumn = [<>Customer<br />Order Item ID</>, "Audit Type", "Planned Date", "Clam Approved", "Activity Status", "Actions"]
+const activityColumn = [<>Customer<br />Order Item ID</>, "Audit Type", "Planned Date", "Clam Approved", "Claim Status","Activity Status", "Actions"]
 
 const currency = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
@@ -338,26 +338,35 @@ const ClamList = () => {
     const filteredClaimsByDate = useMemo(() => {
       if (!Array.isArray(claimList)) return [];
 
-      const startDate = new Date(`${dateRange.start}T00:00:00`);
-      const endDate = new Date(`${dateRange.end}T23:59:59`);
+      // const startDate = new Date(`${dateRange.start}T00:00:00`);
+      // const endDate = new Date(`${dateRange.end}T23:59:59`);
+      const startDate = dateRange.start;
+      const endDate = dateRange.end;
 
       return claimList.filter((claim) => {
         if (!claim?.claim_date) return false;
 
-        // claim_date format: 07-Jul-2026
-        const claimDate = new Date(claim.claim_date);
+      const hasMatchingItem = claim.claim_items.some((item) => {
+      if (!item?.expense_date) return false;
+      
+      // const expenseDate = new Date(item.expense_date);
+      const formattedExpenseDate = DateForApiFormate(item?.expense_date, true);
+      
+      return formattedExpenseDate >= startDate && formattedExpenseDate <= endDate;
+    });
 
-        return claimDate >= startDate && claimDate <= endDate;
-      });
+    return hasMatchingItem;
+  });
     }, [claimList, dateRange.start, dateRange.end]);
 
-    const activitiesWithClaims = useMemo(() => {
+    // console.log("filteredClaimsByDate", filteredClaimsByDate)
+    // console.log("assignedActivity", assignedActivity)
+
+  const activitiesWithClaims = useMemo(() => {
     if (!Array.isArray(assignedActivity)) return [];
 
     return assignedActivity.map((activity) => {
-
-      const activityOrderItemId = activity?.order_item_id ?? activity?.original_P?.order_item_id;
-      const matchedClaims = filteredClaimsByDate.filter((claim) => String(claim?.order_item_id) === String(activityOrderItemId));
+      const matchedClaims = matchClaimsToActivity(filteredClaimsByDate, activity);
 
       return {
         ...activity,
@@ -366,8 +375,6 @@ const ClamList = () => {
       };
     });
   }, [assignedActivity, filteredClaimsByDate]);
-
-  console.log("activitiesWithClaims", activitiesWithClaims)
 
   const handleRangeChange = (type) => {
     setActiveRangeType(type);
@@ -386,8 +393,10 @@ const ClamList = () => {
   };
 
   const getFilteredAndSortedActivities = () => {
-    return assignedActivity;
+    return activitiesWithClaims;
   };
+
+  console.log("activitiesWithClaims", activitiesWithClaims)
 
   const filteredActivities = getFilteredAndSortedActivities();
 
@@ -532,6 +541,10 @@ const stats_card = useMemo(
             }
             // const isResourceAssigned = employee?.original_A?.resource_list;
             const PlannedResource = getMatchingRetainerList(employee?.original_P)
+            const claims = Array.isArray(employee.claims) ? employee.claims : [];
+            const firstClaim = claims[0];
+
+            const { variant, label } = getClaimStatusVariant(firstClaim?.expense_status);
             return (
               <>
                 <Td>
@@ -547,19 +560,23 @@ const stats_card = useMemo(
                 {/* <Td>{employee.original_P?.store_name || '-'}</Td> */}
                 {/* <Td>BM: {PlannedResource[0].}</Td> */}
                 <Td>
-                  <Badge variant='error'>NO</Badge>
+                  <Badge variant={firstClaim?.is_approved ? 'success' : 'error'}>
+                    {firstClaim?.is_approved ? 'YES' : 'NO'}
+                  </Badge>
                 </Td>
+                <Td><Badge variant={variant}>{label}</Badge></Td>
                 <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
                 <Td>
-                  {/* {employee.activityStatus !== "C" && <Button disabled={true}>not able to clam yet</Button>} */}
+                  {employee.activityStatus !== "C" && <Button disabled={true}>Cannot claim</Button>}
 
-                  {/* {employee.activityStatus === "C" && */}
+                  {employee.activityStatus === "C" &&
                     <ButtonGroup>
-                      <Button onClick={() => navigate('/clamDetails', { state: { data: employee } })}>Clam</Button>
+                      <Button onClick={() => navigate('/clamDetails', { state: { data:{...employee, mode: "ADD"} } })}>Add Clam</Button>
 
-                      {/* <Button>View Clam</Button> */}
+                      {firstClaim?.is_approved && <Button onClick={() => navigate('/clamDetails', { state: { data:{...employee, mode: "VIEW"} } })}>View Clam</Button>}
+
                     </ButtonGroup>
-                  {/* } */}
+                  } 
 
                 </Td>
               </>
@@ -581,4 +598,16 @@ const stats_card = useMemo(
   )
 }
 
-export default ClamList
+export default ClamList;
+
+const getClaimStatusVariant = (expense_status) => {
+  const statusMap = {
+    'N': { variant: 'warning', label: 'Not Submitted' },
+    'S': { variant: 'success', label: 'Submitted' },
+    'A': { variant: 'info', label: 'Approved' },
+    'R': { variant: 'error', label: 'Rejected' },
+    // 'P': { variant: 'info', label: 'Pending' },
+  };
+
+  return statusMap[expense_status] || { variant: 'warning', label: 'Not Submitted' };
+};

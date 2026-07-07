@@ -575,8 +575,6 @@ export const AssignEmployee = ({ isOpen, onClose, activityData, refreshData }) =
 
   const dayWindow = useMemo(() => buildDayWindow(activityStart, 10), [activityStart])
 
-  console.log("dayWindow", dayWindow)
-
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {

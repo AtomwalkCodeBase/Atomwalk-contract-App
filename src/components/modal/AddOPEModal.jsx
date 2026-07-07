@@ -177,7 +177,7 @@ const UploadedFile = styled.div`
 `;
 
 
-const AddOPEModal = ({ isOpen, onClose, claimData = null, fetchProfileAndClaims }) => {
+const AddOPEModal = ({ isOpen, onClose, claimData = null , onSaved}) => {
   const loggedEmpId = localStorage.getItem("cust_emp_id");
 
   const [ isLoading, setIsLoading ] = useState(false);
@@ -191,6 +191,7 @@ const AddOPEModal = ({ isOpen, onClose, claimData = null, fetchProfileAndClaims 
     claim_remarks: "",
     file: null,
     emp_id: loggedEmpId,
+    o_item_id: claimData?.o_item_id
   };
 
   const [formData, setFormData] = useState(initialFormData);
@@ -229,6 +230,7 @@ const AddOPEModal = ({ isOpen, onClose, claimData = null, fetchProfileAndClaims 
         ? { uri: data.submitted_file_1, name: data.submitted_file_1.split("/").pop().split("?")[0] }
         : null,
       emp_id: loggedEmpId,
+      o_item_id: claimData?.o_item_id
     });
   }, [loggedEmpId]);
 
@@ -296,6 +298,7 @@ const AddOPEModal = ({ isOpen, onClose, claimData = null, fetchProfileAndClaims 
       formDatas.append("expense_date", expense_date)
       formDatas.append("emp_id", formData.emp_id)
       formDatas.append("quantity", 1)
+      formDatas.append("o_item_id", formData.o_item_id)
       // if (value === "save") {
       //   if (claimupdate?.substatusText === "Back To Claimant") {
       //     formDatas.append("call_mode", "CLAIM_RESUBMIT");
@@ -314,15 +317,15 @@ const AddOPEModal = ({ isOpen, onClose, claimData = null, fetchProfileAndClaims 
       for (let [key, value] of formDatas.entries()) {
         console.log(key, value);
       }
-      // const res = await postClaim(formDatas)
+      const res = await postClaim(formDatas)
 
-      const res = {status: 200}
+      // const res = {status: 200}
       if (res.status === 200) {
         setIsLoading(false)
         handleClose();
         toast.success(claimData?.item_id ? "Update claim successfully" : "Add claim successfully")
         setIsFileError(false)
-        await fetchProfileAndClaims();
+        await onSaved();
       } else {
         toast.error("Claim Submission Error", "Failed to claim. Unexpected response.")
       }

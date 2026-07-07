@@ -523,8 +523,7 @@ const ActivityListScreen = () => {
     setSelectedActivity(employee);
     setOpenOpeModal(true);
   };
-
-  console.log("filteredActivities", filteredActivities)
+  
   // console.log("expandedRowId", expandedRowId)
 
   // const handleRangeChange = (type) => {
