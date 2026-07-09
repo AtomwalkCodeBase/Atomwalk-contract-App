@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import StatsCard from '../components/StatsCard'
 import { FaBoxes, FaFileInvoice, FaHandHoldingUsd, FaUsers, FaWallet } from 'react-icons/fa'
@@ -12,6 +12,10 @@ import Badge from '../components/Badge'
 import OrderDetailModal from '../components/modal/OrderDetailModal'
 import Card from '../components/Card'
 import { useNavigate } from 'react-router-dom'
+import { formatDate2, formatRetainerActivities, formatToDDMMYYYY, getStatusVariant } from '../utils/utils'
+import { getEmpAllocationData } from '../services/productServices'
+import Tabs from '../components/Tabs'
+import { useFilter } from '../hooks/useFilter'
 
 const StatsGrid = styled.div`
   display: grid;
@@ -71,6 +75,141 @@ const ResourceCount = styled.span`
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 `;
 
+const FilterRow = styled.div`
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+const CustomRangeRow = styled.div`
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: #fafafa;
+  border: 1px dashed ${({ theme }) => theme.colors.border};
+
+  span {
+    color: #666;
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+const FilterContainer = styled.div`
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+
+  @media (max-width: 1024px) {
+    gap: 0.7rem;
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    width: 100%;
+    align-items: stretch;
+  }
+`;
+const FilterSelect = styled.select`
+  padding: 0.5rem 1rem;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: 6px;
+  background: white;
+  min-width: 150px;
+
+  @media (max-width: 768px) {
+    width: 45%;
+    min-width: unset;
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+  }
+`;
+const DateInput = styled.input`
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: white;
+
+  @media (max-width: 768px) {
+    width: 45%;
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+  }
+`;
+const SearchBox = styled.input`
+  flex: 1;
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  border: 1px solid ${theme.colors.border};
+  border-radius: ${theme.borderRadius.md};
+  font-family: ${theme.fonts.body};
+  font-size: ${theme.fontSizes.sm};
+  min-width: 200px;
+  
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary};
+  }
+  
+  &::placeholder {
+    color: ${theme.colors.textLight};
+  }
+`;
+
+const CustomerName = styled.div`
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 0.875rem;
+  line-height: 1.3;
+`;
+
+const OrderItemId = styled.div`
+  font-size: 0.75rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  font-family: monospace;
+  background: ${({ theme }) => theme.colors.backgroundAlt};
+  padding: 0.2rem 0.2rem;
+  border-radius: 4px;
+  display: inline-block;
+  width: fit-content;
+`;
+
+const StoreLocation = styled.div`
+  font-size: 0.75rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  font-family: monospace;
+  background: ${({ theme }) => theme.colors.accentLight};
+  padding: 0.2rem 0.2rem;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 150px; /* Adjust this value as needed */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
 
 
 const stats_card = [
@@ -80,17 +219,234 @@ const stats_card = [
     {label: "AMOUNT TO BE PAID", value: "135,000", color: "error",   icon: <FaHandHoldingUsd /> }
 ]
 
-const column = [<>Customer<br />Order Item ID</>, "No of resource", "Order status", "Payment Status", "Payout Amount", "OPE Amount", "Actions"]
+const column = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>,"No of resource(planned)", "Activity status", "Payment Status", "Payout Amount", "OPE Amount", "Actions"]
+
+
+const ACTIVITY_LIST_STORAGE_KEY = 'ReceivableListSelection';
+
+const getStoredActivityListSelection = () => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const storedValue = window.sessionStorage.getItem(ACTIVITY_LIST_STORAGE_KEY);
+    return storedValue ? JSON.parse(storedValue) : null;
+  } catch {
+    return null;
+  }
+};
+
+function getMatchingRetainerList(original_P = {}) {
+  const {
+    start_date: originalStartDate,
+    end_date: originalEndDate,
+    retainer_list = []
+  } = original_P;
+
+  return retainer_list.filter(item => {
+    return (
+      item.a_type === "P" &&
+      item.start_date === originalStartDate &&
+      item.end_date === originalEndDate
+    );
+  });
+}
 
 const ProfitabilityDashboard = () => {
+  const today = new Date();
+  const emp_id = localStorage.getItem("cust_emp_id");
+    const storedSelection = getStoredActivityListSelection();
+    const [isLoading, setIsLoading] = useState(false);
+    const [assignedActivity, setAssignedActivity] = useState([]);
+    const [tab, setTab] = useState(storedSelection?.tab || "month")
+      const [filter, setFilter] = useState({ search: "", status: "" })
+
+      const [activeRangeType, setActiveRangeType] = useState(storedSelection?.activeRangeType || "month");
+    
+
+      const [dateRange, setDateRange] = useState(() => {
+        const savedRange = storedSelection?.dateRange;
+        if (savedRange?.start && savedRange?.end) {
+          return savedRange;
+        }
+        return getMonthRange({ type: "current", mode: "month" });
+      });
+
+      const [selectedDate, setSelectedDate] = useState(today.toISOString().split("T")[0]);
+      
+        const getCurrentMonth = () =>
+          `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+      
+        const getCurrentWeek = () => {
+          const date = new Date(today);
+          const day = date.getDay() || 7;
+          date.setDate(date.getDate() + 4 - day);
+      
+          const yearStart = new Date(date.getFullYear(), 0, 1);
+          const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+      
+          return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
+        };
+      
+        const [selectedMonth, setSelectedMonth] = useState(storedSelection?.selectedMonth || getCurrentMonth());
+        const [selectedWeek, setSelectedWeek] = useState(storedSelection?.selectedWeek || getCurrentWeek());
+    
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(
+        ACTIVITY_LIST_STORAGE_KEY,
+        JSON.stringify({
+          tab,
+          activeRangeType,
+          selectedMonth,
+          selectedWeek,
+          dateRange,
+        })
+      );
+    }
+  }, [tab, activeRangeType, selectedMonth, selectedWeek, dateRange]);
+
+    useEffect(() => {
+      if (emp_id) {
+        fetchEmpAllocationData(dateRange.start, dateRange.end)
+      }
+    }, [emp_id]);
+
+
+      const handleMonthChange = (e) => {
+        const value = e.target.value;
+    
+        setSelectedMonth(value);
+    
+        const [year, month] = value.split("-").map(Number);
+    
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 0);
+    
+        const range = {
+          start: formatDate2(start),
+          end: formatDate2(end),
+        };
+    
+        setDateRange(range);
+        fetchEmpAllocationData(range.start, range.end);
+      };
+    
+
+      const handleWeekChange = (e) => {
+        const value = e.target.value;
+    
+        setSelectedWeek(value);
+    
+        const range = getWeekRange(value);
+    
+        const formattedRange = {
+          start: formatDate2(new Date(range.start)),
+          end: formatDate2(new Date(range.end)),
+        };
+    
+        setDateRange(formattedRange);
+        fetchEmpAllocationData(formattedRange.start, formattedRange.end);
+      };
+    
+      const handleDateChange = (e) => {
+        const value = e.target.value;
+        setSelectedDate(value);
+    
+        const start = new Date(value);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+    
+        const range = {
+          start: formatDate2(start),
+          end: formatDate2(end),
+        };
+    
+        setDateRange(range);
+        fetchEmpAllocationData(range.start, range.end);
+      };
+      const handleRangeChange = (type) => {
+        setActiveRangeType(type);
+    
+        if (type === "month") {
+          const [year, month] = selectedMonth.split("-").map(Number);
+    
+          const start = new Date(year, month - 1, 1);
+          const end = new Date(year, month, 0);
+    
+          const range = {
+            start: formatDate2(start),
+            end: formatDate2(end),
+          };
+    
+          setDateRange(range);
+          fetchEmpAllocationData(range.start, range.end);
+        } else {
+          const range = getWeekRange(selectedWeek);
+    
+          const formattedRange = {
+            start: formatDate2(new Date(range.start)),
+            end: formatDate2(new Date(range.end)),
+          };
+    
+          setDateRange(formattedRange);
+          fetchEmpAllocationData(formattedRange.start, formattedRange.end);
+        }
+      };
+
+    const fetchEmpAllocationData = async (startOverride, endOverride) => {
+      const emp_id = localStorage.getItem("cust_emp_id")
+      const start = startOverride || dateRange.start
+      const end = endOverride || dateRange.end
+  
+      const startDateObj = new Date(start)
+      const endDateObj = new Date(end)
+  
+      if (endDateObj < startDateObj) {
+        toast.info("End date cannot be earlier than start date")
+        return false;
+      }
+      const payload = {
+        emp_id: emp_id,
+        start_date: formatToDDMMYYYY(start),
+        end_date: formatToDDMMYYYY(end),
+      }
+  
+      setIsLoading(true);
+  
+      try {
+        const response = await getEmpAllocationData(payload);
+        setAssignedActivity(formatRetainerActivities(response.data))
+        // console.log("normalizeProjects(response.data)", formatRetainerActivities(response.data))
+      } catch (error) {
+        toast.error("No data found...")
+        setIsLoading(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
   const navigate = useNavigate();
     const [isOpeModalOpen, setIsOpeModalOpen] = useState(false);
     
     const [selectedOrder, setSelectedOrder] = useState(null);
-    const [data, setData] = useState(profitabilityDashboard.orders);
+    // const [data, setData] = useState(profitabilityDashboard.orders);
+
+      const FilteredData = useFilter({
+        data: assignedActivity, fields: ["customer_name", "order_item_key", "store_name", "audit_type"],
+        search: filter.search,
+        extraFilters: {
+          activityStatus: filter.status,
+        },
+      });
 
     
-      const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(data, 10)
+      const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(FilteredData, 10)
+  const TABS = [
+    { key: "month", label: "Monthly view" },
+    { key: "week", label: "Weekly view" }
+  ]
+
+  console.log(paginatedData)
 
   return (
     <Layout title="Receivable Dashboard">
@@ -103,19 +459,72 @@ const ProfitabilityDashboard = () => {
 
 <Card>
 
+          <Tabs tabs={TABS} activeTab={tab} setActiveTab={(value) => {
+          setTab(value);
+          handleRangeChange(value);
+        }} />
+
+                <FilterRow style={{ marginBottom: "1rem" }}>
+          <SearchBox type="text" placeholder="Search Auditor's name, ID..." value={filter.search} onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value, }))} />
+          {tab === "month" && (<DateInput type="month" value={selectedMonth} onChange={handleMonthChange} />)}
+
+          {tab === "week" && (<DateInput type="week" value={selectedWeek} onChange={handleWeekChange} />)}
+
+          <FilterSelect
+            name="status"
+            value={filter.status}
+            onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
+          >
+            <option value="ALL">All</option>
+            <option value="NA">Not Assigned</option>
+            <option value="P">In Progress</option>
+            <option value="C">Completed</option>
+            <option value="NS">Not Started</option>
+          </FilterSelect>
+
+          <Button variant="outline" size='sm'
+            onClick={() => setFilter({ search: "", status: "ALL" })}
+          >
+            Clear Filters
+          </Button>
+        </FilterRow>
+
         <DataTable
         columns={column}
         data={paginatedData}
-        renderRow={(orders) => {
+        renderRow={(employee) => {
+        const displayPlannedDate = () => {
+          if (employee.planned_start_date === employee.planned_end_date) {
+            return formatDate(employee.planned_start_date)
+          } else {
+            return (
+              <>
+                {formatDate(employee.planned_start_date)} to  {formatDate(employee.planned_end_date)}
+                {/* <br /> */}
+                {/* {formatDate(employee.planned_end_date)} */}
+              </>
+            );
+          }
+        }
+        const isResourceAssigned = employee?.original_A?.resource_list;
+        const PlannedResource = getMatchingRetainerList(employee?.original_P)
             return(
                 <>
-                <Td>{orders.client_name} <br/> {orders.order_id}</Td>
-                <Td style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <Td>
+                  <CustomerName>{employee.customer_name}</CustomerName> <OrderItemId>{employee?.original_P?.order_item_key}</OrderItemId>
+                </Td> 
+                <Td>
+                  {employee.audit_type}<br />
+                  <StoreLocation title={employee.original_P?.store_name || '-'}>
+                    {employee.original_P?.store_name || '-'}
+                  </StoreLocation>
+                </Td>              
+                 <Td>
                   <ResourcesRow variant="primary">
-                    <ResourcesLabel variant="primary">P:</ResourcesLabel>
+                    {/* <ResourcesLabel variant="primary">P:</ResourcesLabel> */}
                     <ResourcesValue>
-                      <ResourceCount variant="primary">{orders?.planned_tl || 0}</ResourceCount> TL /
-                      <ResourceCount variant="primary">{orders?.planned_ex || 0}</ResourceCount> EX
+                      <ResourceCount variant="primary">{PlannedResource[0].tl_count || 0}</ResourceCount> TL /
+                      <ResourceCount variant="primary">{PlannedResource[0].ex_count || 0}</ResourceCount> EX
                     </ResourcesValue>
                   </ResourcesRow>
                   {/* <ResourcesRow variant="success">
@@ -126,14 +535,12 @@ const ProfitabilityDashboard = () => {
                     </ResourcesValue>
                   </ResourcesRow> */}
                  </Td>
+                <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
                 <Td>
-                    <Badge variant={orders?.order_status === "Completed" ? "success" : orders?.order_status === "Pending" ? "warning" : "info"}>{orders?.order_status}</Badge>
+                    <Badge variant="error">NO</Badge>
                 </Td>
-                <Td>
-                    <Badge variant={orders?.payment_status === "Paid" ? "success" : "error"}>{orders?.payment_status}</Badge>
-                </Td>
-                <Td>{orders?.payout_amount}</Td>
-                <Td>{orders?.ope_amount}</Td>
+                <Td>4000</Td>
+                <Td>1200</Td>
                 <Td>
                     <Button onClick={() => navigate("/clamDetails", { state: { data: orders },})}>
                   View
