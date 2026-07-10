@@ -30,6 +30,7 @@ import ProfitabilityDashboard from "./pages/ProfitabilityDashboard";
 import ResourceAllocation from "./components/modal/ModifiedAssignedResourceModal";
 import ClamList from "./pages/ClamList";
 import ClamDetailsScreen from "./pages/ClamDetailsScreen";
+import ClamList1 from "./pages/ClaimList1";
 
 function App() {
   const url = "https://www.atomwalk.com/rest-auth/login/";
@@ -84,7 +85,8 @@ function App() {
                   <Route path="/dashboard" element={<RetainerScreen />} />
                   <Route path="/activity" element={<ActivityListScreen />} />
                   <Route path="/profitability-dashboard" element={<ProfitabilityDashboard />} />
-                  <Route path="/clam-list" element={<ClamList />} />
+                  {/* <Route path="/clam-list" element={<ClamList />} /> */}
+                  <Route path="/clam-list" element={<ClamList1 />} />
                   <Route path="/clamDetails" element={<ClamDetailsScreen />} />
                   {/* <Route path="/resource-list" element={<ResourceAllocationList />} /> */}
                   {/* <Route path="/resource-list" element={<ResourceAllocation />} /> */}

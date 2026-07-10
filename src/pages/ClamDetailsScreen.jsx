@@ -250,6 +250,8 @@ const ClamDetailsScreen = () => {
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const ViewMode = activityData.mode;
 
+  console.log("activityData", activityData)
+
   const [loading, setLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [openOpeModal, setOpenOpeModal] = useState(false);

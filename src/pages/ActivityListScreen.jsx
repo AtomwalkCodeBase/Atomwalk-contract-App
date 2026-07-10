@@ -495,7 +495,7 @@ const ActivityListScreen = () => {
 
   const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(FilteredData, 10)
 
-  // console.log("filteredActivities", filteredActivities)
+  console.log("paginatedData", paginatedData);
 
   const handleViewOPE = (employee, e) => {
     e.stopPropagation();

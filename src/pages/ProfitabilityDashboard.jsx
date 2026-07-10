@@ -12,7 +12,7 @@ import Badge from '../components/Badge'
 import OrderDetailModal from '../components/modal/OrderDetailModal'
 import Card from '../components/Card'
 import { useNavigate } from 'react-router-dom'
-import { formatDate2, formatRetainerActivities, formatToDDMMYYYY, getStatusVariant } from '../utils/utils'
+import { formatDate2, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant } from '../utils/utils'
 import { getEmpAllocationData } from '../services/productServices'
 import Tabs from '../components/Tabs'
 import { useFilter } from '../hooks/useFilter'
@@ -542,7 +542,7 @@ const ProfitabilityDashboard = () => {
                 <Td>4000</Td>
                 <Td>1200</Td>
                 <Td>
-                    <Button onClick={() => navigate("/clamDetails", { state: { data: orders },})}>
+                    <Button onClick={() => navigate("/clamDetails", { state: { data: employee, mode: "VIEW" },})}>
                   View
                 </Button>
                 </Td>

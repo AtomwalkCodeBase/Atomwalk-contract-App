@@ -413,23 +413,23 @@ const ResourceAllocation = () => {
       }
       }
 
-      if (activeResources.length > 0) {
-        const resourceListStr = activeResources
-          .map((r) => `${r.emp_id}^${r.employee_name || ""}^${r.emp_type}`)
-          .join("|");
+      // if (activeResources.length > 0) {
+      //   const resourceListStr = activeResources
+      //     .map((r) => `${r.emp_id}^${r.employee_name || ""}^${r.emp_type}`)
+      //     .join("|");
 
-        const activityFd = new FormData();
-        activityFd.append("emp_id", loggedEmpId);
-        activityFd.append("call_mode", "RESOURCE_ADD");
-        activityFd.append("a_id", p_id);
-        activityFd.append("geo_type", "O");
-        activityFd.append("resource_list", resourceListStr);
-        await postActivityAllocationData(activityFd);
+      //   const activityFd = new FormData();
+      //   activityFd.append("emp_id", loggedEmpId);
+      //   activityFd.append("call_mode", "RESOURCE_ADD");
+      //   activityFd.append("a_id", p_id);
+      //   activityFd.append("geo_type", "O");
+      //   activityFd.append("resource_list", resourceListStr);
+      //   await postActivityAllocationData(activityFd);
 
-        for (let [key, value] of activityFd.entries()) {
-          console.log(key, value);
-        }
-      }
+      //   for (let [key, value] of activityFd.entries()) {
+      //     console.log(key, value);
+      //   }
+      // }
 
       toast.success("Saved successfully");
       loadAllData();
@@ -501,6 +501,7 @@ const ResourceAllocation = () => {
           activityData={activityData}
           isActual={false}
           employees={employees}
+          loadAllData={loadAllData}
         />
 
         {activityData.activityStatus !== "C" &&
@@ -530,7 +531,7 @@ const ResourceAllocation = () => {
           handleAutoAssign={handleAutoAssign}
         />}
 
-        <NewCurrentAssugnmentList
+        {/* <NewCurrentAssugnmentList
          dateWiseAssignments={dateWiseAssignments}
           dayWindow={dayWindow}
           editingId={editingId?.rowKey}
@@ -545,7 +546,7 @@ const ResourceAllocation = () => {
           isActual={false}
           employees={employees}
         
-        />
+        /> */}
 
         {pendingCount > 0 && (
           <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
