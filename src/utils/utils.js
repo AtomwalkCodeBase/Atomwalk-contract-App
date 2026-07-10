@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 export const MONTH_SHORT_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const MONTH_MAP = MONTH_SHORT_NAMES.reduce((acc, m, i) => {
@@ -525,6 +527,12 @@ export const normalizeApiAllocations = (data=[])=>{
         emp_type:item.emp_type,
         is_approved:item.is_approved,
         is_active:item.is_active,
+        is_present:item.is_present,
+        app_remarks:item.app_remarks,
+        contract_rate:item.contract_rate,
+        ope_amt:item.ope_amt,
+        order_item_id:item.order_item_id,
+        approve_date:item.approve_date,
         action:"NONE"
     }))
 }
@@ -603,10 +611,7 @@ export const normalizeOverlappingAllocations = (rows = []) => {
     return result;
 };
 
-export const splitAllocationByDate = (
-  row,
-  targetDate,
-  mode = "DELETE" // DELETE | EDIT
+export const splitAllocationByDate = ( row, targetDate, mode = "DELETE" // DELETE | EDIT
 ) => {
   const result = [];
 
@@ -618,20 +623,12 @@ export const splitAllocationByDate = (
   */
   if (startDate === targetDate && endDate === targetDate) {
     if (mode === "DELETE") {
-      result.push({
-        ...row,
-        action: row.id ? "DELETE" : "REMOVE",
-      });
+      result.push({ ...row, action: row.id ? "DELETE" : "REMOVE",});
     } else {
-      result.push({
-        ...row,
-        action: row.id ? "EDIT" : "ADD",
-      });
+      result.push({ ...row, action: row.id ? "EDIT" : "ADD",});
     }
-
     return result;
   }
-
   const target = new Date(targetDate);
 
   /*
@@ -655,31 +652,18 @@ export const splitAllocationByDate = (
   const middleAction =
     mode === "DELETE"
       ? row.id
-        ? "DELETE"
-        : "REMOVE"
-      : row.id
-      ? "EDIT"
-      : "ADD";
+      ? "DELETE" : "REMOVE" : row.id
+      ? "EDIT" : "ADD";
 
   result.push({
     ...row,
-
     rowKey: crypto.randomUUID(),
-
     parent_id: row.id,
-
     id: mode === "EDIT" ? null : row.id,
-
     start_date: targetDate,
-
     end_date: targetDate,
-
     action: middleAction,
   });
-
-  /*
-      RIGHT PART
-  */
 
   if (endDate > targetDate) {
     const next = new Date(target);
@@ -687,33 +671,21 @@ export const splitAllocationByDate = (
 
     result.push({
       ...row,
-
       rowKey: crypto.randomUUID(),
-
       parent_id: row.id,
-
       id: null,
-
       start_date: DateForApiFormate(next, true),
-
       action: "ADD",
     });
   }
-
   return result.filter((r) => r.action !== "REMOVE");
 };
 
 export const splitAllocationForEdit = (row, targetDate) => {
     const rows = [];
 
-    console.log("splitAllocationForEdit",row, targetDate)
-
-    // already single day
     if ( row.start_date === targetDate && row.end_date === targetDate) {
-        rows.push({
-            ...row,
-            action: "EDIT"
-        });
+        rows.push({ ...row, action: "EDIT"});
         return rows;
     }
     const target = new Date(targetDate);
@@ -1227,3 +1199,53 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
   return { addPayload, updatePayload, deletePayload };
 };
  
+export const generateDateRange = ( startDate, endDate, { format = false, maxDays = 366 } = {}) => {
+  const dates = [];
+
+  const startComparable = DateForApiFormate(startDate, true);
+  const endComparable = DateForApiFormate(endDate, true);
+
+  if (!startComparable || !endComparable) return dates;
+
+  const [sY, sM, sD] = startComparable.split("-").map(Number);
+  const [eY, eM, eD] = endComparable.split("-").map(Number);
+
+  const current = new Date(sY, sM - 1, sD);
+  const last = new Date(eY, eM - 1, eD);
+
+  let limit = 0;
+
+  while (current <= last && limit < maxDays) {
+    dates.push( format ? formatToApiDate(current) : new Date(current));
+    current.setDate(current.getDate() + 1);
+    limit++;
+  }
+
+  return dates;
+};
+
+export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations = [], originalById = {}, getRowStatus,}) => {
+  const activityDates = useMemo(() => generateDateRange(activityStart, activityEnd),
+    [activityStart, activityEnd]
+  );
+
+  const dateWiseAssignments = useMemo(() => {
+    const map = {};
+    activityDates.forEach((date) => { map[formatToApiDate(date)] = [];});
+
+    allocations.forEach((row) => {
+      const rowDates = generateDateRange(row.start_date,row.end_date,{ format: true });
+      rowDates.forEach((date) => {
+        if (map[date]) {
+          map[date].push({
+            ...row, date, status: getRowStatus(row, originalById),
+          });
+        }
+      });
+    });
+
+    return map;
+  }, [ allocations, activityDates, originalById, getRowStatus,]);
+
+  return { activityDates, dayWindow: activityDates, dateWiseAssignments,};
+};

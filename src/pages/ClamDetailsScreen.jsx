@@ -464,10 +464,7 @@ const handleSubmitAll = async(masterClaimId) => {
           isLoading={isLoading}
           columns={[ "Claim ID", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" ? "Action" : ""}`]}
             data={claimList.flatMap((claim) =>
-            (claim?.claim_items || []).map((item) => ({
-              ...item,
-              master_data: claim,
-            }))
+              (claim?.claim_items || []).map((item) => ({...item,master_data: claim,}))
           )}
           renderRow={((item) => {
                 const {variant, label} = getStatusVariant(item.expense_status)

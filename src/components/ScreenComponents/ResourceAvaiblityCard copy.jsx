@@ -289,9 +289,9 @@ export const ResourceAvailability = ({
                 const isAssigned = !!employeeDateMap[emp.emp_id]?.[dStr];
 
                 const isBusy = !!busyDateMap[emp.emp_id]?.[dStr];
-                console.log("busyDateMap", busyDateMap)
-                console.log("employeeDateMap", JSON.stringify(employeeDateMap))
-                console.log("dStr", dStr)
+                // console.log("busyDateMap", busyDateMap)
+                // console.log("employeeDateMap", JSON.stringify(employeeDateMap))
+                // console.log("dStr", dStr)
 
                 const disabled = isBusy && !isAssigned;
                 const isAfterEnd = activityEnd ? (dStr > DateForApiFormate(activityEnd, true)) : false;

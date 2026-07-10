@@ -337,9 +337,6 @@ const ClamList = () => {
 
     const filteredClaimsByDate = useMemo(() => {
       if (!Array.isArray(claimList)) return [];
-
-      // const startDate = new Date(`${dateRange.start}T00:00:00`);
-      // const endDate = new Date(`${dateRange.end}T23:59:59`);
       const startDate = dateRange.start;
       const endDate = dateRange.end;
 
@@ -348,8 +345,7 @@ const ClamList = () => {
 
       const hasMatchingItem = claim.claim_items.some((item) => {
       if (!item?.expense_date) return false;
-      
-      // const expenseDate = new Date(item.expense_date);
+
       const formattedExpenseDate = DateForApiFormate(item?.expense_date, true);
       
       return formattedExpenseDate >= startDate && formattedExpenseDate <= endDate;
@@ -358,9 +354,6 @@ const ClamList = () => {
     return hasMatchingItem;
   });
     }, [claimList, dateRange.start, dateRange.end]);
-
-    // console.log("filteredClaimsByDate", filteredClaimsByDate)
-    // console.log("assignedActivity", assignedActivity)
 
   const activitiesWithClaims = useMemo(() => {
     if (!Array.isArray(assignedActivity)) return [];
@@ -395,8 +388,6 @@ const ClamList = () => {
   const getFilteredAndSortedActivities = () => {
     return activitiesWithClaims;
   };
-
-  console.log("activitiesWithClaims", activitiesWithClaims)
 
   const filteredActivities = getFilteredAndSortedActivities();
 

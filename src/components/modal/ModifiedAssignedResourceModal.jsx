@@ -13,6 +13,7 @@ import {
   mergeAdjacentRows,
   recomputeEmployeeRows,
   splitRangeAtDate,
+  useDateWiseAssignments,
 } from "../../utils/utils";
 import { useLocation } from "react-router-dom";
 import { getContractAllocationData, getemployeeLists, postActivityAllocationData, postAllocationData } from "../../services/productServices";
@@ -23,6 +24,7 @@ import { ResourceAvailability } from "../ScreenComponents/ResourceAvaiblityCard 
 import CurrentAssignments from "../ScreenComponents/CurrentAssignResourceList copy";
 import { FaArrowLeft, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaUser, FaUserTie } from "react-icons/fa";
 import styled from "styled-components";
+import NewCurrentAssugnmentList from "../ScreenComponents/NewCurrentAssugnmentList";
 
 const InfoStrip = styled.div`
   display: flex;
@@ -57,7 +59,6 @@ const ResourceAllocation = () => {
   const location = useLocation();
   const activityData = location.state?.data;
 
-  console.log("activityData", activityData)
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const { start, end } = getMonthRange();
 
@@ -78,35 +79,18 @@ const ResourceAllocation = () => {
   const activityStart = activityData?.original_P?.start_date || activityData?.planned_start_date || "";
   const activityEnd = activityData?.original_P?.end_date || activityData?.planned_end_date || "";
 
-  const activityDates = useMemo(() => {
-    const dates = [];
-    const startComparable = DateForApiFormate(activityStart, true);
-    const endComparable = DateForApiFormate(activityEnd, true);
-    if (!startComparable || !endComparable) return dates;
-    const [sY, sM, sD] = startComparable.split("-").map(Number);
-    const [eY, eM, eD] = endComparable.split("-").map(Number);
-    const cur = new Date(sY, sM - 1, sD);
-    const last = new Date(eY, eM - 1, eD);
-    let limit = 0;
-    while (cur <= last && limit < 366) {
-      dates.push(new Date(cur));
-      cur.setDate(cur.getDate() + 1);
-      limit++;
-    }
-    return dates;
-  }, [activityStart, activityEnd]);
-
-  const dayWindow = activityDates;
-
+  
   const isLocked = (row) => row.is_approved || !!activityData?.allAEntries?.length;
-
+  
   const ownershipMap = useMemo(() => buildOwnershipMap(originalAllocations), [originalAllocations]);
+  
   const originalById = useMemo(() => {
     const map = {};
     originalAllocations.forEach((r) => { map[r.id] = r; });
     return map;
   }, [originalAllocations]);
-
+  
+  const { dayWindow, dateWiseAssignments} = useDateWiseAssignments({ activityStart, activityEnd, allocations: workingAllocations, originalById, getRowStatus});
   // ---- Derived data — ALL computed from workingAllocations, nothing else ----
 
   const employeeDateMap = useMemo(() => {
@@ -132,19 +116,6 @@ const ResourceAllocation = () => {
     });
     return map;
   }, [busyAllocations, employeeDateMap]);
-
-  const dateWiseAssignments = useMemo(() => {
-    const map = {};
-    dayWindow.forEach((d) => { map[formatToApiDate(d)] = []; });
-    workingAllocations.forEach((row) => {
-      generateDatesBetween(row.start_date, row.end_date).forEach((date) => {
-        if (map[date]) {
-          map[date].push({ ...row, date, status: getRowStatus(row, originalById) });
-        }
-      });
-    });
-    return map;
-  }, [workingAllocations, dayWindow, originalById]);
 
   const { addPayload, updatePayload, deletePayload } = useMemo(
     () => buildPayloads(workingAllocations, originalAllocations),
@@ -265,7 +236,7 @@ const ResourceAllocation = () => {
   };
 
   const handleAutoAssign = (emp) => {
-    const freeDates = activityDates.map(formatToApiDate).filter((d) => {
+    const freeDates = dayWindow.map(formatToApiDate).filter((d) => {
       return !employeeDateMap[emp.emp_id]?.[d] && !busyDateMap[emp.emp_id]?.[d];
     });
 
@@ -549,7 +520,7 @@ const ResourceAllocation = () => {
           employees={employees}
           dayWindow={dayWindow}
           activityData={activityData}
-          activityDates={activityDates}
+          activityDates={dayWindow}
           activityStart={activityStart}
           activityEnd={activityEnd}
           busyDateMap={busyDateMap}
@@ -558,6 +529,23 @@ const ResourceAllocation = () => {
           workingAllocations={workingAllocations}
           handleAutoAssign={handleAutoAssign}
         />}
+
+        <NewCurrentAssugnmentList
+         dateWiseAssignments={dateWiseAssignments}
+          dayWindow={dayWindow}
+          editingId={editingId?.rowKey}
+          handleEditDate={handleEditDate}
+          handleDeleteDate={handleDeleteDate}
+          handleFieldChange={handleFieldChange}
+          handleConfirmUpdate={handleConfirmUpdate}
+          handleCancelEdit={handleCancelEdit}
+          activityStart={activityStart}
+          activityEnd={activityEnd}
+          activityData={activityData}
+          isActual={false}
+          employees={employees}
+        
+        />
 
         {pendingCount > 0 && (
           <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

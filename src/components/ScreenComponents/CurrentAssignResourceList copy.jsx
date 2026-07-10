@@ -348,7 +348,7 @@ const CurrentAssignments = ({
           );
           const mergedData = responses.flatMap((response) => Array.isArray(response?.data) ? response.data : []);
           setResourceList(mergedData);
-          console.log("mergedData", mergedData)
+          // console.log("mergedData", mergedData)
         } catch (error) {
           console.error("Failed to fetch resource data:", error);
           toast.error("Failed to load resource data");
@@ -736,8 +736,8 @@ const minActualDate = activityStartDate
 
 const maxActualDate = toInputDate(maxAllowedActualDate);
 
-  console.log("activityData", activityData)
-  console.log("plannedDates", plannedDates)
+  // console.log("activityData", activityData)
+  // console.log("plannedDates", JSON.stringify(plannedDates))
   
   return (
     <>
@@ -817,6 +817,11 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
 
               const actualDraft = actualDraftsByDate[dStr];
               const actualRows = actualDraft?.rows || [];
+
+              // console.log("actualResourcesForDate", actualResourcesForDate)
+              // console.log("actualDraft", actualDraftsByDate)
+              // console.log("actualDraft", actualDraft)
+              // console.log("actualRows", actualRows)
 
               const displayedActualRows = hasResourceActual ? actualResourcesForDate : actualRows;
 
@@ -1201,10 +1206,10 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
               return;
             }
 
-            console.log("Selected actual range:", {
-              start_date: actualStartDate,
-              end_date: actualEndDate,
-            });
+            // console.log("Selected actual range:", {
+            //   start_date: actualStartDate,
+            //   end_date: actualEndDate,
+            // });
 
             setIsActualRangeModalOpen(false);
           }}
