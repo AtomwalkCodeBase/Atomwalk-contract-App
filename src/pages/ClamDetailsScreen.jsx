@@ -370,6 +370,9 @@ const ClamDetailsScreen = () => {
   //   handleOpenClaimModal(existingClaim ? {...activityData, master_data: existingClaim}: null);
   // };
 
+  console.log("totalClaim.totalOPE", totalClaim.totalOPE)
+  console.log("activityData", activityData)
+
   const handleAddClaim = () => {
   const existingClaim = claimList?.[0] || null;
   handleOpenClaimModal({ activityData, ...(existingClaim && {master_data: existingClaim,}),});
@@ -445,7 +448,8 @@ const handleSubmitAll = async(masterClaimId) => {
           Claims ({claimList[0]?.claim_items?.length})
         </>
       }
-        headerAction={ViewMode !== "VIEW" && <Button variant="primary" onClick={handleAddClaim}>
+        headerAction={ViewMode !== "VIEW" && activityData.activityStatus === "C" && 
+        <Button variant="primary" onClick={handleAddClaim}>
           <FaPlus size={11} style={{ marginRight: "0.35rem" }} />
           Add Claim
         </Button>}

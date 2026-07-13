@@ -191,6 +191,42 @@ export const ResourceAvailability = ({
     return cols;
   }, [dayWindow]);
 
+  const selectedCountsByDate = useMemo(() => {
+  const counts = {};
+
+  dayWindow.forEach((d) => {
+    const dStr = formatToApiDate(d);
+    counts[dStr] = { tl: 0, ex: 0 };
+  });
+
+  const empTypeById = {};
+  mappedEmployees.forEach((emp) => {
+    empTypeById[emp.emp_id] = emp.role; // "TL" | "EX"
+  });
+
+  Object.entries(employeeDateMap).forEach(([empId, dateMap]) => {
+    const role = empTypeById[empId];
+    if (!role) return;
+
+    Object.entries(dateMap).forEach(([dStr, isAssigned]) => {
+      if (!isAssigned || !counts[dStr]) return;
+      if (role === "TL") counts[dStr].tl += 1;
+      else counts[dStr].ex += 1;
+    });
+  });
+
+    return counts;
+  }, [employeeDateMap, mappedEmployees, dayWindow]);
+
+  const selectedTLTotal = useMemo(
+    () => workingAllocations.filter((x) => x.emp_type === "T" && x.action !== "DELETE").length,
+    [workingAllocations]
+  );
+  const selectedEXTotal = useMemo(
+    () => workingAllocations.filter((x) => x.emp_type === "E" && x.action !== "DELETE").length,
+    [workingAllocations]
+  );
+
   return (
     <Card hoverable={false}
       title={`Resource Availability (${formatDate(activityStart)} – ${formatDate(activityEnd)}})`}
@@ -202,22 +238,35 @@ export const ResourceAvailability = ({
           {formatDate(activityStart)} – {formatDate(activityEnd)}
         </InfoPill>
         <InfoPill>
-          <FaUsers size={10} />
-          <span>TL:</span>
-          {activeTL} / {plannedTL}
-          {activeTL < plannedTL && (
-            <ShortPill>Short {plannedTL - activeTL} TL</ShortPill>
-          )}
+          <FaUsers size={10} />TL
+          <span style={{fontWeight: 600}}>Planned:</span> {plannedTL}
+          {/* <span style={{ marginLeft: 6 , fontWeight: 600}}>Selected:</span> {selectedTLTotal} */}
+          {/* {selectedTLTotal < plannedTL && (
+            <ShortPill>Short {plannedTL - selectedTLTotal} TL</ShortPill>
+          )} */}
         </InfoPill>
         <InfoPill>
-          <FaUser size={10} />
-          <span>EX:</span>
-          {activeEX} / {plannedEX}
-          {activeEX < plannedEX && (
-            <ShortPill>Short {plannedEX - activeEX} EX</ShortPill>
-          )}
+          <FaUser size={10} />EX
+          <span style={{fontWeight: 600}}>Planned:</span> {plannedEX}
+          {/* <span style={{ marginLeft: 6, fontWeight: 600 }}>Selected:</span> {selectedEXTotal} */}
+          {/* {selectedEXTotal < plannedEX && (
+            <ShortPill>Short {plannedEX - selectedEXTotal} EX</ShortPill>
+          )} */}
         </InfoPill>
       </InfoStrip>
+
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+        {dayWindow.map((d) => {
+          const dStr = formatToApiDate(d);
+          const { num, dow } = shortDay(d);
+          const c = selectedCountsByDate[dStr] || { tl: 0, ex: 0 };
+          return (
+            <InfoPill key={dStr} style={{ fontSize: "0.75rem" }}>
+              <span style={{fontWeight: 600}}>{num} {dow}:</span> TL {c.tl} · EX {c.ex}
+            </InfoPill>
+          );
+        })}
+      </div>
 
       <div
         style={{

@@ -267,7 +267,8 @@ const ResourceAllocation = () => {
       return mergeAdjacentRows([...others, ...newRows]);
     });
 
-    toast.success(`Assigned ${freeDates.length} date(s) to ${emp.name}`);
+    // toast.success(`Assigned ${freeDates.length} date(s) to ${emp.name}`);
+    toast.success(`${freeDates.length} date(s) selected for ${emp.name}`);
   };
 
   const handleEditDate = (row, targetDate) => {
@@ -511,9 +512,13 @@ const ResourceAllocation = () => {
             {showResourceAvailability &&
               <Button variant="outline" onClick={() => setShowResourceAvailability(false)}>Close</Button>}
           </div>
-
-
         }
+        
+        {pendingCount > 0 && (
+          <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Button onClick={handleSubmit} color="primary" style={{ marginLeft: "auto" }}>{saveLabel} Resources in plan </Button>
+          </div>
+        )}
 
 
 
@@ -548,11 +553,6 @@ const ResourceAllocation = () => {
         
         /> */}
 
-        {pendingCount > 0 && (
-          <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Button onClick={handleSubmit} color="primary" style={{ marginLeft: "auto" }}>{saveLabel}</Button>
-          </div>
-        )}
       {/* </Card> */}
     </Layout>
   );

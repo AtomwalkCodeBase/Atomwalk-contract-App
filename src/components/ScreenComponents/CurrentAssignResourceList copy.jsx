@@ -11,6 +11,8 @@ import { LuCopy, LuCopyPlus } from "react-icons/lu";
 import { getContractAllocationData, postActivityAllocationData, postAllocationData } from "../../services/productServices";
 import { buildActualPayloadsForSubmit } from "../../utils/resourceAllocationLogic";
 import { useNavigate } from "react-router-dom";
+import ConfirmPopup from "../ConfirmPopup";
+import Modal from "../Modal";
 
 const ScrollableTableWrapper = styled.div`
   max-height: 800px;
@@ -282,6 +284,40 @@ const toInputDate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const MONTH_ABBR = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+const parseApiDateKey = (dStr) => {
+  if (typeof dStr !== "string") return null;
+
+  let match = dStr.match(/^(\d{4})-(\d{2})-(\d{2})$/); // YYYY-MM-DD
+  if (match) {
+    const [, y, m, d] = match;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  match = dStr.match(/^(\d{2})-(\d{2})-(\d{4})$/); // DD-MM-YYYY
+  if (match) {
+    const [, d, m, y] = match;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  match = dStr.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/); // ADD — DD-MMM-YYYY
+  if (match) {
+    const [, d, mon, y] = match;
+    const monthIndex = MONTH_ABBR[mon.toLowerCase()];
+    if (monthIndex == null) return null;
+    const date = new Date(Number(y), monthIndex, Number(d));
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
+};
+
 /* ---------------------------------- */
 /* Main Component                      */
 /* ---------------------------------- */
@@ -319,9 +355,16 @@ const CurrentAssignments = ({
   const [isActualRangeModalOpen, setIsActualRangeModalOpen] = useState(false);
   const [actualStartDate, setActualStartDate] = useState("");
   const [actualEndDate, setActualEndDate] = useState("");
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    loading: false,
+    title: "Confirmation",
+    message: "",
+    confirmLabel: "Confirm",
+    onConfirm: null,
+  });
 
     const navigate = useNavigate();
-
 
   const [rangeEmpId, setRangeEmpId] = useState("");
 const [rangeEmpType, setRangeEmpType] = useState("E");
@@ -459,7 +502,7 @@ const handleStartActivity = async (dStr) => {
               })
             )
           );
-          const mergedData = responses.flatMap((response) => Array.isArray(response?.data) ? response.data : []);
+          const mergedData = responses.flatMap((response) => Array.isArray(response?.data) ? response.data : []).filter(item => item?.is_active === true);;
           setResourceList(mergedData);
           // console.log("mergedData", mergedData)
         } catch (error) {
@@ -685,6 +728,7 @@ const handleConfirmActualRange = () => {
       const existing = next[dStr] || { confirmed: false, rows: [] };
       next[dStr] = {
         ...existing,
+        confirmed: false,
         rows: [
           ...existing.rows,
           {
@@ -695,6 +739,8 @@ const handleConfirmActualRange = () => {
             emp_type: rangeEmpType,
             remarks: rangeRemarks,
             contract_rate: 0,
+            start_date: dStr, // ADD
+            end_date: dStr, 
           },
         ],
       };
@@ -791,9 +837,9 @@ const handleCopyAllActual = () => {
 
   setActualDraftsByDate((prev) => {
     const next = { ...prev };
-    plannedDates.forEach((d) => {
+    dayWindow.forEach((d) => {          // CHANGED — was plannedDates
       const dStr = formatToApiDate(d);
-      if (dStr > lastStartedDate) return; // don't copy dates after the started cutoff
+      if (dStr > lastStartedDate) return;
       const currentDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       if (currentDate > todayDate) return;
       if (next[dStr]) return;
@@ -969,10 +1015,39 @@ const handleEditActualAgain = (dStr) => {
     setIsModalOpen(false);
   };
 
-  const plannedDates = dayWindow.filter((d) => {
-    const dStr = formatToApiDate(d);
-    return (dateWiseAssignments[dStr] || []).length > 0;
-  });
+  // const plannedDates = dayWindow.filter((d) => {
+  //   const dStr = formatToApiDate(d);
+  //   return (dateWiseAssignments[dStr] || []).length > 0;
+  // });
+
+// CHANGE plannedDates — include actual-draft dates even if outside dayWindow
+const dayWindowStrs = new Set(dayWindow.map((d) => formatToApiDate(d)));
+
+const isValidDateKey = (dStr) =>
+  typeof dStr === "string" &&
+  (/^\d{4}-\d{2}-\d{2}$/.test(dStr) || /^\d{2}-\d{2}-\d{4}$/.test(dStr) || /^\d{2}-[A-Za-z]{3}-\d{4}$/.test(dStr));
+
+const draftOnlyDates = Object.keys(actualDraftsByDate)
+  .filter(
+    (dStr) =>
+      isValidDateKey(dStr) &&                              // ADD — reject "0" or any malformed key up front
+      (actualDraftsByDate[dStr]?.rows || []).length > 0 &&
+      !dayWindowStrs.has(dStr)
+  )
+  .map((dStr) => ({ d: parseApiDateKey(dStr), dStr }))
+  .filter((item) => item.d);
+
+const plannedDates = [
+  ...dayWindow
+    .filter((d) => {
+      const dStr = formatToApiDate(d);
+      const hasPlan = (dateWiseAssignments[dStr] || []).length > 0;
+      const hasActualDraft = (actualDraftsByDate[dStr]?.rows || []).length > 0;
+      return hasPlan || hasActualDraft;
+    })
+    .map((d) => ({ d, dStr: formatToApiDate(d) })),
+  ...draftOnlyDates,
+].sort((a, b) => a.d - b.d);
 
 today.setHours(0, 0, 0, 0);
 
@@ -992,11 +1067,64 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
 
   // console.log("activityData", activityData)
   // console.log("plannedDates", JSON.stringify(plannedDates))
+
+const hasAnyDateWithoutActual = plannedDates.some(({ dStr }) => {
+  const alreadyHasResourceActual = resourceList.some((row) => {
+    const currentDate = DateForApiFormate(dStr, true);
+    const startDate = DateForApiFormate(row.s_date, true);
+    const endDate = DateForApiFormate(row.e_date, true);
+    return currentDate && startDate && endDate && currentDate >= startDate && currentDate <= endDate;
+  });
+  return !alreadyHasResourceActual;
+});
   
+const hasUserActualChanges = Object.values(actualDraftsByDate).some((draft) =>
+  (draft.rows || []).some((row) => row.source !== "api")
+);
+
+const openConfirmation = ({
+  title = "Confirmation",
+  message,
+  confirmLabel = "Confirm",
+  onConfirm,
+}) => {
+  setConfirmationModal({
+    isOpen: true,
+    loading: false,
+    title,
+    message,
+    confirmLabel,
+    onConfirm,
+  });
+};
+
+const closeConfirmation = () => {
+  setConfirmationModal((prev) => ({
+    ...prev,
+    isOpen: false,
+    loading: false,
+    onConfirm: null,
+  }));
+};
+
+const handleConfirmation = async () => {
+  try {
+    setConfirmationModal((prev) => ({ ...prev, loading: true }));
+
+    if (confirmationModal.onConfirm) {
+      await confirmationModal.onConfirm();
+    }
+
+    closeConfirmation();
+  } catch (err) {
+    setConfirmationModal((prev) => ({ ...prev, loading: false }));
+  }
+};
+
   return (
     <>
   <Card
-    title="Current Assignments"
+    title="Resource Overview"
     hoverable={false}
     headerAction={
     !hasAnyActivityStarted ? (
@@ -1005,7 +1133,7 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
           Start Activity
         </Button>
       ) : null // per-date Start buttons handle it inside each DateBlock instead
-    ) : (
+    ) : hasAnyDateWithoutActual ? (
       <RenderButton
         activityStarted={activityStarted}
         handleStartActivity={handleStartActivity}
@@ -1014,7 +1142,13 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
         hasUnconfirmedDrafts={hasUnconfirmedDrafts}
         handleOpenActualRangeModal={handleOpenActualRangeModal}
       />
-    )
+    )  : (
+    <ButtonRows>
+      <Button size="sm" variant="outline" onClick={handleOpenActualRangeModal}>
+        <FaPlus /> Add Actual
+      </Button>
+    </ButtonRows>
+  )
   }  >  
       {/* <ButtonRows>
     <Button variant="primary" onClick={handleCopyAllActual}>
@@ -1022,13 +1156,15 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
     </Button>
   </ButtonRows> */}
         <ScrollableTableWrapper>
-          {plannedDates.length === 0 ? (
+          {plannedDates.filter(({ d }) => d instanceof Date && !isNaN(d)).length === 0 ? (
             <EmptyRow style={{ fontSize: "1rem", padding: "2rem" }}>
               No resource allocated
             </EmptyRow>
           ) : (
-            plannedDates.map((d) => {
-              const dStr = formatToApiDate(d);
+            plannedDates
+                  .filter(({ d }) => d instanceof Date && !isNaN(d))   // ADD — drop any invalid entries before mapping
+                  .map(({ d, dStr }) => {
+              // const dStr = formatToApiDate(d);
               const planAssignments = dateWiseAssignments[dStr] || [];
               const tlCount = planAssignments.filter((a) => a.emp_type === 'T').length;
               const exCount = planAssignments.filter((a) => a.emp_type === 'E').length;
@@ -1075,20 +1211,43 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
 
               const isStarted = startedDates.has(dStr) || hasResourceActual;
 
+              console.log("isStarted", isStarted)
+              console.log("startedDates", startedDates)
+              console.log("actualResourcesForDate", actualResourcesForDate)
+
               // const actualEntry = allAEntries.find((entry) => entry.start_date === dStr) || null;
               // const actualResources = parseActualResources(actualEntry);
 
               const actualDraft = actualDraftsByDate[dStr];
               const actualRows = actualDraft?.rows || [];
 
+              console.log("actualDraft", JSON.stringify(actualDraftsByDate))
+              console.log("actualDraft", actualDraft)
+              console.log("actualDraft", isStarted)
+
               // console.log("actualResourcesForDate", actualResourcesForDate)
               // console.log("actualDraft", actualDraftsByDate)
               // console.log("actualDraft", actualDraft)
               // console.log("actualRows", actualRows)
 
-              const displayedActualRows = hasResourceActual ? actualResourcesForDate : actualRows;
+              const displayedActualRows = hasResourceActual
+  ? [
+      ...actualResourcesForDate,
+      ...actualRows.filter(
+        (draftRow) =>
+          !actualResourcesForDate.some(
+            (apiRow) =>
+              apiRow.emp_id === draftRow.emp_id &&
+              apiRow.start_date === draftRow.start_date &&
+              apiRow.end_date === draftRow.end_date
+          )
+      ),
+    ]
+  : actualRows;
 
               const planEmpIds = new Set(planAssignments.map((a) => a.emp_id));
+
+              const isPlannedFromApi = planAssignments.some((row) => row.status === "ORIGINAL");
 
               const planTotal = planAssignments.reduce(
                 (sum, r) => sum + (Number(r.contract_rate) || 0),
@@ -1108,7 +1267,9 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
                   {/* Date header */}
                   <DateHeader>
                     <HeaderDate>
-                      {d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' }).toUpperCase()}
+                        {d instanceof Date && !isNaN(d)
+                          ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' }).toUpperCase()
+                          : dStr}
                     </HeaderDate>
                     <CountPill>
                       TL: <strong>{tlCount}</strong> &nbsp;&nbsp; EX: <strong>{exCount}</strong>
@@ -1124,13 +1285,13 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
   <SubPanelHeader $variant="plan" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
     <span>Plan</span>
 
-    {!isPastActivityWindow && !isStarted &&  (
+    {!isPastActivityWindow && !isStarted && isPlannedFromApi && (
       <Button size="sm" variant="primary" onClick={() => handleStartActivity(dStr)}>
         Start Activity
       </Button>
     )}
 
-    {isStarted && !actualDraft && planAssignments.length > 0 && (
+    {isStarted && !hasResourceActual && !actualDraft && planAssignments.length > 0 && (
       <Button size="sm" variant="outline" onClick={() => handleCopyActual(dStr, planAssignments)}>
         <LuCopy /> Copy Actual
       </Button>
@@ -1160,6 +1321,7 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
             onCancel={handleCancelEdit}
             activityStart={activityStart}
             activityEnd={activityEnd}
+            openConfirmation={openConfirmation}
           />
         );
       }
@@ -1199,8 +1361,12 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
 
   {/* MOVED OUT of the ternary/map — renders regardless of planAssignments length */}
   {displayedActualRows
-    .filter((r) => !planEmpIds.has(r.emp_id))
-    .map((r) => (
+  .filter(
+    (r, index, arr) =>
+      !planEmpIds.has(r.emp_id) &&
+      arr.findIndex((x) => x.emp_id === r.emp_id) === index
+  )
+  .map((r) => (
       <ResourceRow key={`extra-${r.rowKey}`} style={{ opacity: 0.6 }}>
         <ResourceInfo>
           <ResourceName>
@@ -1389,7 +1555,7 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
                   </Section>
 
                   <ButtonRows>
-                    {hasResourceActual &&
+                    {hasResourceActual && activityData?.original_P?.is_ope_actual &&
                       <>
                         <Button onClick={() => navigate('/clamDetails', { state: { data:{...activityData, mode: "ADD"} } })}>Add claims</Button>
                         <Button onClick={() => navigate('/clamDetails', { state: { data:{...activityData, mode: "VIEW"} } })}>View claims</Button>
@@ -1406,9 +1572,17 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
             })
           )}
         </ScrollableTableWrapper>
-          {hasAnyActivityStarted && startedDates.size > 0 && (
+          {hasAnyActivityStarted && hasUserActualChanges && (
             <ButtonRows style={{ marginTop: "1rem", justifyContent: "flex-end" }}>
-              <Button variant="primary" onClick={handleSubmitAllActuals}>
+              <Button variant="primary"   onClick={() =>
+                  openConfirmation({
+                    title: "Submit Actuals",
+                    message: "Are you sure you want to submit all actual allocations?",
+                    confirmLabel: "Submit",
+                    onConfirm: handleSubmitAllActuals,
+                  })
+                }
+              >
                 Submit Actuals
               </Button>
             </ButtonRows>
@@ -1416,9 +1590,14 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
       </Card>
 
       {isActualRangeModalOpen && (
-        <ActualModalOverlay onClick={() => setIsModalOpen(false)}>
+
+        <Modal isOpen={isActualRangeModalOpen} onClose={(e) => {setIsActualRangeModalOpen(false); e.stopPropagation()}} title={isUpdateMode ? "Update Actual" : "Add Actual"}
+        onSave={handleConfirmActualRange} saveButtonText="Continue" cancelButtonText="Cancel"
+        >
+
+        {/* <ActualModalOverlay onClick={() => setIsModalOpen(false)}>
           <ActualModalContent onClick={(e) => e.stopPropagation()}>
-            <ActualModalHeader>{isUpdateMode ? "Update Actual" : "Add Actual"}</ActualModalHeader>
+            <ActualModalHeader>{isUpdateMode ? "Update Actual" : "Add Actual"}</ActualModalHeader> */}
                         <ActualFormGroup>
               <ActualLabel>Resource Name</ActualLabel>
               <ActualSelect value={rangeEmpId} onChange={(e) => setRangeEmpId(e.target.value)}>
@@ -1445,7 +1624,7 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
           type="date"
           value={actualStartDate}
           min={minActualDate}
-          max={maxActualDate}
+          // max={maxActualDate}
           onChange={(e) => {
             const value = e.target.value;
 
@@ -1453,10 +1632,7 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
 
             // If end date becomes smaller than start date,
             // automatically move end date
-            if (
-              actualEndDate &&
-              value > actualEndDate
-            ) {
+            if ( actualEndDate && value > actualEndDate) {
               setActualEndDate(value);
             }
           }}
@@ -1469,7 +1645,7 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
           type="date"
           value={actualEndDate}
           min={actualStartDate || minActualDate}
-          max={maxActualDate}
+          // max={maxActualDate}
           onChange={(e) =>
             setActualEndDate(e.target.value)
           }
@@ -1482,23 +1658,33 @@ const maxActualDate = toInputDate(maxAllowedActualDate);
 </ActualFormGroup>
             
 
-            <ActualButtonGroup>
+            {/* <ActualButtonGroup>
               <Button variant="outlines" onClick={() => setIsActualRangeModalOpen(false)}>
                 Cancel
-              </Button>
+              </Button> */}
               {/* <Button variant="primary" onClick={handleSaveActual}>
                 Save
               </Button> */}
-                      <Button
+                      {/* <Button
           variant="primary"
           onClick={handleConfirmActualRange}
         >
           Continue
         </Button>
-            </ActualButtonGroup>
-          </ActualModalContent>
-        </ActualModalOverlay>
+            </ActualButtonGroup> */}
+          {/* </ActualModalContent>
+        </ActualModalOverlay> */}
+        </Modal>
       )}
+      <ConfirmPopup
+        isOpen={confirmationModal.isOpen}
+        onClose={closeConfirmation}
+        isLoading={confirmationModal.loading}
+        onConfirm={handleConfirmation}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        confirmLabel={confirmationModal.confirmLabel}
+      />
     </>
   );
 };
@@ -1554,63 +1740,6 @@ const FormSelect = styled.select`
     border-color: ${({ theme }) => theme.colors?.primary || '#6C5CE7'};
   }
 `;
-
-const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, activityEnd }) => {
-  const formattedStart = activityStart ? DateForApiFormate(activityStart, true) : "";
-  const formattedEnd = activityEnd ? DateForApiFormate(activityEnd, true) : "";
-
-  return (
-    <EditRowContainer onClick={(e) => e.stopPropagation()}>
-      <FormField>
-        <FormLabel>Start Date</FormLabel>
-        <FormInput
-          type="date"
-          min={formattedStart}
-          max={formattedEnd}
-          value={row.start_date || ""}
-          onChange={(e) => onChange(row.rowKey, "start_date", e.target.value)}
-        />
-      </FormField>
-      <FormField>
-        <FormLabel>End Date</FormLabel>
-        <FormInput
-          type="date"
-          min={formattedStart}
-          max={formattedEnd}
-          value={row.end_date || ""}
-          onChange={(e) => onChange(row.rowKey, "end_date", e.target.value)}
-        />
-      </FormField>
-      <FormField>
-        <FormLabel>Employee Type</FormLabel>
-        <FormSelect
-          value={row.emp_type || "E"}
-          onChange={(e) => onChange(row.rowKey, "emp_type", e.target.value)}
-        >
-          <option value="E">Executive (EX)</option>
-          <option value="T">Team Lead (TL)</option>
-        </FormSelect>
-      </FormField>
-      <FormField style={{ gridColumn: "span 2" }}>
-        <FormLabel>Remarks</FormLabel>
-        <FormInput
-          type="text"
-          value={row.remarks || ""}
-          placeholder="Remarks"
-          onChange={(e) => onChange(row.rowKey, "remarks", e.target.value)}
-        />
-      </FormField>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem" }}>
-        <Button size="small" variant="successGhost" onClick={() => onConfirm(row.rowKey)}>
-          Confirm
-        </Button>
-        <Button size="small" variant="outlines" onClick={() => onCancel(row.rowKey)}>
-          Cancel
-        </Button>
-      </div>
-    </EditRowContainer>
-  );
-};
 
 const ActualModalOverlay = styled.div`
   position: fixed;
@@ -1670,6 +1799,69 @@ const ActualButtonGroup = styled.div`
   gap: 12px;
   margin-top: 20px;
 `;
+const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, activityEnd, openConfirmation }) => {
+  const formattedStart = activityStart ? DateForApiFormate(activityStart, true) : "";
+  const formattedEnd = activityEnd ? DateForApiFormate(activityEnd, true) : "";
+
+  return (
+    <EditRowContainer onClick={(e) => e.stopPropagation()}>
+      <FormField>
+        <FormLabel>Start Date</FormLabel>
+        <FormInput
+          type="date"
+          min={formattedStart}
+          max={formattedEnd}
+          value={row.start_date || ""}
+          onChange={(e) => onChange(row.rowKey, "start_date", e.target.value)}
+        />
+      </FormField>
+      <FormField>
+        <FormLabel>End Date</FormLabel>
+        <FormInput
+          type="date"
+          min={formattedStart}
+          max={formattedEnd}
+          value={row.end_date || ""}
+          onChange={(e) => onChange(row.rowKey, "end_date", e.target.value)}
+        />
+      </FormField>
+      <FormField>
+        <FormLabel>Employee Type</FormLabel>
+        <FormSelect
+          value={row.emp_type || "E"}
+          onChange={(e) => onChange(row.rowKey, "emp_type", e.target.value)}
+        >
+          <option value="E">Executive (EX)</option>
+          <option value="T">Team Lead (TL)</option>
+        </FormSelect>
+      </FormField>
+      <FormField style={{ gridColumn: "span 2" }}>
+        <FormLabel>Remarks</FormLabel>
+        <FormInput
+          type="text"
+          value={row.remarks || ""}
+          placeholder="Remarks"
+          onChange={(e) => onChange(row.rowKey, "remarks", e.target.value)}
+        />
+      </FormField>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem" }}>
+        <Button size="small" variant="successGhost" onClick={() =>
+          openConfirmation({
+            title: "Update Resource",
+            message: "Are you sure you want to update this resource?",
+            confirmLabel: "Update",
+            onConfirm: () => onConfirm(row.rowKey),
+          })
+        }>
+          Confirm
+        </Button>
+        <Button size="small" variant="outlines" onClick={() => onCancel(row.rowKey)}>
+          Cancel
+        </Button>
+      </div>
+    </EditRowContainer>
+  );
+};
 
 const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove,disableActualAction,  onToggleEdit, minActualDate, maxActualDate  }) => {
   if (readOnly) {
@@ -1684,7 +1876,7 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
             <Badge variant={row.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
               {row.emp_type === 'T' ? 'TL' : 'EX'}
             </Badge>
-            <span>{row.start_date || '—'} to {row.end_date || '—'}</span>
+            <span>{row.start_date || row.s_date|| '—'} to {row.end_date || row.e_date || '—'}</span>
             {row.remarks && <span>· {row.remarks}</span>}
           </ResourceMeta>
         </ResourceInfo>
@@ -1697,6 +1889,12 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
       </ResourceRow>
     );
   } 
+
+  console.log("row.start_date", row)
+  console.log("row.end_date", row)
+
+  const getStartDateField = (row) => row.start_date ? 'start_date' : 's_date';
+ const getEndDateField = (row) => row.end_date ? 'end_date' : 'e_date';
  
   return (
     <EditRowContainer>
@@ -1731,8 +1929,8 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
           type="date"
           min={minActualDate}
           max={maxActualDate}
-          value={row.start_date || ""}
-          onChange={(e) => onFieldChange("start_date", e.target.value)}
+          value={DateForApiFormate(row.start_date || row.s_date || "", true)}
+          onChange={(e) => onFieldChange(getStartDateField(row), e.target.value)}
         />
       </FormField>
 
@@ -1742,8 +1940,8 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
           type="date"
           min={row.start_date || minActualDate}
           max={maxActualDate}
-          value={row.end_date || ""}
-          onChange={(e) => onFieldChange("end_date", e.target.value)}
+          value={DateForApiFormate(row.end_date || row.e_date ||  "", true)}
+          onChange={(e) => onFieldChange(getStartDateField(row), e.target.value)}
         />
       </FormField>
 

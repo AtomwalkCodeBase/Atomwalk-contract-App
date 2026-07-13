@@ -528,7 +528,7 @@ const stats_card = useMemo(
 };
 
 
-console.log("paginatedData",paginatedData)
+// console.log("paginatedData",paginatedData)
 
   return (
     <Layout title="Clam screen">
@@ -671,6 +671,7 @@ console.log("paginatedData",paginatedData)
                 const claims = Array.isArray(employee.claims) ? employee.claims : [];
                 const firstClaim = claims[0];
                 const { variant, label } = getClaimStatusVariant(firstClaim?.expense_status);
+                const is_ope_actual = employee?.original_P?.is_ope_actual
 
                 return (
                 <>
@@ -689,22 +690,28 @@ console.log("paginatedData",paginatedData)
                     <Td><Badge variant={variant}>{label}</Badge></Td>
                     <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
                     <Td>
-                    {employee.activityStatus !== "C" && <Button disabled={true}>Cannot claim</Button>}
-                    {/* {employee.activityStatus === "C" && ( */}
-                    {employee.claims.length === 0 && (
-                        // <ButtonGroup>
-                        <Button onClick={() => navigate('/clamDetails', { state: { data: { ...employee, mode: "ADD" } } })}>
-                            Add Clam
-                        </Button>
+                      {is_ope_actual &&
+                    employee.activityStatus !== "C" && <Button disabled={true}>Cannot claim</Button>}
+
+                    {!is_ope_actual && <Button disabled={true}>OPE fix , can't claimable</Button>}
+
+                     {/* <Button onClick={() => navigate('/clamDetails', { state: { data: { ...employee, mode: "ADD" } } })}>
+                        Add Clam
+                      </Button> */}
+
+                    {employee.activityStatus === "C" && is_ope_actual && (
+                  <ButtonGroup>
+                    {employee.claims.length === 0 ? (
+                      <Button onClick={() => navigate('/clamDetails', { state: { data: { ...employee, mode: "ADD" } } })}>
+                        Add Clam
+                      </Button>
+                    ) : firstClaim?.is_approved && (
+                      <Button onClick={() => navigate('/clamDetails', { state: { data: { ...employee, mode: "VIEW" } } })}>
+                        View Clam
+                      </Button>
                     )}
-                        {/* {firstClaim?.is_approved && ( */}
-                        {employee.claims.length !== 0 && employee.activityStatus === "C" && (
-                            <Button onClick={() => navigate('/clamDetails', { state: { data: { ...employee, mode: "VIEW" } } })}>
-                            View Clam
-                            </Button>
-                        )}
-                        {/* </ButtonGroup> */}
-                    {/* // )} */}
+                  </ButtonGroup>
+                )}
                     </Td>
                 </>
                 );
