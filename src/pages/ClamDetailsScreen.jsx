@@ -243,6 +243,51 @@ const ClaimGrandTotalBar = styled.div`
   color: ${({ theme }) => theme.colors?.primary || "#6C5CE7"};
 `;
 
+// ADD — styled-components for the grid layout
+const DetailsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem 1.5rem;
+`;
+
+const DetailItem = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+`;
+
+const DetailIconWrap = styled.div`
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #f1f0fe;
+  color: #6C5CE7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+`;
+
+const DetailText = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+`;
+
+const DetailLabel = styled.span`
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+`;
+
+const DetailValue = styled.span`
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+`;
+
 const ClamDetailsScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -396,6 +441,11 @@ const handleSubmitAll = async(masterClaimId) => {
   }
 }
 
+  const matchingRetainer = (activityData?.original_P?.retainer_list || []).find((r) => r.a_type === "P" && r.start_date === activityData?.original_P?.start_date && r.end_date === activityData?.original_P?.end_date,);
+
+  const plannedTL = matchingRetainer?.tl_count || 0;
+  const plannedEX = matchingRetainer?.ex_count || 0;
+
   return (
     <Layout title="Clam Details ">
       <ClaimsHeader>
@@ -407,45 +457,62 @@ const handleSubmitAll = async(masterClaimId) => {
           </Button>
         </div>
       </ClaimsHeader>
-      <Card title="Activity Details" hoverable={false}>
-        <InfoStrip>
-          <InfoPill>
-            <FaCalendarAlt size={11} />
-            <span>Duration:</span>
-            {formatDate(activityData.planned_start_date)} – {formatDate(activityData.planned_end_date)}
-          </InfoPill>
-          <InfoPill>
-            <FaFileAlt size={11} />
-            <span>Customer:</span>
-            {activityData.customer_name}
-          </InfoPill>
-          <InfoPill>
-            <FaFileAlt size={11} />
-            <span>Order Item:</span>
-            {activityData.order_item_key}
-          </InfoPill>
-          <InfoPill>
-            <FaUserTie size={11} />
-            <span>Required TL:</span>
-            {activityData.required_tl}
-          </InfoPill>
-          <InfoPill>
-            <FaUser size={11} />
-            <span>Required EX:</span>
-            {activityData.required_ex}
-          </InfoPill>
-        </InfoStrip>
-        <InfoPill>
-          <FaMapMarkerAlt size={11} />
-          <span>Location:</span>
-          {activityData.location}
-        </InfoPill>
-      </Card>
+     <Card title="Activity Details" hoverable={false}>
+  <DetailsGrid>
+    <DetailItem>
+      <DetailIconWrap><FaCalendarAlt size={13} /></DetailIconWrap>
+      <DetailText>
+        <DetailLabel>Duration</DetailLabel>
+        <DetailValue>{formatDate(activityData.planned_start_date)} – {formatDate(activityData.planned_end_date)}</DetailValue>
+      </DetailText>
+    </DetailItem>
+
+    <DetailItem>
+      <DetailIconWrap><FaFileAlt size={13} /></DetailIconWrap>
+      <DetailText>
+        <DetailLabel>Customer</DetailLabel>
+        <DetailValue>{activityData.customer_name}</DetailValue>
+      </DetailText>
+    </DetailItem>
+
+    <DetailItem>
+      <DetailIconWrap><FaFileAlt size={13} /></DetailIconWrap>
+      <DetailText>
+        <DetailLabel>Order Item</DetailLabel>
+        <DetailValue>{activityData.order_item_key}</DetailValue>
+      </DetailText>
+    </DetailItem>
+
+    <DetailItem>
+      <DetailIconWrap><FaUserTie size={13} /></DetailIconWrap>
+      <DetailText>
+        <DetailLabel>Required TL</DetailLabel>
+        <DetailValue>{plannedTL ?? '—'}</DetailValue>
+      </DetailText>
+    </DetailItem>
+
+    <DetailItem>
+      <DetailIconWrap><FaUser size={13} /></DetailIconWrap>
+      <DetailText>
+        <DetailLabel>Required EX</DetailLabel>
+        <DetailValue>{plannedEX?? '—'}</DetailValue>
+      </DetailText>
+    </DetailItem>
+
+    <DetailItem>
+      <DetailIconWrap><FaMapMarkerAlt size={13} /></DetailIconWrap>
+      <DetailText>
+        <DetailLabel>Location</DetailLabel>
+        <DetailValue>{activityData.store_name  || '—'}</DetailValue>
+      </DetailText>
+    </DetailItem>
+  </DetailsGrid>
+</Card>
 
       <Card hoverable={false} style={{ marginTop: "1rem" }} title={
         <>
           <FaFileInvoiceDollar size={12} style={{ marginRight: "0.4rem" }} />
-          Claims ({claimList[0]?.claim_items?.length})
+          Claims { claimList[0]?.claim_items?.length && `(${claimList[0]?.claim_items?.length})`}
         </>
       }
         headerAction={ViewMode !== "VIEW" && activityData.activityStatus === "C" && 
@@ -462,9 +529,11 @@ const handleSubmitAll = async(masterClaimId) => {
         </InfoPill>
         )}
 
-        {claimList.length === 0 ? (
-          <EmptyRow>No claims submitted yet</EmptyRow>
-        ) : (
+        {activityData.activityStatus !== "C" ?
+          (<EmptyRow style={{fontWeight: "600", fontSize: "0.8rem"}}>Activity not completed yet</EmptyRow>) :
+          claimList.length === 0 ? (
+            <EmptyRow>No claims submitted yet</EmptyRow>
+          ) : (
           <DataTable
           emptyMessage="No claims submitted yet"
           isLoading={isLoading}

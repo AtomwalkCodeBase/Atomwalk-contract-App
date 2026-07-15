@@ -13,6 +13,7 @@ import { buildActualPayloadsForSubmit } from "../../utils/resourceAllocationLogi
 import { useNavigate } from "react-router-dom";
 import ConfirmPopup from "../ConfirmPopup";
 import Modal from "../Modal";
+import AddActualModal from "./AddActualModal";
 
 const ScrollableTableWrapper = styled.div`
   max-height: 800px;
@@ -585,9 +586,9 @@ const handleSubmitAllActuals = async () => {
       fd.append("c_emp_list", JSON.stringify(rows));
       await postAllocationData(fd);
 
-             for (let [key, value] of fd.entries()) {
-          console.log(key, value);
-        }
+        //      for (let [key, value] of fd.entries()) {
+        //   console.log(key, value);
+        // }
     }
 
     setActualDraftsByDate((prev) => {
@@ -1087,6 +1088,7 @@ const openConfirmation = ({
   message,
   confirmLabel = "Confirm",
   onConfirm,
+  reload = false,
 }) => {
   setConfirmationModal({
     isOpen: true,
@@ -1095,6 +1097,7 @@ const openConfirmation = ({
     message,
     confirmLabel,
     onConfirm,
+    reload,
   });
 };
 
@@ -1115,10 +1118,49 @@ const handleConfirmation = async () => {
       await confirmationModal.onConfirm();
     }
 
+    const shouldReload = confirmationModal.reload;
     closeConfirmation();
+    if (shouldReload) {
+      window.location.reload();
+    }
   } catch (err) {
     setConfirmationModal((prev) => ({ ...prev, loading: false }));
   }
+};
+
+const handleSaveActualRange = (rows, startDate, endDate) => {
+  setActualDraftsByDate((prev) => {
+    const next = { ...prev };
+    let cur = toLocalDateOnly(startDate);
+    const end = toLocalDateOnly(endDate);
+
+    while (cur <= end) {
+      const dStr = formatToApiDate(cur);
+      const existing = next[dStr] || { confirmed: false, rows: [] };
+      next[dStr] = {
+        ...existing,
+        confirmed: false,
+        rows: [
+          ...existing.rows,
+          ...rows.map((r) => ({
+            rowKey: crypto.randomUUID(),
+            original_emp_id: null,
+            emp_id: r.emp_id,
+            employee_name: r.employee_name,
+            emp_type: r.emp_type,
+            remarks: r.remarks,
+            contract_rate: 0,
+            start_date: dStr,
+            end_date: dStr,
+          })),
+        ],
+      };
+      cur.setDate(cur.getDate() + 1);
+    }
+    return next;
+  });
+
+  setIsActualRangeModalOpen(false);
 };
 
   return (
@@ -1129,7 +1171,13 @@ const handleConfirmation = async () => {
     headerAction={
     !hasAnyActivityStarted ? (
       isPastActivityWindow ? (
-        <Button size="sm" variant="primary" onClick={handleStartActivityOnce}>
+        <Button size="sm" variant="primary" onClick={() => openConfirmation({
+          title: "Start Activity",
+          message: "Are you sure you want to start this activity?",
+          confirmLabel: "Start",
+          onConfirm: handleStartActivityOnce,
+          reload: true,
+        })}>
           Start Activity
         </Button>
       ) : null // per-date Start buttons handle it inside each DateBlock instead
@@ -1142,13 +1190,13 @@ const handleConfirmation = async () => {
         hasUnconfirmedDrafts={hasUnconfirmedDrafts}
         handleOpenActualRangeModal={handleOpenActualRangeModal}
       />
-    )  : (
+    )  : isPastActivityWindow ?  (
     <ButtonRows>
       <Button size="sm" variant="outline" onClick={handleOpenActualRangeModal}>
         <FaPlus /> Add Actual
       </Button>
     </ButtonRows>
-  )
+  )  : null
   }  >  
       {/* <ButtonRows>
     <Button variant="primary" onClick={handleCopyAllActual}>
@@ -1211,9 +1259,9 @@ const handleConfirmation = async () => {
 
               const isStarted = startedDates.has(dStr) || hasResourceActual;
 
-              console.log("isStarted", isStarted)
-              console.log("startedDates", startedDates)
-              console.log("actualResourcesForDate", actualResourcesForDate)
+              // console.log("isStarted", isStarted)
+              // console.log("startedDates", startedDates)
+              // console.log("actualResourcesForDate", actualResourcesForDate)
 
               // const actualEntry = allAEntries.find((entry) => entry.start_date === dStr) || null;
               // const actualResources = parseActualResources(actualEntry);
@@ -1221,9 +1269,9 @@ const handleConfirmation = async () => {
               const actualDraft = actualDraftsByDate[dStr];
               const actualRows = actualDraft?.rows || [];
 
-              console.log("actualDraft", JSON.stringify(actualDraftsByDate))
-              console.log("actualDraft", actualDraft)
-              console.log("actualDraft", isStarted)
+              // console.log("actualDraft", JSON.stringify(actualDraftsByDate))
+              // console.log("actualDraft", actualDraft)
+              // console.log("actualDraft", isStarted)
 
               // console.log("actualResourcesForDate", actualResourcesForDate)
               // console.log("actualDraft", actualDraftsByDate)
@@ -1286,7 +1334,13 @@ const handleConfirmation = async () => {
     <span>Plan</span>
 
     {!isPastActivityWindow && !isStarted && isPlannedFromApi && (
-      <Button size="sm" variant="primary" onClick={() => handleStartActivity(dStr)}>
+      <Button size="sm" variant="primary" onClick={() => openConfirmation({
+        title: "Start Activity",
+        message: `Are you sure you want to start the activity for ${dStr}?`,
+        confirmLabel: "Start",
+        onConfirm: () => handleStartActivity(dStr),
+        reload: true,
+      })}>
         Start Activity
       </Button>
     )}
@@ -1580,6 +1634,7 @@ const handleConfirmation = async () => {
                     message: "Are you sure you want to submit all actual allocations?",
                     confirmLabel: "Submit",
                     onConfirm: handleSubmitAllActuals,
+                    reload: true,
                   })
                 }
               >
@@ -1589,93 +1644,17 @@ const handleConfirmation = async () => {
           )}
       </Card>
 
-      {isActualRangeModalOpen && (
 
-        <Modal isOpen={isActualRangeModalOpen} onClose={(e) => {setIsActualRangeModalOpen(false); e.stopPropagation()}} title={isUpdateMode ? "Update Actual" : "Add Actual"}
-        onSave={handleConfirmActualRange} saveButtonText="Continue" cancelButtonText="Cancel"
-        >
+   {isActualRangeModalOpen &&   <AddActualModal
+  isOpen={isActualRangeModalOpen}
+  onClose={(e) => {setIsActualRangeModalOpen(false); e.stopPropagation()}}
+  employees={employees}
+  minActualDate={minActualDate}
+  maxActualDate={maxActualDate}
+  onSave={handleSaveActualRange}
+  isUpdateMode={isUpdateMode}
+/>}
 
-        {/* <ActualModalOverlay onClick={() => setIsModalOpen(false)}>
-          <ActualModalContent onClick={(e) => e.stopPropagation()}>
-            <ActualModalHeader>{isUpdateMode ? "Update Actual" : "Add Actual"}</ActualModalHeader> */}
-                        <ActualFormGroup>
-              <ActualLabel>Resource Name</ActualLabel>
-              <ActualSelect value={rangeEmpId} onChange={(e) => setRangeEmpId(e.target.value)}>
-                <option value="">Select Resource</option>
-                {employees.map((emp) => (
-                  <option key={emp.emp_id} value={emp.emp_id}>
-                    {emp.name} ({emp.emp_id})
-                  </option>
-                ))}
-              </ActualSelect>
-            </ActualFormGroup>
-
-            <ActualFormGroup>
-  <ActualLabel>Employee Type</ActualLabel>
-  <ActualSelect value={rangeEmpType} onChange={(e) => setRangeEmpType(e.target.value)}>
-    <option value="E">Executive (EX)</option>
-    <option value="T">Team Lead (TL)</option>
-  </ActualSelect>
-</ActualFormGroup>
-
-            <ActualFormGroup>
-              <ActualLabel>Start Date</ActualLabel>
-                <ActualInput
-          type="date"
-          value={actualStartDate}
-          min={minActualDate}
-          // max={maxActualDate}
-          onChange={(e) => {
-            const value = e.target.value;
-
-            setActualStartDate(value);
-
-            // If end date becomes smaller than start date,
-            // automatically move end date
-            if ( actualEndDate && value > actualEndDate) {
-              setActualEndDate(value);
-            }
-          }}
-        />
-            </ActualFormGroup>
-                  <ActualFormGroup>
-        <ActualLabel>End Date</ActualLabel>
-
-        <ActualInput
-          type="date"
-          value={actualEndDate}
-          min={actualStartDate || minActualDate}
-          // max={maxActualDate}
-          onChange={(e) =>
-            setActualEndDate(e.target.value)
-          }
-        />
-      </ActualFormGroup>
-
-      <ActualFormGroup>
-  <ActualLabel>Remarks</ActualLabel>
-  <ActualInput type="text" value={rangeRemarks} onChange={(e) => setRangeRemarks(e.target.value)} placeholder="Remarks" />
-</ActualFormGroup>
-            
-
-            {/* <ActualButtonGroup>
-              <Button variant="outlines" onClick={() => setIsActualRangeModalOpen(false)}>
-                Cancel
-              </Button> */}
-              {/* <Button variant="primary" onClick={handleSaveActual}>
-                Save
-              </Button> */}
-                      {/* <Button
-          variant="primary"
-          onClick={handleConfirmActualRange}
-        >
-          Continue
-        </Button>
-            </ActualButtonGroup> */}
-          {/* </ActualModalContent>
-        </ActualModalOverlay> */}
-        </Modal>
-      )}
       <ConfirmPopup
         isOpen={confirmationModal.isOpen}
         onClose={closeConfirmation}
@@ -1890,8 +1869,8 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
     );
   } 
 
-  console.log("row.start_date", row)
-  console.log("row.end_date", row)
+  // console.log("row.start_date", row)
+  // console.log("row.end_date", row)
 
   const getStartDateField = (row) => row.start_date ? 'start_date' : 's_date';
  const getEndDateField = (row) => row.end_date ? 'end_date' : 'e_date';
