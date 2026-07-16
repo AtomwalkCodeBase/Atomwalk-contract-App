@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import ConfirmPopup from "../ConfirmPopup";
 import Modal from "../Modal";
 import AddActualModal from "./AddActualModal";
+import { useFilter } from "../../hooks/useFilter";
 
 const ScrollableTableWrapper = styled.div`
   max-height: 800px;
@@ -346,6 +347,8 @@ const CurrentAssignments = ({
 
       const today = new Date();
 
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
   const [allAEntries, setAllAEntries] = useState(activityData?.allAEntries || []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDate, setModalDate] = useState("");
@@ -1028,13 +1031,16 @@ const isValidDateKey = (dStr) =>
   typeof dStr === "string" &&
   (/^\d{4}-\d{2}-\d{2}$/.test(dStr) || /^\d{2}-\d{2}-\d{4}$/.test(dStr) || /^\d{2}-[A-Za-z]{3}-\d{4}$/.test(dStr));
 
-const draftOnlyDates = Object.keys(actualDraftsByDate)
-  .filter(
-    (dStr) =>
-      isValidDateKey(dStr) &&                              // ADD — reject "0" or any malformed key up front
-      (actualDraftsByDate[dStr]?.rows || []).length > 0 &&
-      !dayWindowStrs.has(dStr)
-  )
+  const actualOnlyDateKeys = new Set([
+  ...Object.keys(actualDraftsByDate).filter(
+    (dStr) => isValidDateKey(dStr) && (actualDraftsByDate[dStr]?.rows || []).length > 0
+  ),
+  ...resourceList.map((r) => formatToApiDate(toLocalDateOnly(r.s_date))).filter(Boolean),
+  ...allAEntries.map((e) => e.start_date).filter(isValidDateKey),
+]);
+
+const draftOnlyDates = [...actualOnlyDateKeys]
+  .filter((dStr) => !dayWindowStrs.has(dStr))
   .map((dStr) => ({ d: parseApiDateKey(dStr), dStr }))
   .filter((item) => item.d);
 
@@ -1049,6 +1055,37 @@ const plannedDates = [
     .map((d) => ({ d, dStr: formatToApiDate(d) })),
   ...draftOnlyDates,
 ].sort((a, b) => a.d - b.d);
+
+const filteredPlannedDates = useFilter({
+  data: plannedDates,
+  fields: [],
+  search: "",
+  extraFilters: {
+    dateRange: {
+      field: "d",
+      from: filterStartDate ? toLocalDateOnly(filterStartDate) : null,
+      to: filterEndDate ? toLocalDateOnly(filterEndDate) : null,
+    },
+  },
+});
+
+useEffect(() => {
+  if (!plannedDates.length) return;
+  if (filterStartDate || filterEndDate) return; // don't override user's manual selection
+
+  const validDates = plannedDates
+    .map(({ d }) => d)
+    .filter((d) => d instanceof Date && !isNaN(d));
+
+  if (!validDates.length) return;
+
+  const minDate = new Date(Math.min(...validDates));
+  const maxDate = new Date(Math.max(...validDates));
+
+  setFilterStartDate(toInputDate(minDate));
+  setFilterEndDate(toInputDate(maxDate));
+}, [plannedDates]);
+
 
 today.setHours(0, 0, 0, 0);
 
@@ -1204,12 +1241,28 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
     </Button>
   </ButtonRows> */}
         <ScrollableTableWrapper>
-          {plannedDates.filter(({ d }) => d instanceof Date && !isNaN(d)).length === 0 ? (
+        {filteredPlannedDates.length !== 0 && <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", margin: "0.5rem 0" }}>
+          <FormField>
+            <FormLabel>From</FormLabel>
+            <FormInput type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
+          </FormField>
+          <FormField>
+            <FormLabel>To</FormLabel>
+            <FormInput type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
+          </FormField>
+          {(filterStartDate || filterEndDate) && (
+            <Button size="sm" variant="outlines" onClick={() => { setFilterStartDate(""); setFilterEndDate(""); }}>
+              Clear
+            </Button>
+          )}
+        </div>}
+
+          {filteredPlannedDates.filter(({ d }) => d instanceof Date && !isNaN(d)).length === 0 ? (
             <EmptyRow style={{ fontSize: "1rem", padding: "2rem" }}>
               No resource allocated
             </EmptyRow>
           ) : (
-            plannedDates
+            filteredPlannedDates
                   .filter(({ d }) => d instanceof Date && !isNaN(d))   // ADD — drop any invalid entries before mapping
                   .map(({ d, dStr }) => {
               // const dStr = formatToApiDate(d);

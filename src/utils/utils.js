@@ -374,17 +374,17 @@ export const matchClaimsToActivity = (claims = [], activity) => {
   const activityOrderItemId = getActivityOrderItemId(activity);
 
   if (!activityOrderItemId) return [];
-  
+
   return claims.map((claim) => {
     const matchedItems = (claim?.claim_items || []).filter((item) => {
       const itemId = String(item?.o_item_id).replace(/^0+/, "");
-        return itemId === activityOrderItemId;
-      });
+      return itemId === activityOrderItemId;
+    });
 
-      if (matchedItems.length === 0) return null;
+    if (matchedItems.length === 0) return null;
 
-      return { ...claim, claim_items: matchedItems };
-    })
+    return { ...claim, claim_items: matchedItems };
+  })
     .filter(Boolean);
 };
 
@@ -486,10 +486,10 @@ export const getStatusVariant = (activityStatus) => {
 
 export const buildDayWindow = (startStr, count = 5) => {
   if (!startStr) return [];
-  
+
   const dateStr = DateForApiFormate(startStr, true);
   if (!dateStr) return [];
-  
+
   const base = new Date(dateStr);
   if (isNaN(base)) return [];
 
@@ -514,104 +514,104 @@ export const generateDatesBetween = (startStr, endStr) => {
   return dates;
 };
 
-export const normalizeApiAllocations = (data=[])=>{
-    return data.filter(x=>x.is_active).map(item=>({
-        rowKey:String(item.id),
-        id:item.id,
-        allocation_id:item.allocation_id,
-        emp_id:item.emp_id,
-        employee_name:item.employee_name,
-        start_date:item.s_date ? DateForApiFormate(item.s_date,true) : DateForApiFormate(item.start_date,true),
-        end_date:item.e_date ? DateForApiFormate(item.e_date,true) : DateForApiFormate(item.end_date,true),
-        remarks:item.remarks||"",
-        emp_type:item.emp_type,
-        is_approved:item.is_approved,
-        is_active:item.is_active,
-        is_present:item.is_present,
-        app_remarks:item.app_remarks,
-        contract_rate:item.contract_rate,
-        ope_amt:item.ope_amt,
-        order_item_id:item.order_item_id,
-        approve_date:item.approve_date,
-        action:"NONE"
-    }))
+export const normalizeApiAllocations = (data = []) => {
+  return data.filter(x => x.is_active).map(item => ({
+    rowKey: String(item.id),
+    id: item.id,
+    allocation_id: item.allocation_id,
+    emp_id: item.emp_id,
+    employee_name: item.employee_name,
+    start_date: item.s_date ? DateForApiFormate(item.s_date, true) : DateForApiFormate(item.start_date, true),
+    end_date: item.e_date ? DateForApiFormate(item.e_date, true) : DateForApiFormate(item.end_date, true),
+    remarks: item.remarks || "",
+    emp_type: item.emp_type,
+    is_approved: item.is_approved,
+    is_active: item.is_active,
+    is_present: item.is_present,
+    app_remarks: item.app_remarks,
+    contract_rate: item.contract_rate,
+    ope_amt: item.ope_amt,
+    order_item_id: item.order_item_id,
+    approve_date: item.approve_date,
+    action: "NONE"
+  }))
 }
 
 export const normalizeOverlappingAllocations = (rows = []) => {
 
-    // ignore deleted rows
-    const activeRows = rows.filter(r => r.action !== "DELETE");
+  // ignore deleted rows
+  const activeRows = rows.filter(r => r.action !== "DELETE");
 
-    // sort by employee and start date
-    activeRows.sort((a, b) => {
-      if (a.emp_id !== b.emp_id) return a.emp_id.localeCompare(b.emp_id);
-        return new Date(a.start_date) - new Date(b.start_date);
-    });
+  // sort by employee and start date
+  activeRows.sort((a, b) => {
+    if (a.emp_id !== b.emp_id) return a.emp_id.localeCompare(b.emp_id);
+    return new Date(a.start_date) - new Date(b.start_date);
+  });
 
-    const result = [];
+  const result = [];
 
-    activeRows.forEach(current => {
+  activeRows.forEach(current => {
 
-        // if (!result.length) {
+    // if (!result.length) {
 
-        //     result.push({ ...current });
-        //     return;
+    //     result.push({ ...current });
+    //     return;
 
-        // }
+    // }
 
-        let inserted = false;
+    let inserted = false;
 
-        for (let i = 0; i < result.length; i++) {
-            const prev = result[i];
-            if (prev.emp_id !== current.emp_id)continue;
+    for (let i = 0; i < result.length; i++) {
+      const prev = result[i];
+      if (prev.emp_id !== current.emp_id) continue;
 
-            const prevStart = new Date(prev.start_date);
-            const prevEnd = new Date(prev.end_date);
-            const curStart = new Date(current.start_date);
-            const curEnd = new Date(current.end_date);
+      const prevStart = new Date(prev.start_date);
+      const prevEnd = new Date(prev.end_date);
+      const curStart = new Date(current.start_date);
+      const curEnd = new Date(current.end_date);
 
-                // overlap exists
-            if (curStart <= prevEnd && curEnd >= prevStart) {
-                // left part
-                if (curStart > prevStart) {
-                    const leftEnd = new Date(curStart);
-                    leftEnd.setDate(leftEnd.getDate() - 1);
-                    result[i] = {
-                        ...prev,
-                        end_date: formatToApiDate(leftEnd),
-                        action:prev.id ? "UPDATE" : "ADD"
-                    };
-                } else {
-                    // remove previous completely
-                    result.splice(i, 1);
-                    i--;
-                }
-                    // right part
-                if (curEnd < prevEnd) {
-                    const rightStart = new Date(curEnd);
-                    rightStart.setDate(rightStart.getDate() + 1);
-                    result.push({
-                        ...prev,
-                        rowKey: crypto.randomUUID(),
-                        id: null,
-                        parent_id: prev.id,
-                        start_date:formatToApiDate(rightStart),
-                        action: "ADD"
-                    });
-                }
-                inserted = true;
-            }
+      // overlap exists
+      if (curStart <= prevEnd && curEnd >= prevStart) {
+        // left part
+        if (curStart > prevStart) {
+          const leftEnd = new Date(curStart);
+          leftEnd.setDate(leftEnd.getDate() - 1);
+          result[i] = {
+            ...prev,
+            end_date: formatToApiDate(leftEnd),
+            action: prev.id ? "UPDATE" : "ADD"
+          };
+        } else {
+          // remove previous completely
+          result.splice(i, 1);
+          i--;
         }
-        if (!inserted) {
-            result.push({ ...current });
+        // right part
+        if (curEnd < prevEnd) {
+          const rightStart = new Date(curEnd);
+          rightStart.setDate(rightStart.getDate() + 1);
+          result.push({
+            ...prev,
+            rowKey: crypto.randomUUID(),
+            id: null,
+            parent_id: prev.id,
+            start_date: formatToApiDate(rightStart),
+            action: "ADD"
+          });
         }
-    });
-    rows.filter(x => x.action === "DELETE").forEach(x => result.push(x));
+        inserted = true;
+      }
+    }
+    if (!inserted) {
+      result.push({ ...current });
+    }
+  });
+  rows.filter(x => x.action === "DELETE").forEach(x => result.push(x));
 
-    return result;
+  return result;
 };
 
-export const splitAllocationByDate = ( row, targetDate, mode = "DELETE" // DELETE | EDIT
+export const splitAllocationByDate = (row, targetDate, mode = "DELETE" // DELETE | EDIT
 ) => {
   const result = [];
 
@@ -623,9 +623,9 @@ export const splitAllocationByDate = ( row, targetDate, mode = "DELETE" // DELET
   */
   if (startDate === targetDate && endDate === targetDate) {
     if (mode === "DELETE") {
-      result.push({ ...row, action: row.id ? "DELETE" : "REMOVE",});
+      result.push({ ...row, action: row.id ? "DELETE" : "REMOVE", });
     } else {
-      result.push({ ...row, action: row.id ? "EDIT" : "ADD",});
+      result.push({ ...row, action: row.id ? "EDIT" : "ADD", });
     }
     return result;
   }
@@ -652,8 +652,8 @@ export const splitAllocationByDate = ( row, targetDate, mode = "DELETE" // DELET
   const middleAction =
     mode === "DELETE"
       ? row.id
-      ? "DELETE" : "REMOVE" : row.id
-      ? "EDIT" : "ADD";
+        ? "DELETE" : "REMOVE" : row.id
+        ? "EDIT" : "ADD";
 
   result.push({
     ...row,
@@ -682,51 +682,51 @@ export const splitAllocationByDate = ( row, targetDate, mode = "DELETE" // DELET
 };
 
 export const splitAllocationForEdit = (row, targetDate) => {
-    const rows = [];
+  const rows = [];
 
-    if ( row.start_date === targetDate && row.end_date === targetDate) {
-        rows.push({ ...row, action: "EDIT"});
-        return rows;
-    }
-    const target = new Date(targetDate);
-    // left part
-  
-    if (row.start_date < targetDate) {
-        const prev = new Date(target);
-        prev.setDate(prev.getDate() - 1);
-        rows.push({
-            ...row,
-            end_date: DateForApiFormate(prev, true),
-            action: row.id ? "UPDATE" : "ADD"
-        });
-    }
-        // editable part
-
-    rows.push({
-        ...row,
-        rowKey: crypto.randomUUID(),
-        parent_id: row.rowKey,
-        id: null,
-        start_date: targetDate,
-        end_date: targetDate,
-        action: "EDIT"
-    });
-
-    // right part
-
-    if (row.end_date > targetDate) {
-        const next = new Date(target);
-        next.setDate(next.getDate() + 1);
-        rows.push({
-            ...row,
-            rowKey: crypto.randomUUID(),
-            parent_id: row.rowKey,
-            id: null,
-            start_date: DateForApiFormate(next, true),
-            action: "ADD"
-        });
-    }
+  if (row.start_date === targetDate && row.end_date === targetDate) {
+    rows.push({ ...row, action: "EDIT" });
     return rows;
+  }
+  const target = new Date(targetDate);
+  // left part
+
+  if (row.start_date < targetDate) {
+    const prev = new Date(target);
+    prev.setDate(prev.getDate() - 1);
+    rows.push({
+      ...row,
+      end_date: DateForApiFormate(prev, true),
+      action: row.id ? "UPDATE" : "ADD"
+    });
+  }
+  // editable part
+
+  rows.push({
+    ...row,
+    rowKey: crypto.randomUUID(),
+    parent_id: row.rowKey,
+    id: null,
+    start_date: targetDate,
+    end_date: targetDate,
+    action: "EDIT"
+  });
+
+  // right part
+
+  if (row.end_date > targetDate) {
+    const next = new Date(target);
+    next.setDate(next.getDate() + 1);
+    rows.push({
+      ...row,
+      rowKey: crypto.randomUUID(),
+      parent_id: row.rowKey,
+      id: null,
+      start_date: DateForApiFormate(next, true),
+      action: "ADD"
+    });
+  }
+  return rows;
 };
 
 // export const buildPayloads = (workingAllocations) => {
@@ -735,7 +735,7 @@ export const splitAllocationForEdit = (row, targetDate) => {
 //     const deletePayload = [];
 
 //     workingAllocations.forEach(row => {
-      
+
 //       // ADD
 //         if (row.action === "ADD") {
 //             addPayload.push({
@@ -746,9 +746,9 @@ export const splitAllocationForEdit = (row, targetDate) => {
 //                 remarks: row.remarks || "",
 //                 contract_rate:Number(row.contract_rate) || 0
 //             });
-        
+
 //           }
-           
+
 //           // UPDATE
 //         else if ( row.action === "UPDATE" && row.id) {
 //             updatePayload.push({
@@ -916,14 +916,14 @@ const parseComparable = (s) => {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 };
- 
+
 const formatComparable = (d) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
 };
- 
+
 /** Local, timezone-safe replacement for generateDatesBetween that stays in YYYY-MM-DD. */
 export const datesBetweenComparable = (startStr, endStr) => {
   if (!startStr || !endStr) return [];
@@ -936,7 +936,7 @@ export const datesBetweenComparable = (startStr, endStr) => {
   }
   return dates;
 };
- 
+
 /**
  * SINGLE SOURCE OF TRUTH MODEL
  * -----------------------------------------------------------------------
@@ -951,18 +951,18 @@ export const datesBetweenComparable = (startStr, endStr) => {
  * DELETE if its id is missing from workingAllocations entirely.
  * -----------------------------------------------------------------------
  */
- 
+
 const addDays = (dateStr, n) => {
   const d = parseComparable(dateStr);
   d.setDate(d.getDate() + n);
   return formatComparable(d);
 };
- 
+
 const isNextDay = (a, b) => {
   const diff = (parseComparable(b) - parseComparable(a)) / (1000 * 60 * 60 * 24);
   return diff === 1;
 };
- 
+
 /** Map: emp_id -> { 'YYYY-MM-DD': original_db_id } based on the DB snapshot. */
 export const buildOwnershipMap = (originalAllocations) => {
   const map = {};
@@ -974,7 +974,7 @@ export const buildOwnershipMap = (originalAllocations) => {
   });
   return map;
 };
- 
+
 /**
  * Given the full set of dates an employee should be active on, rebuilds
  * their rows as contiguous ranges, cutting at any date whose "owner id"
@@ -990,20 +990,20 @@ export const recomputeEmployeeRows = ({
 }) => {
   const sortedDates = [...new Set(activeDates)].sort();
   if (sortedDates.length === 0) return [];
- 
+
   const ownerOf = (d) => ownershipMap[empId]?.[d] ?? null;
- 
+
   const byId = {};
   existingRowsForEmp.forEach((r) => {
     if (r.id != null) byId[r.id] = r;
   });
   const fallback = existingRowsForEmp[0] || employeeMeta;
- 
+
   const rows = [];
   let segStart = sortedDates[0];
   let segOwner = ownerOf(segStart);
   let prev = segStart;
- 
+
   const pushSeg = (start, end, owner) => {
     const base = (owner != null && byId[owner]) || fallback;
     rows.push({
@@ -1019,7 +1019,7 @@ export const recomputeEmployeeRows = ({
       is_approved: !!base.is_approved,
     });
   };
- 
+
   for (let i = 1; i < sortedDates.length; i++) {
     const d = sortedDates[i];
     const owner = ownerOf(d);
@@ -1033,10 +1033,10 @@ export const recomputeEmployeeRows = ({
     prev = d;
   }
   pushSeg(segStart, prev, segOwner);
- 
+
   return rows;
 };
- 
+
 /**
  * Splits a single row at targetDate.
  * mode 'EDIT'   -> isolates targetDate into its own editable row.
@@ -1052,7 +1052,7 @@ export const splitRangeAtDate = (row, targetDate, mode) => {
   const segments = [];
   const hasBefore = targetDate > row.start_date;
   const hasAfter = targetDate < row.end_date;
- 
+
   if (hasBefore) {
     segments.push({
       ...row,
@@ -1061,7 +1061,7 @@ export const splitRangeAtDate = (row, targetDate, mode) => {
       end_date: addDays(targetDate, -1),
     });
   }
- 
+
   if (mode === "EDIT") {
     segments.push({
       ...row,
@@ -1073,7 +1073,7 @@ export const splitRangeAtDate = (row, targetDate, mode) => {
     });
   }
   // mode === 'DELETE': targetDate is simply omitted, no segment pushed.
- 
+
   if (hasAfter) {
     segments.push({
       ...row,
@@ -1082,10 +1082,10 @@ export const splitRangeAtDate = (row, targetDate, mode) => {
       start_date: addDays(targetDate, 1),
     });
   }
- 
+
   return segments;
 };
- 
+
 /**
  * Auto-merge pass: run after any mutation so adjacent same-employee rows
  * with identical fields collapse back into one continuous range.
@@ -1097,7 +1097,7 @@ export const mergeAdjacentRows = (allocations) => {
     if (!byEmp[r.emp_id]) byEmp[r.emp_id] = [];
     byEmp[r.emp_id].push(r);
   });
- 
+
   const merged = [];
   Object.values(byEmp).forEach((rows) => {
     const sorted = [...rows].sort((a, b) => a.start_date.localeCompare(b.start_date));
@@ -1109,7 +1109,7 @@ export const mergeAdjacentRows = (allocations) => {
         current.emp_type === row.emp_type &&
         (current.remarks || "") === (row.remarks || "") &&
         (current.id == null || row.id == null || current.id === row.id);
- 
+
       if (sameFields) {
         const keepId = current.id ?? row.id;
         current = {
@@ -1127,7 +1127,7 @@ export const mergeAdjacentRows = (allocations) => {
   });
   return merged;
 };
- 
+
 /** Status is only ever used for UI badges — never stored. */
 export const getRowStatus = (row, originalById) => {
   if (row.id == null) return "ADD";
@@ -1140,21 +1140,21 @@ export const getRowStatus = (row, originalById) => {
     (row.remarks || "") !== (original.remarks || "");
   return changed ? "UPDATE" : "ORIGINAL";
 };
- 
+
 /** The actual diff. This is the only place ADD/UPDATE/DELETE get decided. */
 export const buildPayloads = (workingAllocations, originalAllocations) => {
   const originalById = {};
   originalAllocations.forEach((r) => {
     originalById[r.id] = r;
   });
- 
+
   const addPayload = [];
   const updatePayload = [];
   const seenIds = new Set();
- 
+
   workingAllocations.forEach((row) => {
     const rateNum = row.contract_rate ? parseFloat(row.contract_rate) : 0;
- 
+
     if (row.id == null) {
       addPayload.push({
         emp_id: row.emp_id,
@@ -1166,18 +1166,18 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
       });
       return;
     }
- 
+
     seenIds.add(row.id);
     const original = originalById[row.id];
     if (!original) return; // defensive: id present but not in snapshot
- 
+
     const changed =
       row.start_date !== original.start_date ||
       row.end_date !== original.end_date ||
       row.emp_type !== original.emp_type ||
       (row.remarks || "") !== (original.remarks || "") ||
       String(row.contract_rate ?? "") !== String(original.contract_rate ?? "");
- 
+
     if (changed) {
       updatePayload.push({
         id: row.id,
@@ -1191,15 +1191,15 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
       });
     }
   });
- 
+
   const deletePayload = originalAllocations
     .filter((o) => !seenIds.has(o.id))
-    .map((o) => ({ id: o.id, is_deleted: true }));
- 
+    .map((o) => ({ id: o.id, is_deleted: true, emp_type: o.emp_type }));
+
   return { addPayload, updatePayload, deletePayload };
 };
- 
-export const generateDateRange = ( startDate, endDate, { format = false, maxDays = 366 } = {}) => {
+
+export const generateDateRange = (startDate, endDate, { format = false, maxDays = 366 } = {}) => {
   const dates = [];
 
   const startComparable = DateForApiFormate(startDate, true);
@@ -1216,7 +1216,7 @@ export const generateDateRange = ( startDate, endDate, { format = false, maxDays
   let limit = 0;
 
   while (current <= last && limit < maxDays) {
-    dates.push( format ? formatToApiDate(current) : new Date(current));
+    dates.push(format ? formatToApiDate(current) : new Date(current));
     current.setDate(current.getDate() + 1);
     limit++;
   }
@@ -1224,17 +1224,17 @@ export const generateDateRange = ( startDate, endDate, { format = false, maxDays
   return dates;
 };
 
-export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations = [], originalById = {}, getRowStatus,}) => {
+export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations = [], originalById = {}, getRowStatus, }) => {
   const activityDates = useMemo(() => generateDateRange(activityStart, activityEnd),
     [activityStart, activityEnd]
   );
 
   const dateWiseAssignments = useMemo(() => {
     const map = {};
-    activityDates.forEach((date) => { map[formatToApiDate(date)] = [];});
+    activityDates.forEach((date) => { map[formatToApiDate(date)] = []; });
 
     allocations.forEach((row) => {
-      const rowDates = generateDateRange(row.start_date,row.end_date,{ format: true });
+      const rowDates = generateDateRange(row.start_date, row.end_date, { format: true });
       rowDates.forEach((date) => {
         if (map[date]) {
           map[date].push({
@@ -1245,7 +1245,7 @@ export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations
     });
 
     return map;
-  }, [ allocations, activityDates, originalById, getRowStatus,]);
+  }, [allocations, activityDates, originalById, getRowStatus,]);
 
-  return { activityDates, dayWindow: activityDates, dateWiseAssignments,};
+  return { activityDates, dayWindow: activityDates, dateWiseAssignments, };
 };

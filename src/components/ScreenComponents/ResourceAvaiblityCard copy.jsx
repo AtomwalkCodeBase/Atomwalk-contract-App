@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import Card from "../Card";
 import { buildDayWindow, DateForApiFormate, formatDate, formatToApiDate } from "../../utils/utils";
-import { FaCalendarAlt, FaCheck, FaSearch, FaUser, FaUserPlus, FaUsers } from "react-icons/fa";
+import { FaCalendarAlt, FaCheck, FaChevronLeft, FaChevronRight, FaSearch, FaUndo, FaUser, FaUserPlus, FaUsers } from "react-icons/fa";
 import { useFilter } from "../../hooks/useFilter";
 import { usePagination } from "../../hooks/usePagination";
 import DataTable, { Td } from "../DataTable";
@@ -143,12 +143,29 @@ export const ResourceAvailability = ({
 
   handleToggleAllocation,
   handleAutoAssign,
+  handleUndoAutoAssign,
+  lastAutoAssign,
 }) => {
   const [filter, setFilter] = useState({ search: "", roleFilter: "ALL" });
 
   const mappedEmployees = useMemo(() => employees.map((emp) => ({
     ...emp, role: Number(emp.grade_level) > 1 ? "TL" : "EX",
   })), [employees]);
+
+  const WINDOW_SIZE = 6;               // was 7 — align with the 6-day pill strip
+  const [weekOffset, setWeekOffset] = useState(0);
+  const needsPaging = dayWindow.length > 6;
+
+  const displayedDayWindow = useMemo(() => {
+    if (!needsPaging) return dayWindow;
+    return dayWindow.slice(weekOffset, weekOffset + WINDOW_SIZE);
+  }, [dayWindow, weekOffset, needsPaging]);
+
+  const canGoPrev = weekOffset > 0;
+  const canGoNext = weekOffset + WINDOW_SIZE < dayWindow.length;
+
+  const handlePrevWeek = () => setWeekOffset((w) => Math.max(0, w - WINDOW_SIZE));
+  const handleNextWeek = () => setWeekOffset((w) => Math.min(dayWindow.length - WINDOW_SIZE, w + WINDOW_SIZE));
 
   const filteredEmployees = useFilter({
     data: mappedEmployees,
@@ -181,15 +198,14 @@ export const ResourceAvailability = ({
   const columns = useMemo(() => {
     const cols = ["Resource"];
 
-    dayWindow.forEach((d) => {
+    displayedDayWindow.forEach((d) => {
       const { num, dow } = shortDay(d);
       cols.push(`${num} ${dow}`);
     });
 
     cols.push("Action");
-
     return cols;
-  }, [dayWindow]);
+  }, [displayedDayWindow]);
 
   const selectedCountsByDate = useMemo(() => {
   const counts = {};
@@ -255,8 +271,13 @@ export const ResourceAvailability = ({
         </InfoPill>
       </InfoStrip>
 
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-        {dayWindow.map((d) => {
+<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+        {needsPaging && (
+          <Button size="sm" variant="outline" iconOnly disabled={!canGoPrev} onClick={handlePrevWeek} title="Previous 7 days">
+            <FaChevronLeft size={11} />
+          </Button>
+        )}
+        {displayedDayWindow.map((d) => {
           const dStr = formatToApiDate(d);
           const { num, dow } = shortDay(d);
           const c = selectedCountsByDate[dStr] || { tl: 0, ex: 0 };
@@ -266,6 +287,11 @@ export const ResourceAvailability = ({
             </InfoPill>
           );
         })}
+        {needsPaging && (
+          <Button size="sm" variant="outline" iconOnly disabled={!canGoNext} onClick={handleNextWeek} title="Next 7 days">
+            <FaChevronRight size={11} />
+          </Button>
+        )}
       </div>
 
       <div
@@ -333,7 +359,7 @@ export const ResourceAvailability = ({
                   </div>
                 </ResourceCell>
               </Td>
-              {dayWindow.map((d) => {
+              {displayedDayWindow.map((d) => {
                 const dStr = formatToApiDate(d)
                 const isAssigned = !!employeeDateMap[emp.emp_id]?.[dStr];
 
@@ -374,6 +400,16 @@ export const ResourceAvailability = ({
                   ) : (
                     <Button variant="outline" iconOnly={true} disabled={true} title="Already assigned / No free dates for this activity">
                       <FaCheck size={11} />
+                    </Button>
+                  )}
+                  {lastAutoAssign?.[emp.emp_id]?.length > 0 && (
+                    <Button
+                      variant="outline"
+                      iconOnly={true}
+                      onClick={() => handleUndoAutoAssign(emp)}
+                      title="Undo last auto-assign for this resource"
+                    >
+                      <FaUndo size={11} />
                     </Button>
                   )}
                 </div>

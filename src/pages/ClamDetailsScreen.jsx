@@ -12,6 +12,7 @@ import { getContractAllocationData, getEmpClaim, getemployeeLists, postClaimActi
 import { toast } from "react-toastify";
 import DataTable, { Td } from "../components/DataTable";
 import ConfirmPopup from "../components/ConfirmPopup";
+import { FaPenToSquare } from "react-icons/fa6";
 
 
 const formatDate = (dateStr) => {
@@ -507,6 +508,14 @@ const handleSubmitAll = async(masterClaimId) => {
       </DetailText>
     </DetailItem>
   </DetailsGrid>
+
+         {activityData.store_remarks && <DetailItem style={{marginTop: "1rem"}}>
+            <DetailIconWrap><FaPenToSquare size={13} /></DetailIconWrap>
+            <DetailText>
+              <DetailLabel>Remark</DetailLabel>
+              <DetailValue>{activityData.store_remarks  || '—'}</DetailValue>
+            </DetailText>
+          </DetailItem>}
 </Card>
 
       <Card hoverable={false} style={{ marginTop: "1rem" }} title={

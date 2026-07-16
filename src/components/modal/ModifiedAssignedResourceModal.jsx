@@ -25,6 +25,7 @@ import CurrentAssignments from "../ScreenComponents/CurrentAssignResourceList co
 import { FaArrowLeft, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaUser, FaUserTie } from "react-icons/fa";
 import styled from "styled-components";
 import NewCurrentAssugnmentList from "../ScreenComponents/NewCurrentAssugnmentList";
+import { FaPenToSquare } from "react-icons/fa6";
 
 const InfoStrip = styled.div`
   display: flex;
@@ -279,6 +280,11 @@ const ResourceAllocation = () => {
     });
   };
 
+  // Tracks, per employee, exactly which dates the *last* Auto Assign click
+  // added — so Undo can remove only those, never dates that were already
+  // checked before (a different assignment / a manual check).
+  const [lastAutoAssign, setLastAutoAssign] = useState({});
+
   const handleAutoAssign = (emp) => {
     const freeDates = dayWindow.map(formatToApiDate).filter((d) => {
       return !employeeDateMap[emp.emp_id]?.[d] && !busyDateMap[emp.emp_id]?.[d];
@@ -311,8 +317,58 @@ const ResourceAllocation = () => {
       return mergeAdjacentRows([...others, ...newRows]);
     });
 
+    setLastAutoAssign((prev) => ({ ...prev, [emp.emp_id]: freeDatesComparable }));
+
     // toast.success(`Assigned ${freeDates.length} date(s) to ${emp.name}`);
     toast.success(`${freeDates.length} date(s) selected for ${emp.name}`);
+  };
+
+  // Undo the *last* Auto Assign for this employee only. Removes exactly the
+  // dates that click added; dates checked before that (manual picks, or an
+  // earlier auto-assign) are untouched because they were never added to
+  // lastAutoAssign[emp.emp_id].
+  const handleUndoAutoAssign = (emp) => {
+    const datesToRemove = lastAutoAssign[emp.emp_id];
+
+    if (!datesToRemove || !datesToRemove.length) {
+      toast.info("Nothing to undo for this resource");
+      return;
+    }
+
+    const removeSet = new Set(datesToRemove);
+
+    setWorkingAllocations((prev) => {
+      const others = prev.filter((r) => r.emp_id !== emp.emp_id);
+      const empRows = prev.filter((r) => r.emp_id === emp.emp_id);
+
+      const remainingDates = empRows
+        .flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
+        .filter((d) => !removeSet.has(d));
+
+      const newRows = recomputeEmployeeRows({
+        empId: emp.emp_id,
+        activeDates: remainingDates,
+        ownershipMap,
+        employeeMeta: {
+          employee_name: emp.name,
+          emp_type: Number(emp.grade_level) > 1 ? "T" : "E",
+          remarks: "",
+          contract_rate: 0,
+          is_approved: false,
+        },
+        existingRowsForEmp: empRows,
+      });
+
+      return mergeAdjacentRows([...others, ...newRows]);
+    });
+
+    setLastAutoAssign((prev) => {
+      const next = { ...prev };
+      delete next[emp.emp_id];
+      return next;
+    });
+
+    toast.success(`Undo auto-assign for ${emp.name}`);
   };
 
   const handleEditDate = (row, targetDate) => {
@@ -434,7 +490,7 @@ const ResourceAllocation = () => {
         fd.append("call_mode", "DELETE");
         fd.append("p_id", p_id);
         fd.append("c_emp_list", JSON.stringify(deletePayload));
-        // await postAllocationData(fd);
+        await postAllocationData(fd);
 
            for (let [key, value] of fd.entries()) {
           console.log(key, value);
@@ -546,6 +602,13 @@ const ResourceAllocation = () => {
           </DetailText>
         </DetailItem>
       </DetailsGrid>
+       {activityData.store_remarks && <DetailItem style={{marginTop: "1rem"}}>
+          <DetailIconWrap><FaPenToSquare size={13} /></DetailIconWrap>
+          <DetailText>
+            <DetailLabel>Remark</DetailLabel>
+            <DetailValue>{activityData.store_remarks  || '—'}</DetailValue>
+          </DetailText>
+        </DetailItem>}
     </Card>
 
       {/* <Card hoverable={false} style={{ marginTop: "1rem" }}> */}
@@ -595,6 +658,8 @@ const ResourceAllocation = () => {
           handleToggleAllocation={handleToggleAllocation}
           workingAllocations={workingAllocations}
           handleAutoAssign={handleAutoAssign}
+          handleUndoAutoAssign={handleUndoAutoAssign}
+          lastAutoAssign={lastAutoAssign}
         />}
 
         {/* <NewCurrentAssugnmentList
