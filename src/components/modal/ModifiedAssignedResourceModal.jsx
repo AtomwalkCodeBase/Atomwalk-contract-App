@@ -5,6 +5,7 @@ import {
   buildPayloads,
   DateForApiFormate,
   datesBetweenComparable,
+  formatRetainerActivities,
   formatToApiDate,
   generateDatesBetween,
   getMonthRange,
@@ -16,7 +17,7 @@ import {
   useDateWiseAssignments,
 } from "../../utils/utils";
 import { useLocation } from "react-router-dom";
-import { getContractAllocationData, getemployeeLists, postActivityAllocationData, postAllocationData } from "../../services/productServices";
+import { getContractAllocationData, getEmpAllocationData, getemployeeLists, postActivityAllocationData, postAllocationData } from "../../services/productServices";
 import { toast } from "react-toastify";
 import Button from "../Button";
 import Card from "../Card";
@@ -66,8 +67,8 @@ const DetailIconWrap = styled.div`
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: #f1f0fe;
-  color: #6C5CE7;
+  background: ${({ theme }) => theme.colors?.backgroundAlt || "#f1f0fe"};
+  color: ${({ theme }) => theme.colors?.primary || "#6C5CE7"};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,7 +84,7 @@ const DetailText = styled.div`
 const DetailLabel = styled.span`
   font-size: 0.68rem;
   font-weight: 600;
-  color: #999;
+  color: ${({ theme }) => theme.colors?.textLight || "#999"};
   text-transform: uppercase;
   letter-spacing: 0.02em;
 `;
@@ -91,7 +92,7 @@ const DetailLabel = styled.span`
 const DetailValue = styled.span`
   font-size: 0.85rem;
   font-weight: 600;
-  color: #333;
+  color: ${({ theme }) => theme.colors?.text || "#333"};
 `;
 
 
@@ -102,7 +103,7 @@ const formatDate = (dateStr) => {
 
 const ResourceAllocation = () => {
   const location = useLocation();
-  const activityData = location.state?.data;
+  const [activityData, setActivityData] = useState(location.state?.data);
 
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const { start, end } = getMonthRange();
@@ -162,7 +163,7 @@ const ResourceAllocation = () => {
     return map;
   }, [busyAllocations, employeeDateMap]);
 
-  const { addPayload, updatePayload, deletePayload } = useMemo(
+  const { addPayload, updatePayload, deletePayload, unchangedPayload } = useMemo(
     () => buildPayloads(workingAllocations, originalAllocations),
     [workingAllocations, originalAllocations]
   );
@@ -207,6 +208,24 @@ const ResourceAllocation = () => {
     }
   };
 
+  const refreshActivityData = async () => {
+    const p_id = activityData?.original_P?.id;
+    if (!p_id) return;
+    try {
+      const payload = {
+        emp_id: loggedEmpId,
+        start_date: DateForApiFormate(start),
+        end_date: DateForApiFormate(end),
+      };
+      const response = await getEmpAllocationData(payload);
+      const formatted = formatRetainerActivities(response.data);
+      const fresh = formatted.find((a) => a?.original_P?.id === p_id);
+      if (fresh) setActivityData(fresh);
+    } catch (err) {
+      console.error("Failed to refresh activity data:", err);
+    }
+  };
+
   const loadAllData = async () => {
     const { id: allocation_id } = activityData?.original_P || {};
     try {
@@ -233,6 +252,7 @@ const ResourceAllocation = () => {
       setBusyAllocations(
         busyData.filter((x) => x.allocation_id !== activityData?.original_P?.id)
       );
+      await refreshActivityData();
     } catch {
       toast.error("Failed to load allocation data");
     }
@@ -418,6 +438,8 @@ const ResourceAllocation = () => {
       return;
     }
 
+    console.log("workingAllocations", workingAllocations)
+
     const overlaps = workingAllocations.some(
       (r) =>
         r.rowKey !== rowKey &&
@@ -484,34 +506,38 @@ const ResourceAllocation = () => {
 
       const activeResources = workingAllocations;
 
-      if (deletePayload.length) {
-        const fd = new FormData();
-        fd.append("emp_id", loggedEmpId);
-        fd.append("call_mode", "DELETE");
-        fd.append("p_id", p_id);
-        fd.append("c_emp_list", JSON.stringify(deletePayload));
-        await postAllocationData(fd);
+      // if (deletePayload.length) {
+      //   const fd = new FormData();
+      //   fd.append("emp_id", loggedEmpId);
+      //   fd.append("call_mode", "DELETE");
+      //   fd.append("p_id", p_id);
+      //   fd.append("c_emp_list", JSON.stringify(deletePayload));
+      //   await postAllocationData(fd);
 
-           for (let [key, value] of fd.entries()) {
-          console.log(key, value);
-        }
-      }
+      //      for (let [key, value] of fd.entries()) {
+      //     console.log(key, value);
+      //   }
+      // }
+
+       const combined = [...addPayload, ...updatePayload, ...deletePayload, ...unchangedPayload];
       
-      if (addPayload.length || updatePayload.length) {
+      // if (addPayload.length || updatePayload.length) {
+      if (combined.length) {
         const fd = new FormData();
         fd.append("emp_id", loggedEmpId);
         fd.append("p_id", p_id);
         
         const hasExistingActive = workingAllocations.some((r) => r.id != null);
-        const callMode = addPayload.length && !updatePayload.length && !hasExistingActive ? "ADD" : "UPDATE";
+        const callMode = addPayload.length && !updatePayload.length && !deletePayload.length && !hasExistingActive ? "ADD" : "UPDATE";
         fd.append("call_mode", callMode);
-        fd.append("c_emp_list", JSON.stringify([...addPayload, ...updatePayload]));
-        await postAllocationData(fd);
+        // fd.append("c_emp_list", JSON.stringify([...addPayload, ...updatePayload]));
+        fd.append("c_emp_list", JSON.stringify(combined));
+        // await postAllocationData(fd);
         
         
-      // for (let [key, value] of fd.entries()) {
-      //  console.log(key, value);
-      // }
+      for (let [key, value] of fd.entries()) {
+       console.log(key, value);
+      }
       }
 
       if (activeResources.length > 0) {
@@ -525,15 +551,15 @@ const ResourceAllocation = () => {
         activityFd.append("a_id", p_id);
         activityFd.append("geo_type", "O");
         activityFd.append("resource_list", resourceListStr);
-        await postActivityAllocationData(activityFd);
+        // await postActivityAllocationData(activityFd);
 
-        // for (let [key, value] of activityFd.entries()) {
-        //   console.log(key, value);
-        // }
+        for (let [key, value] of activityFd.entries()) {
+          console.log(key, value);
+        }
       }
 
       toast.success("Saved successfully");
-      loadAllData();
+      // loadAllData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Save failed");
     }

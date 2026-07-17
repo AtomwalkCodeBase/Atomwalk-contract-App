@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import { formatToApiDate, DateForApiFormate, formatToDDMMYYYY } from "../../utils/utils";
 import Card from "../Card";
@@ -432,14 +432,14 @@ const handleStartActivityOnce = async () => {
     fd.append("start_time", start_time);
     fd.append("end_time", "");
 
-        await postActivityAllocationData(fd);
-        // for (let [key, value] of fd.entries()) {
-        //   console.log(key, value);
-        // }
-    await loadAllData();
+        // await postActivityAllocationData(fd);
+        for (let [key, value] of fd.entries()) {
+          console.log(key, value);
+        }
+    // await loadAllData();
     
     // Fetch updated resource data to get new allAEntries
-    await fetchResourceData();
+    // await fetchResourceData();
 
     toast.success("Activity started.");
   } catch (err) {
@@ -468,15 +468,15 @@ const handleStartActivity = async (dStr) => {
     fd.append("start_time", start_time);
     fd.append("end_time", "");
 
-    await postActivityAllocationData(fd);
-        // for (let [key, value] of fd.entries()) {
-        //   console.log(key, value);
-        // }
+    // await postActivityAllocationData(fd);
+        for (let [key, value] of fd.entries()) {
+          console.log(key, value);
+        }
 
-    await loadAllData();
+    // await loadAllData();
     
     // Fetch updated resource data to get new allAEntries
-    await fetchResourceData();
+    // await fetchResourceData();
 
     toast.success(`Activity started for ${dStr}.`);
   } catch (err) {
@@ -551,7 +551,7 @@ useEffect(() => {
 // UPDATE handleSubmitAllActuals — use per-date a_id from activityIdByDate instead of the single top-level a_id
 const handleSubmitAllActuals = async () => {
   try {
-    const { addPayload, updatePayload, deletePayload } = buildActualPayloadsForSubmit(
+    const { addPayload, updatePayload, deletePayload, unchangedPayload } = buildActualPayloadsForSubmit(
       actualDraftsByDate,
       resourceList
     );
@@ -567,31 +567,45 @@ const handleSubmitAllActuals = async () => {
       return groups;
     };
 
-    if (deletePayload.length) {
-      const fd = new FormData();
-      fd.append("emp_id", loggedEmpId);
-      fd.append("call_mode", "DELETE");
-      fd.append("p_id", a_id || activityData?.original_P?.id);
-      fd.append("c_emp_list", JSON.stringify(deletePayload));
-      // await postAllocationData(fd);
-             for (let [key, value] of fd.entries()) {
-          console.log(key, value);
-        }
-    }
+    // if (deletePayload.length) {
+    //   const fd = new FormData();
+    //   fd.append("emp_id", loggedEmpId);
+    //   fd.append("call_mode", "DELETE");
+    //   fd.append("p_id", a_id || activityData?.original_P?.id);
+    //   fd.append("c_emp_list", JSON.stringify(deletePayload));
+    //   // await postAllocationData(fd);
+    //          for (let [key, value] of fd.entries()) {
+    //       console.log(key, value);
+    //     }
+    // }
 
-    const addUpdateGroups = groupByAId([...addPayload, ...updatePayload]);
-    for (const [aIdForDate, rows] of Object.entries(addUpdateGroups)) {
+    // const addUpdateGroups = groupByAId([...addPayload, ...updatePayload]);
+    // for (const [aIdForDate, rows] of Object.entries(addUpdateGroups)) {
+    //   const fd = new FormData();
+    //   fd.append("emp_id", loggedEmpId);
+    //   fd.append("p_id", aIdForDate);
+    //   const hasUpdate = rows.some((r) => r.is_update);
+    //   fd.append("call_mode", hasUpdate ? "UPDATE" : "ADD");
+    //   fd.append("c_emp_list", JSON.stringify(rows));
+    //   await postAllocationData(fd);
+
+    //     //      for (let [key, value] of fd.entries()) {
+    //     //   console.log(key, value);
+    //     // }
+    // }
+
+    const allGroups = groupByAId([...addPayload, ...updatePayload, ...deletePayload, ...unchangedPayload]);
+    for (const [aIdForDate, rows] of Object.entries(allGroups)) {
       const fd = new FormData();
       fd.append("emp_id", loggedEmpId);
       fd.append("p_id", aIdForDate);
-      const hasUpdate = rows.some((r) => r.is_update);
-      fd.append("call_mode", hasUpdate ? "UPDATE" : "ADD");
+      const hasAddOrUpdate = rows.some((r) => !r.is_deleted);
+      fd.append("call_mode", hasAddOrUpdate ? "UPDATE" : "UPDATE"); // always UPDATE — ADD alone can't carry deletes
       fd.append("c_emp_list", JSON.stringify(rows));
-      await postAllocationData(fd);
-
-        //      for (let [key, value] of fd.entries()) {
-        //   console.log(key, value);
-        // }
+      // await postAllocationData(fd);
+      for (let [key, value] of fd.entries()) {
+        console.log(key, value);
+      }
     }
 
     setActualDraftsByDate((prev) => {
@@ -1068,10 +1082,12 @@ const filteredPlannedDates = useFilter({
     },
   },
 });
+console.log("plannedDates", plannedDates)
 
+// const didAutoSetFilterRef = useRef(false);
 useEffect(() => {
   if (!plannedDates.length) return;
-  if (filterStartDate || filterEndDate) return; // don't override user's manual selection
+  if (filterStartDate || filterEndDate) return;
 
   const validDates = plannedDates
     .map(({ d }) => d)
@@ -1079,8 +1095,18 @@ useEffect(() => {
 
   if (!validDates.length) return;
 
-  const minDate = new Date(Math.min(...validDates));
+ const activityStartDateOnly = toLocalDateOnly(DateForApiFormate(activityStart, true));
+
+  const candidateMinDate = new Date(Math.min(...validDates));
+  const minDate =
+    activityStartDateOnly && candidateMinDate < activityStartDateOnly
+      ? candidateMinDate
+      : activityStartDateOnly || candidateMinDate;
+
   const maxDate = new Date(Math.max(...validDates));
+
+  console.log("activityStartDateOnly", activityStart)
+  console.log("candidateMinDate", candidateMinDate)
 
   setFilterStartDate(toInputDate(minDate));
   setFilterEndDate(toInputDate(maxDate));
@@ -1157,9 +1183,9 @@ const handleConfirmation = async () => {
 
     const shouldReload = confirmationModal.reload;
     closeConfirmation();
-    if (shouldReload) {
-      window.location.reload();
-    }
+    // if (shouldReload) {
+    //   window.location.reload();
+    // }
   } catch (err) {
     setConfirmationModal((prev) => ({ ...prev, loading: false }));
   }
@@ -1270,7 +1296,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
               const tlCount = planAssignments.filter((a) => a.emp_type === 'T').length;
               const exCount = planAssignments.filter((a) => a.emp_type === 'E').length;
 
-              // console.log("planAssignments", planAssignments)
+              console.log("planAssignments", JSON.stringify(planAssignments))
 
               const actualResourcesForDate = resourceList.filter((row) => {
                 if (!row?.s_date || !row?.e_date) return false;
@@ -1902,7 +1928,7 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
         <ResourceInfo>
           <ResourceName>
             {row.employee_name || row.emp_id}
-            {isReplaced && <Badge variant="warning" style={{ fontSize: '0.58rem' }}>Replaced</Badge>}
+            {isReplaced && <Badge variant="info" style={{ fontSize: '0.58rem' }}>Add</Badge>}
           </ResourceName>
           <ResourceMeta>
             <Badge variant={row.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
@@ -2009,9 +2035,10 @@ const RenderButton = ({ activityStarted, handleStartActivity, handleCopyAllActua
 
   return(
     <ButtonRows>
+     {!hasUnconfirmedDrafts && 
      <Button size="sm" variant="primary" onClick={() => handleCopyAllActual()}>
       <LuCopyPlus /> Copy Actual (All Dates)
-    </Button> 
+    </Button> }
 
     {hasUnconfirmedDrafts && (
         <Button size="sm" variant="outlines" onClick={() => handleCancelCopyAllActual()}>

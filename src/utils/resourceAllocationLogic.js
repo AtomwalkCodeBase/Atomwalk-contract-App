@@ -64,6 +64,7 @@ export const buildActualPayloadsForSubmit = (actualDraftsByDate, resourceList) =
 
     const addPayload = [];
     const updatePayload = [];
+    const unchangedPayload = [];
     const seenIds = new Set();
 
     mergedDraft.forEach((row) => {
@@ -96,13 +97,15 @@ export const buildActualPayloadsForSubmit = (actualDraftsByDate, resourceList) =
             String(row.contract_rate ?? "") !== String(original.contract_rate ?? "");
 
         if (changed) {
-            updatePayload.push({ ...base, id: row.id, is_update: true });
+            updatePayload.push({ ...base, id: row.id, is_updated: true });
+        }else {
+            unchangedPayload.push({ id: row.id, emp_id: row.emp_id, emp_type: row.emp_type });
         }
     });
 
     const deletePayload = mergedOriginal
         .filter((o) => !seenIds.has(o.id))
-        .map((o) => ({ id: o.id, is_delete: true }));
+        .map((o) => ({ id: o.id, is_deleted: true }));
 
-    return { addPayload, updatePayload, deletePayload };
+    return { addPayload, updatePayload, deletePayload, unchangedPayload };
 };

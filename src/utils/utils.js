@@ -1049,6 +1049,12 @@ export const recomputeEmployeeRows = ({
  * which buildPayloads() will correctly turn into a DELETE.
  */
 export const splitRangeAtDate = (row, targetDate, mode) => {
+
+    if (row.start_date === row.end_date && row.start_date === targetDate) {
+    if (mode === "DELETE") return [];
+    return [{ ...row, __isEditTarget: true }]; // same id, same rowKey, just flagged for edit
+  }
+
   const segments = [];
   const hasBefore = targetDate > row.start_date;
   const hasAfter = targetDate < row.end_date;
@@ -1150,6 +1156,7 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
 
   const addPayload = [];
   const updatePayload = [];
+  const unchangedPayload = [];
   const seenIds = new Set();
 
   workingAllocations.forEach((row) => {
@@ -1189,6 +1196,13 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
         contract_rate: rateNum,
         is_updated: true,
       });
+    }else {
+      // NEW — unchanged, but backend needs it present to count toward active TL/EX
+      unchangedPayload.push({
+        id: row.id,
+        emp_id: row.emp_id,
+        emp_type: row.emp_type,
+      });
     }
   });
 
@@ -1196,7 +1210,7 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
     .filter((o) => !seenIds.has(o.id))
     .map((o) => ({ id: o.id, is_deleted: true, emp_type: o.emp_type }));
 
-  return { addPayload, updatePayload, deletePayload };
+  return { addPayload, updatePayload, deletePayload, unchangedPayload };
 };
 
 export const generateDateRange = (startDate, endDate, { format = false, maxDays = 366 } = {}) => {
