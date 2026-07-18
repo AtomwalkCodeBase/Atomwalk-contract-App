@@ -1050,7 +1050,7 @@ export const recomputeEmployeeRows = ({
  */
 export const splitRangeAtDate = (row, targetDate, mode) => {
 
-    if (row.start_date === row.end_date && row.start_date === targetDate) {
+  if (row.start_date === row.end_date && row.start_date === targetDate) {
     if (mode === "DELETE") return [];
     return [{ ...row, __isEditTarget: true }]; // same id, same rowKey, just flagged for edit
   }
@@ -1196,7 +1196,7 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
         contract_rate: rateNum,
         is_updated: true,
       });
-    }else {
+    } else {
       // NEW — unchanged, but backend needs it present to count toward active TL/EX
       unchangedPayload.push({
         id: row.id,
@@ -1262,4 +1262,55 @@ export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations
   }, [allocations, activityDates, originalById, getRowStatus,]);
 
   return { activityDates, dayWindow: activityDates, dateWiseAssignments, };
+};
+
+export const getGroupStatus = (groupedData = []) => {
+  if (!groupedData.length) {
+    return {
+      activityStatus: "NA",
+      statusDisplay: "Not Assigned",
+    };
+  }
+
+  const statuses = groupedData.map(
+    (item) => item.activityStatus
+  );
+
+  // Priority 1: Any resource not assigned
+  if (statuses.includes("NA")) {
+    return {
+      activityStatus: "NA",
+      statusDisplay: "Not Assigned",
+    };
+  }
+
+  // Priority 2: Any activity in progress
+  if (statuses.includes("P")) {
+    return {
+      activityStatus: "P",
+      statusDisplay: "In Progress",
+    };
+  }
+
+  // Priority 3: Any activity not started
+  if (statuses.includes("NS")) {
+    return {
+      activityStatus: "NS",
+      statusDisplay: "Not Started",
+    };
+  }
+
+  // Priority 4: All activities completed
+  if (statuses.every((status) => status === "C")) {
+    return {
+      activityStatus: "C",
+      statusDisplay: "Completed",
+    };
+  }
+
+  // Fallback
+  return {
+    activityStatus: "NS",
+    statusDisplay: "Not Started",
+  };
 };

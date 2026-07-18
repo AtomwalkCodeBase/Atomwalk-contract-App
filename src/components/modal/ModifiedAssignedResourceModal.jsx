@@ -438,7 +438,7 @@ const ResourceAllocation = () => {
       return;
     }
 
-    console.log("workingAllocations", workingAllocations)
+    // console.log("workingAllocations", workingAllocations)
 
     const overlaps = workingAllocations.some(
       (r) =>
@@ -532,12 +532,12 @@ const ResourceAllocation = () => {
         fd.append("call_mode", callMode);
         // fd.append("c_emp_list", JSON.stringify([...addPayload, ...updatePayload]));
         fd.append("c_emp_list", JSON.stringify(combined));
-        // await postAllocationData(fd);
+        await postAllocationData(fd);
         
         
-      for (let [key, value] of fd.entries()) {
-       console.log(key, value);
-      }
+      // for (let [key, value] of fd.entries()) {
+      //  console.log(key, value);
+      // }
       }
 
       if (activeResources.length > 0) {
@@ -551,15 +551,15 @@ const ResourceAllocation = () => {
         activityFd.append("a_id", p_id);
         activityFd.append("geo_type", "O");
         activityFd.append("resource_list", resourceListStr);
-        // await postActivityAllocationData(activityFd);
+        await postActivityAllocationData(activityFd);
 
-        for (let [key, value] of activityFd.entries()) {
-          console.log(key, value);
-        }
+        // for (let [key, value] of activityFd.entries()) {
+        //   console.log(key, value);
+        // }
       }
 
       toast.success("Saved successfully");
-      // loadAllData();
+      loadAllData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Save failed");
     }

@@ -15,6 +15,7 @@ import ConfirmPopup from "../ConfirmPopup";
 import Modal from "../Modal";
 import AddActualModal from "./AddActualModal";
 import { useFilter } from "../../hooks/useFilter";
+import { theme } from "../../styles/Theme";
 
 const ScrollableTableWrapper = styled.div`
   max-height: 800px;
@@ -343,7 +344,7 @@ const CurrentAssignments = ({
 
     const [loading, setLoading] = useState(false);
 
-    console.log("activityData", activityData)
+    // console.log("activityData", activityData)
 
       const today = new Date();
 
@@ -375,6 +376,7 @@ const [rangeEmpType, setRangeEmpType] = useState("E");
 const [rangeRemarks, setRangeRemarks] = useState("");
 
 const [editedApiRowKeys, setEditedApiRowKeys] = useState(() => new Set());
+const [savedApiEditKeys, setSavedApiEditKeys] = useState(() => new Set());
 
     const [resourceList, setResourceList] = useState([]);
 
@@ -432,14 +434,14 @@ const handleStartActivityOnce = async () => {
     fd.append("start_time", start_time);
     fd.append("end_time", "");
 
-        // await postActivityAllocationData(fd);
+        await postActivityAllocationData(fd);
         for (let [key, value] of fd.entries()) {
           console.log(key, value);
         }
-    // await loadAllData();
+    await loadAllData();
     
     // Fetch updated resource data to get new allAEntries
-    // await fetchResourceData();
+    await fetchResourceData();
 
     toast.success("Activity started.");
   } catch (err) {
@@ -468,15 +470,15 @@ const handleStartActivity = async (dStr) => {
     fd.append("start_time", start_time);
     fd.append("end_time", "");
 
-    // await postActivityAllocationData(fd);
+    await postActivityAllocationData(fd);
         for (let [key, value] of fd.entries()) {
           console.log(key, value);
         }
 
-    // await loadAllData();
+    await loadAllData();
     
     // Fetch updated resource data to get new allAEntries
-    // await fetchResourceData();
+    await fetchResourceData();
 
     toast.success(`Activity started for ${dStr}.`);
   } catch (err) {
@@ -602,17 +604,19 @@ const handleSubmitAllActuals = async () => {
       const hasAddOrUpdate = rows.some((r) => !r.is_deleted);
       fd.append("call_mode", hasAddOrUpdate ? "UPDATE" : "UPDATE"); // always UPDATE — ADD alone can't carry deletes
       fd.append("c_emp_list", JSON.stringify(rows));
-      // await postAllocationData(fd);
+      await postAllocationData(fd);
       for (let [key, value] of fd.entries()) {
         console.log(key, value);
       }
     }
 
-    setActualDraftsByDate((prev) => {
-      const next = {};
-      Object.entries(prev).forEach(([dStr, d]) => { next[dStr] = { ...d, confirmed: true }; });
-      return next;
-    });
+    // setActualDraftsByDate((prev) => {
+    //   const next = {};
+    //   Object.entries(prev).forEach(([dStr, d]) => { next[dStr] = { ...d, confirmed: true }; });
+    //   return next;
+    // });
+
+    setActualDraftsByDate({});
 
     await loadAllData();
     toast.success("Actuals saved successfully");
@@ -712,11 +716,40 @@ const handleSubmitAllActuals = async () => {
   });
 }, [resourceList]);
 
-const toggleEditApiRow = (rowKey) => {
+const handleSaveApiRowEdit = (rowKey) => {
+  setEditedApiRowKeys((prev) => {
+    const next = new Set(prev);
+    next.delete(rowKey); // exit edit mode
+    return next;
+  });
+  setSavedApiEditKeys((prev) => new Set(prev).add(rowKey));
+};
+
+const toggleEditApiRow = (rowKey, dStr, apiRowsForDate) => {
   setEditedApiRowKeys((prev) => {
     const next = new Set(prev);
     next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey);
     return next;
+  });
+
+  setActualDraftsByDate((prev) => {
+    if (prev[dStr]) return prev; // already has a draft, don't clobber it
+    return {
+      ...prev,
+      [dStr]: {
+        confirmed: false,
+        rows: apiRowsForDate.map((row) => ({
+          rowKey: row.rowKey,
+          original_emp_id: row.original_emp_id,
+          emp_id: row.emp_id,
+          employee_name: row.employee_name,
+          emp_type: row.emp_type,
+          remarks: row.remarks,
+          contract_rate: row.contract_rate,
+          resource_id: row.resource_id, // needed so buildActualPayloadsForSubmit treats it as UPDATE not ADD
+        })),
+      },
+    };
   });
 };
 
@@ -971,6 +1004,29 @@ const handleEditActualAgain = (dStr) => {
   setActualDraftsByDate((prev) => ({ ...prev, [dStr]: { ...prev[dStr], confirmed: false } }));
 };
 
+const handleCancelApiRowEdit = (dStr, rowKey, originalRow) => {
+  setEditedApiRowKeys((prev) => {
+    const next = new Set(prev);
+    next.delete(rowKey);
+    return next;
+  });
+  setActualDraftsByDate((prev) => {
+    const draft = prev[dStr];
+    if (!draft) return prev;
+    return {
+      ...prev,
+      [dStr]: {
+        ...draft,
+        rows: draft.rows.map((r) =>
+          r.rowKey === rowKey
+            ? { ...r, emp_id: originalRow.emp_id, employee_name: originalRow.employee_name, emp_type: originalRow.emp_type, remarks: originalRow.remarks, contract_rate: originalRow.contract_rate }
+            : r
+        ),
+      },
+    };
+  });
+};
+
   const handleOpenActualModal = (dStr) => {
     const existing = allAEntries.find((entry) => entry.start_date === dStr);
     setModalDate(dStr);
@@ -1082,7 +1138,7 @@ const filteredPlannedDates = useFilter({
     },
   },
 });
-console.log("plannedDates", plannedDates)
+// console.log("plannedDates", plannedDates)
 
 // const didAutoSetFilterRef = useRef(false);
 useEffect(() => {
@@ -1105,8 +1161,8 @@ useEffect(() => {
 
   const maxDate = new Date(Math.max(...validDates));
 
-  console.log("activityStartDateOnly", activityStart)
-  console.log("candidateMinDate", candidateMinDate)
+  // console.log("activityStartDateOnly", activityStart)
+  // console.log("candidateMinDate", candidateMinDate)
 
   setFilterStartDate(toInputDate(minDate));
   setFilterEndDate(toInputDate(maxDate));
@@ -1142,7 +1198,7 @@ const hasAnyDateWithoutActual = plannedDates.some(({ dStr }) => {
   return !alreadyHasResourceActual;
 });
   
-const hasUserActualChanges = Object.values(actualDraftsByDate).some((draft) =>
+const hasUserActualChanges =  savedApiEditKeys.size > 0 || Object.values(actualDraftsByDate).some((draft) =>
   (draft.rows || []).some((row) => row.source !== "api")
 );
 
@@ -1183,9 +1239,9 @@ const handleConfirmation = async () => {
 
     const shouldReload = confirmationModal.reload;
     closeConfirmation();
-    // if (shouldReload) {
-    //   window.location.reload();
-    // }
+    if (shouldReload) {
+      window.location.reload();
+    }
   } catch (err) {
     setConfirmationModal((prev) => ({ ...prev, loading: false }));
   }
@@ -1296,7 +1352,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
               const tlCount = planAssignments.filter((a) => a.emp_type === 'T').length;
               const exCount = planAssignments.filter((a) => a.emp_type === 'E').length;
 
-              console.log("planAssignments", JSON.stringify(planAssignments))
+              // console.log("planAssignments", JSON.stringify(planAssignments))
 
               const actualResourcesForDate = resourceList.filter((row) => {
                 if (!row?.s_date || !row?.e_date) return false;
@@ -1316,7 +1372,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
               ...row,
 
               // normalize for ActualEditRow
-              rowKey: `resource-${row.allocation_id}-${row.emp_id}-${dStr}`,
+              rowKey: `api-${row.id}-${row.allocation_id}-${dStr}`,
               original_emp_id: row.emp_id,
 
               emp_id: row.emp_id,
@@ -1335,6 +1391,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
             }));
 
               const hasResourceActual = actualResourcesForDate.length > 0;
+              const isDateBeingEdited = actualResourcesForDate.some((r) => editedApiRowKeys.has(r.rowKey));
 
               const isStarted = startedDates.has(dStr) || hasResourceActual;
 
@@ -1356,18 +1413,27 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
               // console.log("actualDraft", actualDraftsByDate)
               // console.log("actualDraft", actualDraft)
               // console.log("actualRows", actualRows)
+const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
 
-              const displayedActualRows = hasResourceActual
+  //             const displayedActualRows = hasResourceActual
+  // ? [
+  //     ...actualResourcesForDate,
+  //     ...actualRows.filter(
+  //       (draftRow) =>
+  //         !actualResourcesForDate.some(
+  //           (apiRow) =>
+  //             apiRow.emp_id === draftRow.emp_id &&
+  //             apiRow.start_date === draftRow.start_date &&
+  //             apiRow.end_date === draftRow.end_date
+  //         )
+  //     ),
+  //   ]
+  // : actualRows;
+  const displayedActualRows = hasResourceActual
   ? [
-      ...actualResourcesForDate,
+      ...actualResourcesForDate.map((apiRow) => draftRowsByKey.get(apiRow.rowKey) || apiRow),
       ...actualRows.filter(
-        (draftRow) =>
-          !actualResourcesForDate.some(
-            (apiRow) =>
-              apiRow.emp_id === draftRow.emp_id &&
-              apiRow.start_date === draftRow.start_date &&
-              apiRow.end_date === draftRow.end_date
-          )
+        (draftRow) => !actualResourcesForDate.some((apiRow) => apiRow.rowKey === draftRow.rowKey)
       ),
     ]
   : actualRows;
@@ -1424,7 +1490,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
       </Button>
     )}
 
-    {isStarted && !hasResourceActual && !actualDraft && planAssignments.length > 0 && (
+    {isStarted && !hasResourceActual && !actualDraft && !isDateBeingEdited && planAssignments.length > 0 && (
       <Button size="sm" variant="outline" onClick={() => handleCopyActual(dStr, planAssignments)}>
         <LuCopy /> Copy Actual
       </Button>
@@ -1463,7 +1529,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
         <ResourceRow key={row.rowKey}>
           <ResourceInfo>
             <ResourceName>
-              {row.employee_name || row.emp_id}
+              {row.employee_name || row.emp_id}<span style={{ color: theme.colors.textLight }}>({row.emp_id})</span>
               {row.action === "ADD" && <Badge variant="warning" style={{ fontSize: '0.58rem' }}>New</Badge>}
               {row.action === "UPDATE" && <Badge variant="info" style={{ fontSize: '0.58rem' }}>Updated</Badge>}
               {row.is_approved && <Badge variant="success" style={{ fontSize: '0.58rem' }}>Approved</Badge>}
@@ -1567,6 +1633,8 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
         key={row.rowKey}
         row={row}
         employees={employees}
+        onSave={hasResourceActual ? () => handleSaveApiRowEdit(row.rowKey) : undefined}
+        onCancel={hasResourceActual ? () => handleCancelApiRowEdit(dStr, row.rowKey, actualResourcesForDate.find((r) => r.rowKey === row.rowKey)) : undefined}
 
         readOnly={
   hasResourceActual
@@ -1607,7 +1675,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
           );
         }}
 
-        onToggleEdit={hasResourceActual ? () => toggleEditApiRow(row.rowKey) : undefined}
+        onToggleEdit={hasResourceActual ? () => toggleEditApiRow(row.rowKey, dStr, actualResourcesForDate) : undefined}
 
         onRemove={() => {
           if (disableActualAction) return;
@@ -1688,12 +1756,12 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
                   </Section>
 
                   <ButtonRows>
-                    {hasResourceActual && activityData?.original_P?.is_ope_actual &&
+                    {/* {hasResourceActual && activityData?.original_P?.is_ope_actual &&
                       <>
                         <Button onClick={() => navigate('/clamDetails', { state: { data:{...activityData, mode: "ADD"} } })}>Add claims</Button>
                         <Button onClick={() => navigate('/clamDetails', { state: { data:{...activityData, mode: "VIEW"} } })}>View claims</Button>
                       </>
-                    }
+                    }  */}
 {/* 
                     {planAssignments.length !== 0 && activityData.activityStatus === "C" && <Button onClick={() => handleOpenActualModal(dStr)}>
                       {hasActual ? "Update Actual" : "Add Actual"}
@@ -1710,7 +1778,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
               <Button variant="primary"   onClick={() =>
                   openConfirmation({
                     title: "Submit Actuals",
-                    message: "Are you sure you want to submit all actual allocations?",
+                    message: "Are you sure you want to submit actual allocations?",
                     confirmLabel: "Submit",
                     onConfirm: handleSubmitAllActuals,
                     reload: true,
@@ -1861,6 +1929,8 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
   const formattedStart = activityStart ? DateForApiFormate(activityStart, true) : "";
   const formattedEnd = activityEnd ? DateForApiFormate(activityEnd, true) : "";
 
+  console.log("row", row)
+
   return (
     <EditRowContainer onClick={(e) => e.stopPropagation()}>
       <FormField>
@@ -1921,7 +1991,7 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
   );
 };
 
-const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove,disableActualAction,  onToggleEdit, minActualDate, maxActualDate  }) => {
+const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove, disableActualAction, onToggleEdit, onSave,onCancel, minActualDate, maxActualDate  }) => {
   if (readOnly) {
     return (
       <ResourceRow>
@@ -2015,6 +2085,10 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
       </FormField>
  
       <div style={{ display: "flex", alignItems: "flex-end" }}>
+          {onSave && (
+            <Button size="sm" variant="success" onClick={onSave}>Save</Button>
+          )}
+          {onCancel && <Button size="sm" variant="outlines" onClick={onCancel}>Cancel</Button>}
         <Button size="sm" variant="outlines" onClick={onRemove}> <FaUserSlash /> Remove</Button>
       </div>
     </EditRowContainer>

@@ -695,9 +695,9 @@ const stats_card = useMemo(
 
                     {!is_ope_actual && <Button disabled={true}>OPE fix , can't claimable</Button>}
 
-                     {/* <Button onClick={() => navigate('/clamDetails', { state: { data: { ...employee, mode: "ADD" } } })}>
+                     <Button onClick={() => navigate('/clamDetails', { state: { data: { ...employee, mode: "ADD" } } })}>
                         Add Clam
-                      </Button> */}
+                      </Button>
 
                     {employee.activityStatus === "C" && is_ope_actual && (
                   <ButtonGroup>

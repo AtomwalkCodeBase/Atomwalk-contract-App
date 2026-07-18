@@ -198,10 +198,45 @@ export const ResourceAvailability = ({
   const columns = useMemo(() => {
     const cols = ["Resource"];
 
+      if (needsPaging) {
+    cols.push(
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Button
+          size="sm"
+          variant="outline"
+          iconOnly
+          disabled={!canGoPrev}
+          onClick={handlePrevWeek}
+          title="Previous 7 days"
+        >
+          <FaChevronLeft size={11} />
+        </Button>
+      </div>
+    );
+  }
+
     displayedDayWindow.forEach((d) => {
       const { num, dow } = shortDay(d);
       cols.push(`${num} ${dow}`);
     });
+
+
+  if (needsPaging) {
+    cols.push(
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Button
+          size="sm"
+          variant="outline"
+          iconOnly
+          disabled={!canGoNext}
+          onClick={handleNextWeek}
+          title="Next 7 days"
+        >
+          <FaChevronRight size={11} />
+        </Button>
+      </div>
+    );
+  }
 
     cols.push("Action");
     return cols;
@@ -359,6 +394,7 @@ export const ResourceAvailability = ({
                   </div>
                 </ResourceCell>
               </Td>
+             {needsPaging &&  <Td></Td>}
               {displayedDayWindow.map((d) => {
                 const dStr = formatToApiDate(d)
                 const isAssigned = !!employeeDateMap[emp.emp_id]?.[dStr];
@@ -386,6 +422,7 @@ export const ResourceAvailability = ({
                   </Td>
                 );
               })}
+             {needsPaging && <Td></Td>}
               <Td>
                 <div style={{ marginLeft: '0.5rem' }}>
                   {hasAssignableDate ? (

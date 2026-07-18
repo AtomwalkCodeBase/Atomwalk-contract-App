@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import styled from 'styled-components';
 import Card from '../components/Card';
-import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, formatWeekLabel, getWeekRange, formatDate2 } from '../utils/utils';
+import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, formatWeekLabel, getWeekRange, formatDate2, getGroupStatus } from '../utils/utils';
 import { getEmpAllocationData } from '../services/productServices';
 import { toast } from 'react-toastify';
 import Button from '../components/Button';
@@ -220,6 +220,7 @@ const ResourcesValue = styled.span`
   align-items: center;
   gap: 0.25rem;
   flex-wrap: wrap;
+  /* background: ${({ theme, variant }) => `${theme.colors.primary}10`}; */
 `;
 
 const ResourceCount = styled.span`
@@ -285,7 +286,7 @@ const parseDate = (dateStr) => {
   return new Date(year, month - 1, day);
 };
 
-const activityColumn = [<>Customer<br />Order Item ID</>, "Audit Type", "Planned Date", "Resources", "Status", "Actions"]
+const activityColumn = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>, "Planned Date", "Planned Items" , "Status", "Actions"]
 
 function getMatchingRetainerList(original_P = {}) {
   const {
@@ -303,6 +304,69 @@ function getMatchingRetainerList(original_P = {}) {
   });
 }
 
+const groupByOrderItemId = (data = []) => {
+  const grouped = data.reduce((acc, item) => {
+    const key = item.order_item_id;
+
+    if (!acc[key]) {
+      acc[key] = {
+        order_item_id: key,
+        order_item_key: item.order_item_key || "--",
+        product_name: item.product_name || "--",
+        customer_name: item.customer_name || "--",
+
+        // Used for search
+        store_name: "",
+        audit_type: "",
+            planned_start_date: item.planned_start_date,
+    planned_end_date: item.planned_end_date,
+
+        total_planned_item: 0,
+        grouped_data: [],
+      };
+    }
+
+    // Each grouped record = one planned item
+    acc[key].total_planned_item += 1;
+
+    // Keep these searchable from parent group
+    acc[key].store_name += ` ${item.store_name || ""}`;
+    acc[key].audit_type += ` ${item.audit_type || ""}`;
+
+    if (
+  item.planned_start_date &&
+  (!acc[key].planned_start_date ||
+    new Date(item.planned_start_date) <
+      new Date(acc[key].planned_start_date))
+) {
+  acc[key].planned_start_date = item.planned_start_date;
+}
+
+// Get overall latest end date
+if (
+  item.planned_end_date &&
+  (!acc[key].planned_end_date ||
+    new Date(item.planned_end_date) >
+      new Date(acc[key].planned_end_date))
+) {
+  acc[key].planned_end_date = item.planned_end_date;
+}
+
+    acc[key].grouped_data.push(item);
+
+    return acc;
+  }, {});
+
+  return Object.values(grouped).map((group) => {
+  const groupStatus = getGroupStatus(group.grouped_data);
+
+  return {
+    ...group,
+    ...groupStatus,
+  };
+});
+};
+
 const ActivityListScreen = () => {
   const today = new Date();
   const navigate = useNavigate();
@@ -314,6 +378,7 @@ const ActivityListScreen = () => {
   const [openOpeModal, setOpenOpeModal] = useState(false);
   const [isOpeModalOpen, setIsOpeModalOpen] = useState(false);
   const [filter, setFilter] = useState({ search: "", status: "" })
+  const [expandedRow, setExpandedRow] = useState(null);
 
   const [assignedActivity, setAssignedActivity] = useState([]);
   const [tab, setTab] = useState(storedSelection?.tab || "month")
@@ -485,17 +550,32 @@ const ActivityListScreen = () => {
 
   const filteredActivities = getFilteredAndSortedActivities();
 
-  const FilteredData = useFilter({
-    data: filteredActivities, fields: ["customer_name", "order_item_key", "store_name", "audit_type"],
-    search: filter.search,
-    extraFilters: {
-      activityStatus: filter.status,
-    },
-  });
+  const groupedData = groupByOrderItemId(filteredActivities);
+
+const FilteredData = useFilter({
+  data: groupedData,
+  fields: [
+    "customer_name",
+    "order_item_key",
+    "product_name",
+    "store_name",
+    "audit_type",
+  ],
+  search: filter.search,
+  extraFilters: {
+    activityStatus: filter.status,
+  },
+});
 
   const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(FilteredData, 10)
 
   console.log("paginatedData", paginatedData);
+
+  const handleExpandRow = (row) => {
+    setExpandedRow((prev) =>
+      prev === row.order_item_id ? null : row.order_item_id
+    );
+  };
 
   const handleViewOPE = (employee, e) => {
     e.stopPropagation();
@@ -682,91 +762,166 @@ const ActivityListScreen = () => {
 
         <DataTable
           columns={activityColumn}
-          data={paginatedData.reverse()}
+          data={[...paginatedData].reverse()}
           isLoading={isLoading}
+          modifiedId
+          modifiedIdName="order_item_id"
+          expandedRow={expandedRow}
+
+          rowAction={handleExpandRow}
           renderRow={(employee) => {
-            const displayPlannedDate = () => {
-              if (employee.planned_start_date === employee.planned_end_date) {
-                return formatDate(employee.planned_start_date)
-              } else {
-                return (
-                  <>
-                    {formatDate(employee.planned_start_date)} to  {formatDate(employee.planned_end_date)}
-                    {/* <br /> */}
-                    {/* {formatDate(employee.planned_end_date)} */}
-                  </>
-                );
-              }
-            }
-            const isResourceAssigned = employee?.original_A?.resource_list;
-            const PlannedResource = getMatchingRetainerList(employee?.original_P)
+            const firstItem = employee?.grouped_data?.[0] || {};
+
             return (
               <>
                 <Td>
-                  <CustomerName>{employee.customer_name}</CustomerName> <OrderItemId>{employee?.original_P?.order_item_key}</OrderItemId>
+                  <CustomerName>{employee.customer_name}</CustomerName> <OrderItemId>{employee?.order_item_key}</OrderItemId>
                 </Td>
                 <Td>
-                  {employee.audit_type}<br />
-                  <StoreLocation title={employee.original_P?.store_name || '-'}>
-                    {employee.original_P?.store_name || '-'}
+                  {employee.product_name}<br />
+                  <StoreLocation title={firstItem.store_name || '-'}>
+                    {firstItem?.store_name || '-'}
                   </StoreLocation>
                 </Td>
-                <Td>{displayPlannedDate()}</Td>
+               <Td>
+  {employee.planned_start_date === employee.planned_end_date ? (
+    formatDate(employee.planned_start_date)
+  ) : (
+    <>
+      {formatDate(employee.planned_start_date)}
+      {" to "}
+      {formatDate(employee.planned_end_date)}
+    </>
+  )}
+</Td>
+                 <Td style={{paddingLeft: "2.5rem"}}>
+          {employee.total_planned_item || 0}
+        </Td>
+        <Td>
+  <Badge variant={getStatusVariant(employee.activityStatus)}>
+    {employee.statusDisplay}
+  </Badge>
+</Td>
+         <Td>
+          <Button size='sm'
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleExpandRow(employee);
+            }}
+          >
+            {expandedRow === employee.order_item_id
+              ? "Collapse"
+              : "View Details"}
+          </Button>
+          {employee.activityStatus === "C" &&
+          <Button size='sm'>
+            Claim
+          </Button>
+          }
+        </Td>
                 {/* <Td>{employee.original_P?.store_name || '-'}</Td> */}
                 {/* <Td>BM: {PlannedResource[0].}</Td> */}
-                <Td>
-                  <ResourcesRow variant="primary">
-                    {/* <ResourcesLabel variant="primary">BM:</ResourcesLabel> */}
-                    <ResourcesValue>
-                      <ResourceCount variant="primary">{PlannedResource[0].tl_count || 0}</ResourceCount> TL /
-                      <ResourceCount variant="primary">{PlannedResource[0].ex_count || 0}</ResourceCount> EX
-                    </ResourcesValue>
-                  </ResourcesRow>
-                </Td>
-                <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
-                <Td>
-                  <ButtonGroup>
-                    {/* <Button variant={`${isResourceAssigned ? 'outline' : 'primary'}`} onClick={(e) => handleAssignResources(employee, e)}>
-                      {isResourceAssigned ? "Planned" : "Assign"} Resources
-                    </Button> */}
-                    <Button variant={`${isResourceAssigned ? 'outline' : 'primary'}`} onClick={(e) => handleAssignResources1(employee, e)}>
-                      {/* {isResourceAssigned ? "Planned" : "Assign"} Resources */}
-                      {isResourceAssigned ? "View" : "Assign"} Resources
-                      {/* Assign Resources */}
-                    </Button>
-                  </ButtonGroup>
-                </Td>
+                
               </>
             )
           }}
-        // rowAction={(row) => setExpandedRowId(expandedRowId === row.p_id ? null : row.p_id)}
-        // expandedRow={expandedRowId}
-        // renderExpandedRow={(employee) => {
-        //   const isResourceAssigned = employee?.original_A?.resource_list
-        //   return (
-        //     <div style={{ padding: '1rem', backgroundColor: '#f9f9f9' }}>
-        //       <ActivityLogs
-        //         activity={employee}
-        //         logs={employee.day_logs}
-        //         isOpen={true}
-        //         onToggle={() => { }}
-        //       />
+renderExpandedRow={(employee) => {
+  const groupedData = employee?.grouped_data || [];
 
-        //       {isResourceAssigned &&
-        //         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
-        //           <Button variant='primary' onClick={(e) => handleAddOPE(employee, e)}>
-        //             Add OPE
-        //           </Button>
-        //           <Button variant='outline' onClick={(e) => handleViewOPE(employee, e)}>
-        //             View OPE
-        //           </Button>
-        //         </div>
-        //       }
-        //     </div>
-        //   )
-        // }}
+  return (
+    <DataTable
+      columns={[
+        "Sl No.",
+        "Planned Date",
+        "Planned Resource",
+        "Status",
+        "Action",
+      ]}
+      data={groupedData}
+      renderRow={(item) => {
+        const index = groupedData.findIndex(
+          (data) => data === item
+        );
 
-        />
+        const plannedResource =
+          getMatchingRetainerList(item?.original_P);
+
+        const resource = plannedResource?.[0];
+
+        const isResourceAssigned =
+          item?.original_A?.resource_list?.length > 0;
+
+        const displayPlannedDate =
+          item.planned_start_date === item.planned_end_date
+            ? formatDate(item.planned_start_date)
+            : `${formatDate(
+                item.planned_start_date
+              )} to ${formatDate(
+                item.planned_end_date
+              )}`;
+
+        return (
+          <>
+            {/* Serial No */}
+            <Td style={{paddingLeft: "1.5rem"}}>{index + 1}</Td>
+
+            {/* Planned Date */}
+            <Td>{displayPlannedDate}</Td>
+
+            {/* Planned Resource */}
+            <Td>
+              {/* <ResourcesRow variant="primary"> */}
+                <ResourcesValue>
+                  <ResourceCount variant="primary">
+                    {resource?.tl_count || 0}
+                  </ResourceCount>
+                  {" "}TL /{" "}
+                  <ResourceCount variant="primary">
+                    {resource?.ex_count || 0}
+                  </ResourceCount>
+                  {" "}EX
+                </ResourcesValue>
+              {/* </ResourcesRow> */}
+            </Td>
+
+            {/* Status */}
+            <Td>
+              <Badge
+                variant={getStatusVariant(
+                  item.activityStatus
+                )}
+              >
+                {item.statusDisplay}
+              </Badge>
+            </Td>
+
+            {/* Action */}
+            <Td>
+              <Button size='sm'
+                variant={
+                  isResourceAssigned
+                    ? "outline"
+                    : "primary"
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAssignResources1(item, e);
+                }}
+              >
+                {isResourceAssigned
+                  ? "View"
+                  : "Assign"}{" "}
+                Resources
+              </Button>
+            </Td>
+          </>
+        );
+      }}
+    />
+  );
+}}
+/>
         <PaginationComponent
           totalItems={totalItems}
           itemsPerPage={itemsPerPage}
@@ -815,3 +970,26 @@ const ActivityListScreen = () => {
 }
 
 export default ActivityListScreen
+
+// {/* <Td>
+//                   <ResourcesRow variant="primary">
+//                     {/* <ResourcesLabel variant="primary">BM:</ResourcesLabel> */}
+//                     <ResourcesValue>
+//                       <ResourceCount variant="primary">{PlannedResource[0].tl_count || 0}</ResourceCount> TL /
+//                       <ResourceCount variant="primary">{PlannedResource[0].ex_count || 0}</ResourceCount> EX
+//                     </ResourcesValue>
+//                   </ResourcesRow>
+//                 </Td>
+//                 <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
+//                 <Td>
+//                   <ButtonGroup>
+//                     {/* <Button variant={`${isResourceAssigned ? 'outline' : 'primary'}`} onClick={(e) => handleAssignResources(employee, e)}>
+//                       {isResourceAssigned ? "Planned" : "Assign"} Resources
+//                     </Button> */}
+//                     <Button variant={`${isResourceAssigned ? 'outline' : 'primary'}`} onClick={(e) => handleAssignResources1(employee, e)}>
+//                       {/* {isResourceAssigned ? "Planned" : "Assign"} Resources */}
+//                       {isResourceAssigned ? "View" : "Assign"} Resources
+//                       {/* Assign Resources */}
+//                     </Button>
+//                   </ButtonGroup>
+//                 </Td> */}
