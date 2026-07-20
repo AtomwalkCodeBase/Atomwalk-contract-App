@@ -11,7 +11,7 @@ import DataTable, { Td } from '../components/DataTable';
 import { useFilter } from '../hooks/useFilter';
 // import { formatDate } from 'date-fns';
 import Card from '../components/Card';
-import { FaBoxes, FaFileInvoice, FaHandHoldingUsd, FaWallet } from 'react-icons/fa';
+import { FaBoxes, FaEye, FaFileInvoice, FaHandHoldingUsd, FaPlus, FaWallet } from 'react-icons/fa';
 import { usePagination } from '../hooks/usePagination';
 import PaginationComponent from '../components/Pagination';
 import Badge from '../components/Badge';
@@ -250,7 +250,7 @@ const ClaimTitle = styled.span`
   color: ${({ theme, value }) =>  value ? theme.colors.textLight : theme.colors.text};
 `;
 
-const activityColumn = [<>Customer<br />Order Item ID</>, "Audit Type", "Planned Date", "Claim Amount", "Approved/Total Claims","Planned Items", "Claim Status"]
+const activityColumn = [<>Customer<br />Order Item ID</>, "Audit Type", "Planned Date", "Claim Amount", "Approved/Total Claims","Planned slots", "Claim Status", "Actions"]
 
 const currency = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
@@ -384,17 +384,17 @@ const ClamList1 = () => {
         groups[key] = {
             order_item_key: key,
             customer_name: activity.customer_name,
-            items: [],
+            grouped_data: [],
         };
         }
 
-        groups[key].items.push(activity);
+        groups[key].grouped_data.push(activity);
     });
 
     return Object.values(groups)
         .map((group) => {
         // sort items within the group by planned_start_date, earliest first
-        const sortedItems = [...group.items].sort((a, b) =>
+        const sortedItems = [...group.grouped_data].sort((a, b) =>
             (a.planned_start_date || "").localeCompare(b.planned_start_date || "")
         );
 
@@ -421,6 +421,8 @@ const ClamList1 = () => {
         const totalSettlement = allClaims.reduce((sum, c) => sum + Number(c?.settlement_amt || 0), 0);
         const approvedCount = allClaimItems.filter((ci) => ci?.is_approved).length;
         const claimsCount = allClaimItems.length;
+        const claimsItem = allClaims;
+
 
         // aggregate claims across all items in this group
         // const allClaims = sortedItems.flatMap((item) => (Array.isArray(item.claims) ? item.claims : []));
@@ -431,12 +433,14 @@ const ClamList1 = () => {
         return {
             ...group,
             items: sortedItems,
+            grouped_data: sortedItems,
             earliestPlannedDate,
             latestPlannedDate,
             claimsCount,
             totalOPE,
             totalSettlement,
             approvedCount,
+            claimsItem
         };
         })
         // sort groups themselves by earliest planned date, least to latest
@@ -487,7 +491,7 @@ const stats_card = useMemo(
   () => [
     {
       label: "Total Order Items",
-      value: activitiesWithClaims.length,
+      value: groupedActivities.length,
       color: "primary",
       icon: <FaBoxes />,
     },
@@ -528,7 +532,7 @@ const stats_card = useMemo(
 };
 
 
-// console.log("paginatedData",paginatedData)
+console.log("paginatedData",paginatedData)
 
   return (
     <Layout title="Clam screen">
@@ -612,10 +616,14 @@ const stats_card = useMemo(
                 }
                 return (
                 <>
-                    {formatDate(group.earliestPlannedDate)} to {formatDate(group.latestPlannedDate)}
+                    {formatDate(group.earliestPlannedDate)} <br/> {formatDate(group.latestPlannedDate)}
                 </>
                 );
             };
+            const ClaimItem = group.claimsItem[0]
+            const { variant, label } = getClaimStatusVariant(ClaimItem?.expense_status);
+
+            console.log("group", group)
 
             return (
             <>
@@ -641,18 +649,33 @@ const stats_card = useMemo(
                     {group.approvedCount}/{group.claimsCount} approved
                     </Badge>
                 </Td>
-                <Td>{totalItems} activities</Td>
+                <Td>{totalItems}</Td>
                 <Td>
-                <Badge variant="info">Click to expand</Badge>
+                <Badge variant={variant}>{label}</Badge>
+                {/* <Badge variant="info">Click to expand</Badge> */}
+
                 </Td>
                 {/* <Td>—</Td>
                 <Td>—</Td> */}
+                <Td>
+                   <ButtonGroup>
+                    {group?.claimsItem.length === 0 ? (
+                      <Button size='sm' onClick={() => navigate('/clamDetails', { state: { data: { ...group, mode: "ADD" } } })}>
+                       <FaPlus /> Add Clam
+                      </Button>
+                    ) : (
+                      <Button size='sm' variant='outline' onClick={() => navigate('/clamDetails', { state: { data: { ...group, mode: "VIEW" } } })}>
+                        <FaEye /> View Clam
+                      </Button>
+                    )}
+                  </ButtonGroup>
+                </Td>
             </>
             );
         }}
         renderExpandedRow={(group) => (
             <DataTable
-            columns={["Audit Type / Store", "Planned Date", "Clam Approved", "Claim Status", "Activity Status", "Actions"]}
+            columns={["Audit Type / Store", "Planned Date", "Activity Status"]}
             data={group.items}
             modifiedId={true}
             modifiedIdName="unique_id" // ensure each item in group.items has a stable unique key; fallback below if not
@@ -682,14 +705,14 @@ const stats_card = useMemo(
                     </StoreLocation>
                     </Td>
                     <Td>{displayPlannedDate()}</Td>
-                    <Td>
+                    {/* <Td>
                     <Badge variant={firstClaim?.is_approved ? 'success' : 'error'}>
                         {firstClaim?.is_approved ? 'YES' : 'NO'}
                     </Badge>
-                    </Td>
-                    <Td><Badge variant={variant}>{label}</Badge></Td>
+                    </Td> */}
+                    {/* <Td><Badge variant={variant}>{label}</Badge></Td> */}
                     <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
-                    <Td>
+                    {/* <Td>
                       {is_ope_actual &&
                     employee.activityStatus !== "C" && <Button disabled={true}>Cannot claim</Button>}
 
@@ -712,7 +735,7 @@ const stats_card = useMemo(
                     )}
                   </ButtonGroup>
                 )}
-                    </Td>
+                    </Td> */}
                 </>
                 );
             }}

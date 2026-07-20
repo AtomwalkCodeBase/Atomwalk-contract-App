@@ -295,6 +295,7 @@ const ClamDetailsScreen = () => {
   const activityData = location.state?.data;
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const ViewMode = activityData.mode;
+  const [claimStatus, setClaimStatus] = useState("")
 
   console.log("activityData", activityData)
 
@@ -358,9 +359,21 @@ const ClamDetailsScreen = () => {
   const grandTotal = totals.resource + totalClaim.totalOPE;
 
   const fetchResourceData = useCallback(async () => {
-      const startDate = activityData?.planned_start_date;
-      const endDate = activityData?.planned_end_date;
-      const allocationIds = [...new Set((activityData?.allAEntries || []).map(item => item.id).filter(Boolean))];
+      const startDate = activityData?.planned_start_date || activityData.earliestPlannedDate;
+      const endDate = activityData?.planned_end_date || activityData.latestPlannedDate;
+      const allocationIds = [
+        ...new Set(
+          (
+            activityData?.grouped_data?.length
+              ? activityData.grouped_data.flatMap(
+                  item => item?.allAEntries || []
+                )
+              : activityData?.allAEntries || []
+          )
+            .map(item => item?.id)
+            .filter(Boolean)
+        )
+      ];
 
       if (!startDate || !endDate || !allocationIds.length) {
       // if (!startDate || !endDate) {
@@ -447,6 +460,8 @@ const handleSubmitAll = async(masterClaimId) => {
   const plannedTL = matchingRetainer?.tl_count || 0;
   const plannedEX = matchingRetainer?.ex_count || 0;
 
+  console.log("c,aim", claimStatus)
+
   return (
     <Layout title="Clam Details ">
       <ClaimsHeader>
@@ -524,7 +539,7 @@ const handleSubmitAll = async(masterClaimId) => {
           Claims { claimList[0]?.claim_items?.length && `(${claimList[0]?.claim_items?.length})`}
         </>
       }
-        headerAction={ViewMode !== "VIEW" && activityData.activityStatus === "C" && 
+        headerAction={(ViewMode !== "VIEW" && activityData?.activityStatus === "C" && claimStatus !== "Submitted") &&
         <Button variant="primary" onClick={handleAddClaim}>
           <FaPlus size={11} style={{ marginRight: "0.35rem" }} />
           Add Claim
@@ -546,12 +561,13 @@ const handleSubmitAll = async(masterClaimId) => {
           <DataTable
           emptyMessage="No claims submitted yet"
           isLoading={isLoading}
-          columns={[ "Claim ID", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" ? "Action" : ""}`]}
+          columns={[ "Claim ID", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" && claimStatus !== "Submitted" ? "Action" : ""}`]}
             data={claimList.flatMap((claim) =>
               (claim?.claim_items || []).map((item) => ({...item,master_data: claim,}))
           )}
           renderRow={((item) => {
                 const {variant, label} = getStatusVariant(item.expense_status)
+                setClaimStatus(label || "")
                 return(
               <>
                 <Td>{item.claim_id}</Td>
@@ -565,7 +581,7 @@ const handleSubmitAll = async(masterClaimId) => {
                   </RemarkField>
                 </Td>
                 <Td><FileLink href={item.submitted_file_1} target="_blank" rel="noreferrer" disabled={!item.submitted_file_1}>{item.submitted_file_1 ? "View" : "Not Submitted"}</FileLink></Td>
-                {ViewMode !== "VIEW" && <Td><Button size="sm" onClick={() => handleOpenClaimModal(item)}>Update</Button></Td>}
+                {ViewMode !== "VIEW" || label !== "Submitted" && <Td><Button size="sm" onClick={() => handleOpenClaimModal(item)}>Update</Button></Td>}
               </>
         )})}
           
@@ -579,7 +595,7 @@ const handleSubmitAll = async(masterClaimId) => {
 
 
 
-       {claimList.length > 0 && ViewMode !== "VIEW" && <div style={{display: "flex", justifyContent: "flex-end", marginTop: "1rem"}}>
+       {claimList.length > 0 && ViewMode !== "VIEW" && claimStatus !== "Submitted" && <div style={{display: "flex", justifyContent: "flex-end", marginTop: "1rem"}}>
           <Button  onClick={() => {
               setSelectedMasterClaimId(claimList?.[0]?.master_claim_id || null);
               setOpenSubmitAllModal(true);

@@ -3,7 +3,7 @@ import Layout from '../components/Layout'
 import styled from 'styled-components';
 import Card from '../components/Card';
 import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, formatWeekLabel, getWeekRange, formatDate2, getGroupStatus } from '../utils/utils';
-import { getEmpAllocationData } from '../services/productServices';
+import { getContractAllocationData, getEmpAllocationData } from '../services/productServices';
 import { toast } from 'react-toastify';
 import Button from '../components/Button';
 import { parse } from 'date-fns';
@@ -19,7 +19,7 @@ import { theme } from '../styles/Theme';
 import { useFilter } from '../hooks/useFilter';
 import { AssignEmployee } from '../components/modal/Assignemployee';
 import { useNavigate } from 'react-router-dom';
-import { FaCheck, FaClipboardList, FaMinusCircle, FaUserCheck, FaUsers, FaUserTimes } from 'react-icons/fa';
+import { FaCheck, FaChevronDown, FaChevronUp, FaClipboardList, FaEye, FaEyeSlash, FaMinusCircle, FaMoneyBillWave, FaUserCheck, FaUserPlus, FaUsers, FaUserTimes } from 'react-icons/fa';
 import StatsCard from '../components/StatsCard';
 import Tabs from '../components/Tabs';
 
@@ -286,7 +286,7 @@ const parseDate = (dateStr) => {
   return new Date(year, month - 1, day);
 };
 
-const activityColumn = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>, "Planned Date", "Planned Items" , "Status", "Actions"]
+const activityColumn = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>, "Planned Date", "Plan slots" , "Status", "Actions"]
 
 function getMatchingRetainerList(original_P = {}) {
   const {
@@ -304,7 +304,7 @@ function getMatchingRetainerList(original_P = {}) {
   });
 }
 
-const groupByOrderItemId = (data = []) => {
+const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
   const grouped = data.reduce((acc, item) => {
     const key = item.order_item_id;
 
@@ -358,7 +358,7 @@ if (
   }, {});
 
   return Object.values(grouped).map((group) => {
-  const groupStatus = getGroupStatus(group.grouped_data);
+  const groupStatus = getGroupStatus(group.grouped_data, resourcePlannedList);
 
   return {
     ...group,
@@ -381,6 +381,7 @@ const ActivityListScreen = () => {
   const [expandedRow, setExpandedRow] = useState(null);
 
   const [assignedActivity, setAssignedActivity] = useState([]);
+  const [resourcePlannedList , setResourcePlannedList] = useState([]);
   const [tab, setTab] = useState(storedSelection?.tab || "month")
   const [activeRangeType, setActiveRangeType] = useState(storedSelection?.activeRangeType || "month");
   const [offset, setOffset] = useState(0);
@@ -428,7 +429,8 @@ const ActivityListScreen = () => {
 
   useEffect(() => {
     if (emp_id) {
-      fetchEmpAllocationData(dateRange.start, dateRange.end)
+      fetchEmpAllocationData(dateRange.start, dateRange.end);
+      fetchEmpPlannedAllocation(dateRange.start, dateRange.end)
     }
   }, [emp_id]);
 
@@ -544,13 +546,47 @@ const ActivityListScreen = () => {
     }
   }
 
+  const fetchEmpPlannedAllocation = async (startOverride, endOverride) => {
+    const emp_id = localStorage.getItem("cust_emp_id")
+    const start = startOverride || dateRange.start
+    const end = endOverride || dateRange.end
+
+    const startDateObj = new Date(start)
+    const endDateObj = new Date(end)
+
+    if (endDateObj < startDateObj) {
+      toast.info("End date cannot be earlier than start date")
+      return false;
+    }
+    const payload = {
+      emp_id: emp_id,
+      start_date: formatToDDMMYYYY(start),
+      end_date: formatToDDMMYYYY(end),
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await getContractAllocationData(payload);
+      setResourcePlannedList(response.data)
+      // console.log("normalizeProjects(response.data)", formatRetainerActivities(response.data))
+    } catch (error) {
+      toast.error("No data found...")
+      setIsLoading(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+
+
   const getFilteredAndSortedActivities = () => {
     return assignedActivity;
   };
 
   const filteredActivities = getFilteredAndSortedActivities();
 
-  const groupedData = groupByOrderItemId(filteredActivities);
+  const groupedData = groupByOrderItemId(filteredActivities, resourcePlannedList);
 
 const FilteredData = useFilter({
   data: groupedData,
@@ -603,6 +639,29 @@ const FilteredData = useFilter({
     setSelectedActivity(employee);
     setOpenOpeModal(true);
   };
+
+  const handleClearFilters = () => {
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(ACTIVITY_LIST_STORAGE_KEY);
+    }
+
+    const currentMonth = getCurrentMonth();
+    const currentMonthRange = getMonthRange({
+      type: "current",
+      mode: "month",
+    });
+
+    setFilter({ search: "", status: "ALL",});
+
+    setTab("month");
+    setActiveRangeType("month");
+    setSelectedMonth(currentMonth);
+    setSelectedWeek(getCurrentWeek());
+    setDateRange(currentMonthRange);
+
+    fetchEmpAllocationData( currentMonthRange.start, currentMonthRange.end);
+  };
   
   // console.log("expandedRowId", expandedRowId)
 
@@ -611,7 +670,7 @@ const FilteredData = useFilter({
   //   setOffset(0);
   //   const range = getMonthRange({ type: "current", mode: type, offset: 0 });
   //   setDateRange(range);
-  //   fetchEmpAllocationData(range.start, range.end);
+  //   fetchEmpActivityAllocations(range.start, range.end);
   // };
 
   const handleNavigate = (direction) => {
@@ -619,18 +678,19 @@ const FilteredData = useFilter({
     setOffset(newOffset);
     const range = getMonthRange({ type: "current", mode: activeRangeType, offset: newOffset });
     setDateRange(range);
-    fetchEmpAllocationData(range.start, range.end);
+    fetchEmpActivityAllocations(range.start, range.end);
   };
 
   const getStatusCount = (arr, status) => {
     return arr.filter(item => item.statusDisplay === status).length;
   }
 
+  console.log("groupedData",groupedData)
 
-  const notAssignedCount = getStatusCount(filteredActivities, "Not Assigned");
+  const notAssignedCount = getStatusCount(groupedData, "Not Assigned");
   // const assignedCount = getStatusCount(filteredActivities, "Not Started", "Completed");
-  const notStartedCount = getStatusCount(filteredActivities, "Not Started");
-  const completedCount = getStatusCount(filteredActivities, "Completed");
+  const notStartedCount = getStatusCount(groupedData, "Not Started");
+  const completedCount = getStatusCount(groupedData, "Completed");
 
   const statsData = [
     // value={filter.status}
@@ -638,7 +698,7 @@ const FilteredData = useFilter({
     {
       icon: <FaClipboardList />,
       label: "Total Audit Item",
-      value: filteredActivities.length,
+      value: groupedData.length,
       color: "primary",
       onClick: (prev) => setFilter({ ...prev, status: "ALL" }),
     },
@@ -671,7 +731,7 @@ const FilteredData = useFilter({
   ]
 
   return (
-    <Layout title="Activity List">
+    <Layout title="Audit/OrderItem Allocation List">
       <ClaimsHeader>
         <Tagline>Track and manage your assigned audit tasks</Tagline>
         <div>
@@ -753,7 +813,7 @@ const FilteredData = useFilter({
           </FilterSelect>
 
           <Button variant="outline" size='sm'
-            onClick={() => setFilter({ search: "", status: "ALL" })}
+            onClick={handleClearFilters}
           >
             Clear Filters
           </Button>
@@ -772,6 +832,8 @@ const FilteredData = useFilter({
           renderRow={(employee) => {
             const firstItem = employee?.grouped_data?.[0] || {};
 
+            console.log("employee", employee)
+
             return (
               <>
                 <Td>
@@ -789,7 +851,7 @@ const FilteredData = useFilter({
   ) : (
     <>
       {formatDate(employee.planned_start_date)}
-      {" to "}
+      <br/>
       {formatDate(employee.planned_end_date)}
     </>
   )}
@@ -803,22 +865,43 @@ const FilteredData = useFilter({
   </Badge>
 </Td>
          <Td>
-          <Button size='sm'
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleExpandRow(employee);
-            }}
-          >
-            {expandedRow === employee.order_item_id
-              ? "Collapse"
-              : "View Details"}
-          </Button>
-          {employee.activityStatus === "C" &&
-          <Button size='sm'>
-            Claim
-          </Button>
-          }
+ <ButtonGroup>
+    {employee.total_planned_item === 1 ? (
+      <Button 
+        size='sm' 
+        variant="primary"
+        onClick={(e) => {
+          e.stopPropagation();
+          const firstItem = employee?.grouped_data?.[0] || {};
+          handleAssignResources1(firstItem, e);
+        }}
+      >
+        <FaUserPlus size={16} />
+        Assign Resources
+      </Button>
+    ) : (
+      <Button 
+        size='sm'
+        variant="outline"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleExpandRow(employee);
+        }}
+      >
+        {expandedRow === employee.order_item_id ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+        {expandedRow === employee.order_item_id ? "Hide Allocations" : "View Allocations"}
+      </Button>
+    )}
+    {(employee.activityStatus === "C" || employee.activityStatus === "AP" || employee.activityStatus === "AS")  && (
+      <Button 
+        size='sm' 
+        onClick={() => navigate('/clamDetails', { state: { data: {...employee, mode: "ADD"} } })}
+      >
+        <FaMoneyBillWave />
+        Claim
+      </Button>
+    )}
+  </ButtonGroup>
         </Td>
                 {/* <Td>{employee.original_P?.store_name || '-'}</Td> */}
                 {/* <Td>BM: {PlannedResource[0].}</Td> */}
@@ -909,10 +992,8 @@ renderExpandedRow={(employee) => {
                   handleAssignResources1(item, e);
                 }}
               >
-                {isResourceAssigned
-                  ? "View"
-                  : "Assign"}{" "}
-                Resources
+                {isResourceAssigned ? <FaEye /> : <FaUserPlus />}
+                {isResourceAssigned ? "View" : "Assign"}{" "}Resources
               </Button>
             </Td>
           </>
@@ -935,7 +1016,7 @@ renderExpandedRow={(employee) => {
           isOpen={assignEmployeeModal}
           onClose={() => setAssignEmployeeModal(false)}
           activityData={selectedActivity}
-          refreshData={fetchEmpAllocationData}
+          refreshData={fetchEmpActivityAllocations}
         /> */}
 
         <AssignEmployee

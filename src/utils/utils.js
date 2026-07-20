@@ -388,41 +388,161 @@ export const matchClaimsToActivity = (claims = [], activity) => {
     .filter(Boolean);
 };
 
-export const formatRetainerActivities = (apiData = []) => {
+export const formatRetainerActivities = (
+  apiData = [],
+  resourcePlannedList = []
+) => {
   const grouped = buildActivityGroupMap(apiData);
 
-  return grouped.map(group => {
-    const { original_P, original_A, allAEntries, key } = group;
-    const completed = original_A && original_A.status !== "N" ? "In Progress" : "Completed"
-    const hasResources = original_P?.resource_list && Array.isArray(original_P.resource_list) && original_P.resource_list.length > 0;
+  const isSameId = (id1, id2) =>
+    id1 != null &&
+    id2 != null &&
+    String(id1) === String(id2);
+
+  return grouped.map((group) => {
+    const {
+      original_P,
+      original_A,
+      allAEntries = [],
+      key,
+    } = group;
+
+    const hasResources =
+      Array.isArray(original_P?.resource_list) &&
+      original_P.resource_list.length > 0;
 
     let statusDisplay = "";
     let activityStatus = "";
 
-    if (!hasResources) { statusDisplay = "Not Assigned"; activityStatus = "NA"; }
+    // =====================================================
+    // PLAN RESOURCE STATUS
+    // original_P.id -> resourcePlannedList.allocation_id
+    // =====================================================
 
-    else if (!original_A) {
-      statusDisplay = "Not Started";
+    const matchedPlannedResources = resourcePlannedList.filter(
+      (resource) =>
+        isSameId(
+          original_P?.id,
+          resource?.allocation_id
+        )
+    );
+
+    const isPlanSubmitted =
+      matchedPlannedResources.length > 0;
+
+    const isPlanApproved =
+      isPlanSubmitted &&
+      matchedPlannedResources.every(
+        (resource) => resource?.is_approved === true
+      );
+
+
+    // =====================================================
+    // ACTUAL RESOURCE STATUS
+    // allAEntries[].id -> resourcePlannedList.allocation_id
+    // =====================================================
+
+    const actualIds = allAEntries
+      .map((item) => item?.id)
+      .filter(Boolean);
+
+    const matchedActualResources = resourcePlannedList.filter(
+      (resource) =>
+        actualIds.some((actualId) =>
+          isSameId(
+            actualId,
+            resource?.allocation_id
+          )
+        )
+    );
+
+    const isActualSubmitted =
+      matchedActualResources.length > 0;
+
+    const isActualApproved =
+      isActualSubmitted &&
+      matchedActualResources.every(
+        (resource) => resource?.is_approved === true
+      );
+
+
+    // =====================================================
+    // STATUS PRIORITY
+    //
+    // NA / NS
+    //    ↓
+    // Plan Submitted
+    //    ↓
+    // Plan Approved
+    //    ↓
+    // In Progress
+    //    ↓
+    // Actual Submitted
+    //    ↓
+    // Actual Approved
+    // =====================================================
+
+    if (isActualApproved) {
+      statusDisplay = "Actual Approved";
+      activityStatus = "AA";
+    }
+
+    else if (isActualSubmitted) {
+      statusDisplay = "Actual Submitted";
+      activityStatus = "AS";
+    }
+
+    else if (
+      original_A?.status === "N" ||
+      original_A?.status === "P"
+    ) {
+      statusDisplay = "In Progress";
+      activityStatus = "P";
+    }
+
+    else if (isPlanApproved) {
+      statusDisplay = "Plan Approved";
+      activityStatus = "PA";
+    }
+
+    else if (isPlanSubmitted) {
+      statusDisplay = "Plan Submitted";
+      activityStatus = "PS";
+    }
+
+    // else if (!hasResources) {
+    //   statusDisplay = "Not Assigned";
+    //   activityStatus = "NA";
+    // }
+
+    else if (!hasResources || !original_A) {
+      statusDisplay = "Not Planned";
       activityStatus = "NS";
     }
 
     else {
-      if (original_A.status === "N") {
-        statusDisplay = "In Progress";
-        activityStatus = "P";
-      }
-      else if (original_A.status === "P") {
-        statusDisplay = "In Progress";
-        activityStatus = "P";
-      }
-      else {
-        statusDisplay = "Completed";
-        activityStatus = "C";
-      }
+      statusDisplay = "Completed";
+      activityStatus = "C";
     }
 
-    const ui = getTodayActionFlags({ allAEntries });
-    const day_logs = buildDayLogsFromAEntriesForRetainer(allAEntries);
+
+    // =====================================================
+    // EXISTING LOGIC
+    // =====================================================
+
+    const completed =
+      activityStatus === "C"
+        ? "Completed"
+        : "In Progress";
+
+    const ui = getTodayActionFlags({
+      allAEntries,
+    });
+
+    const day_logs =
+      buildDayLogsFromAEntriesForRetainer(
+        allAEntries
+      );
 
     return {
       key,
@@ -430,41 +550,81 @@ export const formatRetainerActivities = (apiData = []) => {
       p_id: original_P?.id ?? null,
       a_id: original_A?.id ?? null,
 
-      employee_name: original_P?.employee_name ?? "",
-      emp_id: original_P?.emp_id ?? "",
-      customer_name: original_P?.customer_name ?? "",
-      product_name: original_P?.product_name ?? "",
-      project_name: original_P?.project_name ?? "",
-      activity_name: original_P?.activity_name ?? "",
-      order_item_id: original_P?.order_item_id ?? "",
-      order_item_key: original_P?.order_item_key ?? "",
+      employee_name:
+        original_P?.employee_name ?? "",
 
-      planned_start_date: original_P?.start_date || null,
-      planned_end_date: original_P?.end_date || null,
-      planned_start_time: original_P?.start_time || null,
-      planned_end_time: original_P?.end_time || null,
+      emp_id:
+        original_P?.emp_id ?? "",
 
-      actual_start_date: original_A?.start_date || null,
-      actual_end_date: original_A?.end_date || null,
+      customer_name:
+        original_P?.customer_name ?? "",
 
-      is_file_applicable: original_P?.is_file_applicable ?? false,
-      audit_type: original_P?.audit_type ?? "",
-      store_name: original_P?.store_name ?? "",
-      store_remarks: original_P?.store_remarks ?? "",
+      product_name:
+        original_P?.product_name ?? "",
+
+      project_name:
+        original_P?.project_name ?? "",
+
+      activity_name:
+        original_P?.activity_name ?? "",
+
+      order_item_id:
+        original_P?.order_item_id ?? "",
+
+      order_item_key:
+        original_P?.order_item_key ?? "",
+
+      planned_start_date:
+        original_P?.start_date || null,
+
+      planned_end_date:
+        original_P?.end_date || null,
+
+      planned_start_time:
+        original_P?.start_time || null,
+
+      planned_end_time:
+        original_P?.end_time || null,
+
+      actual_start_date:
+        original_A?.start_date || null,
+
+      actual_end_date:
+        original_A?.end_date || null,
+
+      is_file_applicable:
+        original_P?.is_file_applicable ?? false,
+
+      audit_type:
+        original_P?.audit_type ?? "",
+
+      store_name:
+        original_P?.store_name ?? "",
+
+      store_remarks:
+        original_P?.store_remarks ?? "",
 
       complete: completed,
-      is_complete: completed === "Completed" ? true : false,
-      statusDisplay: statusDisplay,
-      activityStatus: activityStatus,
 
+      is_complete:
+        activityStatus === "C",
+
+      // New calculated status
+      statusDisplay,
+      activityStatus,
+
+      // Optional flags — useful in UI
+      isPlanSubmitted,
+      isPlanApproved,
+      isActualSubmitted,
+      isActualApproved,
 
       original_P,
       original_A,
       allAEntries,
 
       day_logs,
-
-      ui
+      ui,
     };
   });
 };
@@ -476,9 +636,15 @@ export const getStatusVariant = (activityStatus) => {
     case "NA":
       return "error";
     case "NS":
-      return "warning";
+      return "error";
     case "C":
       return "success";
+    case "AA":
+      return "success";
+    case "AS":
+      return "success";
+    case "PS":
+      return "info";
     default:
       return "default";
   }
@@ -1267,24 +1433,40 @@ export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations
 export const getGroupStatus = (groupedData = []) => {
   if (!groupedData.length) {
     return {
-      activityStatus: "NA",
-      statusDisplay: "Not Assigned",
+      activityStatus: "NS",
+      statusDisplay: "Not Planned",
     };
   }
 
   const statuses = groupedData.map(
-    (item) => item.activityStatus
+    (item) => item?.activityStatus
   );
 
-  // Priority 1: Any resource not assigned
-  if (statuses.includes("NA")) {
+  // If any item is still Not Planned / Not Started
+  if (statuses.includes("NS")) {
     return {
-      activityStatus: "NA",
-      statusDisplay: "Not Assigned",
+      activityStatus: "NS",
+      statusDisplay: "Not Planned",
     };
   }
 
-  // Priority 2: Any activity in progress
+  // If any item is only at Plan Submitted
+  if (statuses.includes("PS")) {
+    return {
+      activityStatus: "PS",
+      statusDisplay: "Plan Submitted",
+    };
+  }
+
+  // If any item is only at Plan Approved
+  if (statuses.includes("PA")) {
+    return {
+      activityStatus: "PA",
+      statusDisplay: "Plan Approved",
+    };
+  }
+
+  // If any item is In Progress
   if (statuses.includes("P")) {
     return {
       activityStatus: "P",
@@ -1292,15 +1474,23 @@ export const getGroupStatus = (groupedData = []) => {
     };
   }
 
-  // Priority 3: Any activity not started
-  if (statuses.includes("NS")) {
+  // If any item has Actual Submitted
+  if (statuses.includes("AS")) {
     return {
-      activityStatus: "NS",
-      statusDisplay: "Not Started",
+      activityStatus: "AS",
+      statusDisplay: "Actual Submitted",
     };
   }
 
-  // Priority 4: All activities completed
+  // If any item has Actual Approved
+  if (statuses.includes("AA")) {
+    return {
+      activityStatus: "AA",
+      statusDisplay: "Actual Approved",
+    };
+  }
+
+  // All items completed
   if (statuses.every((status) => status === "C")) {
     return {
       activityStatus: "C",
@@ -1308,9 +1498,8 @@ export const getGroupStatus = (groupedData = []) => {
     };
   }
 
-  // Fallback
   return {
     activityStatus: "NS",
-    statusDisplay: "Not Started",
+    statusDisplay: "Not Planned",
   };
 };
