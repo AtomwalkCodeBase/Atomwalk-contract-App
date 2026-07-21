@@ -1503,3 +1503,66 @@ export const getGroupStatus = (groupedData = []) => {
     statusDisplay: "Not Planned",
   };
 };
+
+export const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
+  const grouped = data.reduce((acc, item) => {
+    const key = item.order_item_id;
+
+    if (!acc[key]) {
+      acc[key] = {
+        order_item_id: key,
+        order_item_key: item.order_item_key || "--",
+        product_name: item.product_name || "--",
+        customer_name: item.customer_name || "--",
+
+        // Used for search
+        store_name: "",
+        audit_type: "",
+        planned_start_date: item.planned_start_date,
+        planned_end_date: item.planned_end_date,
+
+        total_planned_item: 0,
+        grouped_data: [],
+      };
+    }
+
+    // Each grouped record = one planned item
+    acc[key].total_planned_item += 1;
+
+    // Keep these searchable from parent group
+    acc[key].store_name += ` ${item.store_name || ""}`;
+    acc[key].audit_type += ` ${item.audit_type || ""}`;
+
+    if (
+  item.planned_start_date &&
+  (!acc[key].planned_start_date ||
+    new Date(item.planned_start_date) <
+      new Date(acc[key].planned_start_date))
+) {
+  acc[key].planned_start_date = item.planned_start_date;
+}
+
+// Get overall latest end date
+if (
+  item.planned_end_date &&
+  (!acc[key].planned_end_date ||
+    new Date(item.planned_end_date) >
+      new Date(acc[key].planned_end_date))
+) {
+  acc[key].planned_end_date = item.planned_end_date;
+}
+
+    acc[key].grouped_data.push(item);
+
+    return acc;
+  }, {});
+
+  return Object.values(grouped).map((group) => {
+  const groupStatus = getGroupStatus(group.grouped_data, resourcePlannedList);
+
+  return {
+    ...group,
+    ...groupStatus,
+  };
+});
+};

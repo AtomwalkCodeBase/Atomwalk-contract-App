@@ -24,13 +24,16 @@ import Hello from "./pages/Hello";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ActivityListScreen from "./pages/ActivityListScreen";
+import ActivityListScreen1 from "./pages/New/ActivityListScreen";
 import ProfitabilityDashboard from "./pages/ProfitabilityDashboard";
 // import ResourceAllocationList from "./components/modal/ResourceAllocationList";
 // import ResourceAllocation from "./components/modal/ResourceAllocation";
 import ResourceAllocation from "./components/modal/ModifiedAssignedResourceModal";
-import ClamList from "./pages/ClamList";
+// import ClamList from "./pages/ClamList";
 import ClamDetailsScreen from "./pages/ClamDetailsScreen";
 import ClamList1 from "./pages/ClaimList1";
+import ClamList from "./pages/New/ClaimList1";
+import { ActivityProvider } from "./context/ActivityClaimContext";
 
 function App() {
   const url = "https://www.atomwalk.com/rest-auth/login/";
@@ -63,6 +66,7 @@ function App() {
   return (
       <AuthProvider>
         <ThemeProvider>
+          <ActivityProvider>
             <Router basename="/retainer">
             {/* <Router> */}
               <Routes>
@@ -84,9 +88,11 @@ function App() {
 
                   <Route path="/dashboard" element={<RetainerScreen />} />
                   <Route path="/activity" element={<ActivityListScreen />} />
+                  <Route path="/activity1" element={<ActivityListScreen1 />} />
                   <Route path="/profitability-dashboard" element={<ProfitabilityDashboard />} />
                   {/* <Route path="/clam-list" element={<ClamList />} /> */}
                   <Route path="/clam-list" element={<ClamList1 />} />
+                  <Route path="/clam-list1" element={<ClamList />} />
                   <Route path="/clamDetails" element={<ClamDetailsScreen />} />
                   {/* <Route path="/resource-list" element={<ResourceAllocationList />} /> */}
                   {/* <Route path="/resource-list" element={<ResourceAllocation />} /> */}
@@ -101,6 +107,7 @@ function App() {
   
             </Router>
             <ToastContainer position="top-right" autoClose={3000} />
+            </ActivityProvider>
         </ThemeProvider>
       </AuthProvider>
   );

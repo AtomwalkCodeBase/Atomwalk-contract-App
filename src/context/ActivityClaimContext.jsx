@@ -25,11 +25,7 @@ export const ActivityProvider = ({ children }) => {
 
     // Employee allocation API
     const fetchEmpActivityAllocations = useCallback(async (params = {}) => {
-        setActivityState((prev) => ({
-            ...prev,
-            loading: true,
-            error: null,
-        }));
+        setActivityState((prev) => ({ ...prev, loading: true, error: null}));
 
         try {
             const response = await getEmpAllocationData(params);
@@ -67,60 +63,47 @@ export const ActivityProvider = ({ children }) => {
 
     // Employee list API
     const fetchEmployees = useCallback(async (params = {}) => {
-        setEmployeeState((prev) => ({
-            ...prev,
-            loading: true,
-            error: null,
-        }));
+        setEmployeeState((prev) => ({ ...prev, loading: true, error: null,}));
 
         try {
             const response = await getemployeeLists(params);
             const data = response?.data || [];
-            setEmployeeState({
-                data,
-                loading: false,
-                error: null,
-            });
+            setEmployeeState({ data, loading: false, error: null,});
             return data;
         } catch (error) {
-            setEmployeeState({
-                data: [],
-                loading: false,
-                error,
-            });
+            setEmployeeState({ data: [], loading: false, error,});
             throw error;
         }
     }, []);
 
     const fetchClaims = useCallback(async (method, employeeId, type) => {
-        setClaimState((prev) => ({
-            ...prev,
-            loading: true,
-            error: null,
-        }));
+        setClaimState((prev) => ({ ...prev, loading: true, error: null,}));
 
         try {
             const response = await getEmpClaim(method, employeeId, type);
             const data = response?.data || [];
-            setClaimState({
-                data,
-                loading: false,
-                error: null,
-            });
+
+            setClaimState({ data, loading: false, error: null,});
             return data;
         } catch (error) {
-            setClaimState({
-                data: [],
-                loading: false,
-                error,
-            });
+            setClaimState({ data: [], loading: false, error,});
             throw error;
         }
     }, []);
 
+    const getStoredActivityListSelection = (STORAGE_KEY) => {
+      if (typeof window === 'undefined') return null;
+    
+      try {
+        const storedValue = window.sessionStorage.getItem(STORAGE_KEY);
+        return storedValue ? JSON.parse(storedValue) : null;
+      } catch {
+        return null;
+      }
+    };
+
     // ✅ Move contextValue before return statement
-    const contextValue = useMemo(
-        () => ({
+    const contextValue = useMemo(() => ({
             activityState,
             fetchEmpActivityAllocations,
             employeeState,
@@ -128,16 +111,9 @@ export const ActivityProvider = ({ children }) => {
             claimState,
             fetchClaims,
             fetchContractAllocations,
+            getStoredActivityListSelection
         }),
-        [
-            activityState,
-            employeeState,
-            claimState,
-            fetchEmpActivityAllocations,
-            fetchEmployees,
-            fetchClaims,
-            fetchContractAllocations,
-        ],
+        [ activityState, employeeState, claimState, fetchEmpActivityAllocations, fetchEmployees, fetchClaims, fetchContractAllocations,],
     );
 
     return (
