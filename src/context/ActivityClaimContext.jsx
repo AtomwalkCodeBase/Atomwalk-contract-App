@@ -23,39 +23,55 @@ export const ActivityProvider = ({ children }) => {
         error: null,
     });
 
+    const [resourceAllocationState, setResourceAllocationState] = useState({
+        data: [],
+        loading: false,
+        error: null,
+    });
+
     // Employee allocation API
-    const fetchEmpActivityAllocations = useCallback(async (params = {}) => {
+    const fetchEmpActivityAllocations = useCallback(async (params = {}, resourcePlannedList = []) => {
         setActivityState((prev) => ({ ...prev, loading: true, error: null}));
 
         try {
             const response = await getEmpAllocationData(params);
-            const data = formatRetainerActivities(response?.data || []);
+            const plannedResources = Array.isArray(resourcePlannedList) && resourcePlannedList.length > 0
+                ? resourcePlannedList
+                : resourceAllocationState.data;
+            const data = formatRetainerActivities(response?.data, plannedResources);
             setActivityState({ data, loading: false, error: null });
             return data;
         } catch (error) {
             setActivityState({ data: [], loading: false, error });
             throw error;
         }
-    }, []);
+    }, [resourceAllocationState.data]);
 
     // Contract allocation API
     const fetchContractAllocations = useCallback(async (params = {}) => {
+        setResourceAllocationState((prev) => ({ ...prev, loading: true, error: null}));
         try {
             const response = await getContractAllocationData(params);
-            return (response?.data || []).map((item) => ({
-                ...item,
-                start_date: item.start_date
-                    ? DateForApiFormate(item.start_date, true)
-                    : item.s_date
-                        ? DateForApiFormate(item.s_date, true)
-                        : "",
-                end_date: item.end_date
-                    ? DateForApiFormate(item.end_date, true)
-                    : item.e_date
-                        ? DateForApiFormate(item.e_date, true)
-                        : "",
+            const data = (response?.data || []).map((item) => ({
+            ...item,
+            start_date: item.start_date
+                ? DateForApiFormate(item.start_date, true)
+                : item.s_date
+                ? DateForApiFormate(item.s_date, true)
+                : "",
+
+            end_date: item.end_date
+                ? DateForApiFormate(item.end_date, true)
+                : item.e_date
+                ? DateForApiFormate(item.e_date, true)
+                : "",
             }));
+
+            setResourceAllocationState({ data, loading: false, error: null,});
+
+            return data;
         } catch (error) {
+            setResourceAllocationState({ data: [], loading: false, error });
             console.error("Failed to load allocations", error);
             throw error;
         }
@@ -111,9 +127,10 @@ export const ActivityProvider = ({ children }) => {
             claimState,
             fetchClaims,
             fetchContractAllocations,
-            getStoredActivityListSelection
+            getStoredActivityListSelection,
+            resourceAllocationState
         }),
-        [ activityState, employeeState, claimState, fetchEmpActivityAllocations, fetchEmployees, fetchClaims, fetchContractAllocations,],
+        [ activityState, employeeState, claimState, fetchEmpActivityAllocations, fetchEmployees, fetchClaims, fetchContractAllocations, resourceAllocationState],
     );
 
     return (

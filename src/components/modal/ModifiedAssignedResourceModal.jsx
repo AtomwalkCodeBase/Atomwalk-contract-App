@@ -27,6 +27,7 @@ import { FaArrowLeft, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaUser, FaUserTi
 import styled from "styled-components";
 import NewCurrentAssugnmentList from "../ScreenComponents/NewCurrentAssugnmentList";
 import { FaPenToSquare } from "react-icons/fa6";
+import ConfirmPopup from "../ConfirmPopup";
 
 const InfoStrip = styled.div`
   display: flex;
@@ -105,6 +106,8 @@ const ResourceAllocation = () => {
   const location = useLocation();
   const [activityData, setActivityData] = useState(location.state?.data);
 
+  console.log("activityData", activityData)
+
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const { start, end } = getMonthRange();
 
@@ -112,6 +115,8 @@ const ResourceAllocation = () => {
   const [editBackup, setEditBackup] = useState({}); // groupId -> { originalRow, segmentKeys }
   const [loading, setLoading] = useState(false);
   const [showResourceAvailability, setShowResourceAvailability] = useState(false);
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [employees, setEmployees] = useState([]);
 
@@ -501,6 +506,7 @@ const ResourceAllocation = () => {
 
   const handleSubmit = async () => {
     try {
+      setIsSubmitting(true);
       const p_id = activityData?.original_P?.id;
       if (!p_id) return;
 
@@ -535,9 +541,9 @@ const ResourceAllocation = () => {
         await postAllocationData(fd);
         
         
-      // for (let [key, value] of fd.entries()) {
-      //  console.log(key, value);
-      // }
+      for (let [key, value] of fd.entries()) {
+       console.log(key, value);
+      }
       }
 
       if (activeResources.length > 0) {
@@ -553,15 +559,18 @@ const ResourceAllocation = () => {
         activityFd.append("resource_list", resourceListStr);
         await postActivityAllocationData(activityFd);
 
-        // for (let [key, value] of activityFd.entries()) {
-        //   console.log(key, value);
-        // }
+        for (let [key, value] of activityFd.entries()) {
+          console.log(key, value);
+        }
       }
 
       toast.success("Saved successfully");
+      setShowConfirmPopup(false);
       loadAllData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Save failed");
+    }finally{
+      setIsSubmitting(false);
     }
   };
 
@@ -655,7 +664,7 @@ const ResourceAllocation = () => {
           loadAllData={loadAllData}
         />
 
-        {activityData.activityStatus !== "C" &&
+        {!["AA", "AS", "C", "PA"].includes(activityData.activityStatus) &&
           <div style={{display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem"}}>
 
             <Button onClick={() => setShowResourceAvailability(true)}>Add Resources</Button>
@@ -666,7 +675,7 @@ const ResourceAllocation = () => {
         
         {pendingCount > 0 && (
           <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Button onClick={handleSubmit} color="primary" style={{ marginLeft: "auto" }}>{saveLabel} Resources in plan </Button>
+            <Button onClick={() => setShowConfirmPopup(true)} color="primary" style={{ marginLeft: "auto" }}>{saveLabel} Resources in plan </Button>
           </div>
         )}
 
@@ -706,6 +715,16 @@ const ResourceAllocation = () => {
         /> */}
 
       {/* </Card> */}
+
+      <ConfirmPopup
+        isOpen={showConfirmPopup}
+        isLoading={isSubmitting}
+        onConfirm={handleSubmit}
+        onClose={() => setShowConfirmPopup(false)}
+        title="Confirm Resource Plan"
+        message="Are you sure you want to save these resources in the plan?"
+        confirmLabel="Yes, Save"
+      />
     </Layout>
   );
 };

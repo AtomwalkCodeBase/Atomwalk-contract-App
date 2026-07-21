@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import styled from 'styled-components';
 import Card from '../components/Card';
-import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, formatWeekLabel, getWeekRange, formatDate2, getGroupStatus } from '../utils/utils';
-import { getContractAllocationData, getEmpAllocationData } from '../services/productServices';
+import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, formatWeekLabel, getWeekRange, formatDate2, getGroupStatus, matchClaimsToActivity } from '../utils/utils';
+import { getContractAllocationData, getEmpAllocationData, getEmpClaim, getemployeeLists } from '../services/productServices';
 import { toast } from 'react-toastify';
 import Button from '../components/Button';
 import { parse } from 'date-fns';
@@ -286,7 +286,7 @@ const parseDate = (dateStr) => {
   return new Date(year, month - 1, day);
 };
 
-const activityColumn = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>, "Planned Date", "Plan slots" , "Status", "Actions"]
+const activityColumn = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>, "Planned Date", "Plan slots", "Status", "Actions"]
 
 function getMatchingRetainerList(original_P = {}) {
   const {
@@ -318,11 +318,12 @@ const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
         // Used for search
         store_name: "",
         audit_type: "",
-            planned_start_date: item.planned_start_date,
-    planned_end_date: item.planned_end_date,
+        planned_start_date: item.planned_start_date,
+        planned_end_date: item.planned_end_date,
 
         total_planned_item: 0,
         grouped_data: [],
+        claims: [],
       };
     }
 
@@ -334,23 +335,31 @@ const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
     acc[key].audit_type += ` ${item.audit_type || ""}`;
 
     if (
-  item.planned_start_date &&
-  (!acc[key].planned_start_date ||
-    new Date(item.planned_start_date) <
-      new Date(acc[key].planned_start_date))
-) {
-  acc[key].planned_start_date = item.planned_start_date;
-}
+      item.planned_start_date &&
+      (!acc[key].planned_start_date ||
+        new Date(item.planned_start_date) <
+        new Date(acc[key].planned_start_date))
+    ) {
+      acc[key].planned_start_date = item.planned_start_date;
+    }
 
-// Get overall latest end date
-if (
-  item.planned_end_date &&
-  (!acc[key].planned_end_date ||
-    new Date(item.planned_end_date) >
-      new Date(acc[key].planned_end_date))
-) {
-  acc[key].planned_end_date = item.planned_end_date;
-}
+    // Get overall latest end date
+    if (
+      item.planned_end_date &&
+      (!acc[key].planned_end_date ||
+        new Date(item.planned_end_date) >
+        new Date(acc[key].planned_end_date))
+    ) {
+      acc[key].planned_end_date = item.planned_end_date;
+    }
+
+    if (item.claims && Array.isArray(item.claims)) {
+      item.claims.forEach((c) => {
+        if (!acc[key].claims.some((existing) => existing.master_claim_id === c.master_claim_id)) {
+          acc[key].claims.push(c);
+        }
+      });
+    }
 
     acc[key].grouped_data.push(item);
 
@@ -358,13 +367,13 @@ if (
   }, {});
 
   return Object.values(grouped).map((group) => {
-  const groupStatus = getGroupStatus(group.grouped_data, resourcePlannedList);
+    const groupStatus = getGroupStatus(group.grouped_data, resourcePlannedList);
 
-  return {
-    ...group,
-    ...groupStatus,
-  };
-});
+    return {
+      ...group,
+      ...groupStatus,
+    };
+  });
 };
 
 const ActivityListScreen = () => {
@@ -381,7 +390,8 @@ const ActivityListScreen = () => {
   const [expandedRow, setExpandedRow] = useState(null);
 
   const [assignedActivity, setAssignedActivity] = useState([]);
-  const [resourcePlannedList , setResourcePlannedList] = useState([]);
+  const [resourcePlannedList, setResourcePlannedList] = useState([]);
+  const [claimList, setClaimList] = useState([]);
   const [tab, setTab] = useState(storedSelection?.tab || "month")
   const [activeRangeType, setActiveRangeType] = useState(storedSelection?.activeRangeType || "month");
   const [offset, setOffset] = useState(0);
@@ -412,6 +422,19 @@ const ActivityListScreen = () => {
   const [selectedMonth, setSelectedMonth] = useState(storedSelection?.selectedMonth || getCurrentMonth());
   const [selectedWeek, setSelectedWeek] = useState(storedSelection?.selectedWeek || getCurrentWeek());
 
+  const enrichActivitiesWithClaims = useCallback((activities, claims = claimList) => {
+    if (!Array.isArray(activities)) return [];
+
+    return activities.map((activity) => {
+      const matchedClaims = matchClaimsToActivity(claims, activity);
+      return {
+        ...activity,
+        claims: matchedClaims,
+        hasClaim: matchedClaims.length > 0,
+      };
+    });
+  }, [claimList]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(
@@ -430,7 +453,35 @@ const ActivityListScreen = () => {
   useEffect(() => {
     if (emp_id) {
       fetchEmpAllocationData(dateRange.start, dateRange.end);
-      fetchEmpPlannedAllocation(dateRange.start, dateRange.end)
+    }
+  }, [emp_id, dateRange.start, dateRange.end]);
+
+  const fetchProfileAndClaims = useCallback(async () => {
+    if (!emp_id) return;
+
+    try {
+      const profileRes = await getemployeeLists({ emp_id });
+      const profile = profileRes?.data?.[0] || {};
+
+      if (!profile.id) {
+        setClaimList([]);
+        return;
+      }
+
+      const claimRes = await getEmpClaim("GET", profile.id, "CY");
+      const fetchedClaims = claimRes?.data || [];
+      setClaimList(fetchedClaims);
+      setAssignedActivity((prev) => enrichActivitiesWithClaims(prev, fetchedClaims));
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load claims");
+      setClaimList([]);
+    }
+  }, [emp_id, enrichActivitiesWithClaims]);
+
+  useEffect(() => {
+    if (emp_id) {
+      fetchProfileAndClaims();
     }
   }, [emp_id]);
 
@@ -526,6 +577,7 @@ const ActivityListScreen = () => {
       toast.info("End date cannot be earlier than start date")
       return false;
     }
+
     const payload = {
       emp_id: emp_id,
       start_date: formatToDDMMYYYY(start),
@@ -535,9 +587,15 @@ const ActivityListScreen = () => {
     setIsLoading(true);
 
     try {
-      const response = await getEmpAllocationData(payload);
-      setAssignedActivity(formatRetainerActivities(response.data))
-      // console.log("normalizeProjects(response.data)", formatRetainerActivities(response.data))
+      const [allocationResponse, plannedResponse] = await Promise.all([
+        getEmpAllocationData(payload),
+        getContractAllocationData(payload),
+      ]);
+
+      const plannedList = plannedResponse?.data || [];
+      setResourcePlannedList(plannedList);
+      const formattedActivities = formatRetainerActivities(allocationResponse?.data || [], plannedList);
+      setAssignedActivity(enrichActivitiesWithClaims(formattedActivities, claimList));
     } catch (error) {
       toast.error("No data found...")
       setIsLoading(false)
@@ -588,24 +646,23 @@ const ActivityListScreen = () => {
 
   const groupedData = groupByOrderItemId(filteredActivities, resourcePlannedList);
 
-const FilteredData = useFilter({
-  data: groupedData,
-  fields: [
-    "customer_name",
-    "order_item_key",
-    "product_name",
-    "store_name",
-    "audit_type",
-  ],
-  search: filter.search,
-  extraFilters: {
-    activityStatus: filter.status,
-  },
-});
+  const FilteredData = useFilter({
+    data: groupedData,
+    fields: [
+      "customer_name",
+      "order_item_key",
+      "product_name",
+      "store_name",
+      "audit_type",
+    ],
+    search: filter.search,
+    extraFilters: {
+      activityStatus: filter.status,
+    },
+  });
 
   const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(FilteredData, 10)
 
-  console.log("paginatedData", paginatedData);
 
   const handleExpandRow = (row) => {
     setExpandedRow((prev) =>
@@ -652,7 +709,7 @@ const FilteredData = useFilter({
       mode: "month",
     });
 
-    setFilter({ search: "", status: "ALL",});
+    setFilter({ search: "", status: "ALL", });
 
     setTab("month");
     setActiveRangeType("month");
@@ -660,9 +717,9 @@ const FilteredData = useFilter({
     setSelectedWeek(getCurrentWeek());
     setDateRange(currentMonthRange);
 
-    fetchEmpAllocationData( currentMonthRange.start, currentMonthRange.end);
+    fetchEmpAllocationData(currentMonthRange.start, currentMonthRange.end);
   };
-  
+
   // console.log("expandedRowId", expandedRowId)
 
   // const handleRangeChange = (type) => {
@@ -685,7 +742,6 @@ const FilteredData = useFilter({
     return arr.filter(item => item.statusDisplay === status).length;
   }
 
-  console.log("groupedData",groupedData)
 
   const notAssignedCount = getStatusCount(groupedData, "Not Assigned");
   // const assignedCount = getStatusCount(filteredActivities, "Not Started", "Completed");
@@ -729,6 +785,8 @@ const FilteredData = useFilter({
     { key: "month", label: "Monthly view" },
     { key: "week", label: "Weekly view" }
   ]
+
+  console.log("paginatedData", paginatedData)
 
   return (
     <Layout title="Audit/OrderItem Allocation List">
@@ -832,8 +890,6 @@ const FilteredData = useFilter({
           renderRow={(employee) => {
             const firstItem = employee?.grouped_data?.[0] || {};
 
-            console.log("employee", employee)
-
             return (
               <>
                 <Td>
@@ -845,164 +901,198 @@ const FilteredData = useFilter({
                     {firstItem?.store_name || '-'}
                   </StoreLocation>
                 </Td>
-               <Td>
-  {employee.planned_start_date === employee.planned_end_date ? (
-    formatDate(employee.planned_start_date)
-  ) : (
-    <>
-      {formatDate(employee.planned_start_date)}
-      <br/>
-      {formatDate(employee.planned_end_date)}
-    </>
-  )}
-</Td>
-                 <Td style={{paddingLeft: "2.5rem"}}>
-          {employee.total_planned_item || 0}
-        </Td>
-        <Td>
-  <Badge variant={getStatusVariant(employee.activityStatus)}>
-    {employee.statusDisplay}
-  </Badge>
-</Td>
-         <Td>
- <ButtonGroup>
-    {employee.total_planned_item === 1 ? (
-      <Button 
-        size='sm' 
-        variant="primary"
-        onClick={(e) => {
-          e.stopPropagation();
-          const firstItem = employee?.grouped_data?.[0] || {};
-          handleAssignResources1(firstItem, e);
-        }}
-      >
-        <FaUserPlus size={16} />
-        Assign Resources
-      </Button>
-    ) : (
-      <Button 
-        size='sm'
-        variant="outline"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleExpandRow(employee);
-        }}
-      >
-        {expandedRow === employee.order_item_id ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
-        {expandedRow === employee.order_item_id ? "Hide Allocations" : "View Allocations"}
-      </Button>
-    )}
-    {(employee.activityStatus === "C" || employee.activityStatus === "AP" || employee.activityStatus === "AS")  && (
-      <Button 
-        size='sm' 
-        onClick={() => navigate('/clamDetails', { state: { data: {...employee, mode: "ADD"} } })}
-      >
-        <FaMoneyBillWave />
-        Claim
-      </Button>
-    )}
-  </ButtonGroup>
-        </Td>
+                <Td>
+                  {employee.planned_start_date === employee.planned_end_date ? (
+                    formatDate(employee.planned_start_date)
+                  ) : (
+                    <>
+                      {formatDate(employee.planned_start_date)}
+                      <br />
+                      {formatDate(employee.planned_end_date)}
+                    </>
+                  )}
+                </Td>
+                <Td style={{ paddingLeft: "2.5rem" }}>
+                  {employee.total_planned_item || 0}
+                </Td>
+                <Td>
+                  <Badge variant={getStatusVariant(employee.activityStatus)}>
+                    {employee.statusDisplay}
+                  </Badge>
+                </Td>
+                <Td>
+                  <ButtonGroup>
+                    {employee.total_planned_item === 1 &&
+                      (employee.activityStatus === "NS" || employee.activityStatus === "NP") ? (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const firstItem = employee?.grouped_data?.[0] || {};
+                          handleAssignResources1(firstItem, e);
+                        }}
+                      >
+                        <FaUserPlus size={16} />
+                        Assign Resources
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExpandRow(employee);
+                        }}
+                      >
+                        {expandedRow === employee.order_item_id ? (
+                          <FaEyeSlash size={16} />
+                        ) : (
+                          <FaEye size={16} />
+                        )}
+
+                        {expandedRow === employee.order_item_id
+                          ? "Hide Allocations"
+                          : "View Allocations"}
+                      </Button>
+                    )}
+
+                    {(employee.activityStatus === "C" ||
+                      employee.activityStatus === "AP" ||
+                      employee.activityStatus === "AS") && (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            navigate("/clamDetails", {
+                              state: {
+                                data: {
+                                  ...employee,
+                                  claims: employee?.claims || [],
+                                  mode: "ADD",
+                                },
+                              },
+                            });
+                          }}
+                        >
+                          <FaMoneyBillWave />
+                          Claim
+                        </Button>
+                      )}
+                  </ButtonGroup>
+                </Td>
                 {/* <Td>{employee.original_P?.store_name || '-'}</Td> */}
                 {/* <Td>BM: {PlannedResource[0].}</Td> */}
-                
+
               </>
             )
           }}
-renderExpandedRow={(employee) => {
-  const groupedData = employee?.grouped_data || [];
+          renderExpandedRow={(employee) => {
+            const groupedData = employee?.grouped_data || [];
 
-  return (
-    <DataTable
-      columns={[
-        "Sl No.",
-        "Planned Date",
-        "Planned Resource",
-        "Status",
-        "Action",
-      ]}
-      data={groupedData}
-      renderRow={(item) => {
-        const index = groupedData.findIndex(
-          (data) => data === item
-        );
+            return (
+              <DataTable
+                columns={[
+                  "Sl No.",
+                  "Planned Date",
+                  "Planned Resource",
+                  "Status",
+                  "Action",
+                ]}
+                data={groupedData}
+                renderRow={(item) => {
+                  const index = groupedData.findIndex(
+                    (data) => data === item
+                  );
 
-        const plannedResource =
-          getMatchingRetainerList(item?.original_P);
+                  const plannedResource =
+                    getMatchingRetainerList(item?.original_P);
 
-        const resource = plannedResource?.[0];
+                  const resource = plannedResource?.[0];
 
-        const isResourceAssigned =
-          item?.original_A?.resource_list?.length > 0;
+                  const isResourceAssigned = item?.original_A?.resource_list?.length > 0;
 
-        const displayPlannedDate =
-          item.planned_start_date === item.planned_end_date
-            ? formatDate(item.planned_start_date)
-            : `${formatDate(
-                item.planned_start_date
-              )} to ${formatDate(
-                item.planned_end_date
-              )}`;
+                  const displayPlannedDate =
+                    item.planned_start_date === item.planned_end_date
+                      ? formatDate(item.planned_start_date)
+                      : `${formatDate(
+                        item.planned_start_date
+                      )} to ${formatDate(
+                        item.planned_end_date
+                      )}`;
 
-        return (
-          <>
-            {/* Serial No */}
-            <Td style={{paddingLeft: "1.5rem"}}>{index + 1}</Td>
+                  return (
+                    <>
+                      {/* Serial No */}
+                      <Td style={{ paddingLeft: "1.5rem" }}>{index + 1}</Td>
 
-            {/* Planned Date */}
-            <Td>{displayPlannedDate}</Td>
+                      {/* Planned Date */}
+                      <Td>{displayPlannedDate}</Td>
 
-            {/* Planned Resource */}
-            <Td>
-              {/* <ResourcesRow variant="primary"> */}
-                <ResourcesValue>
-                  <ResourceCount variant="primary">
-                    {resource?.tl_count || 0}
-                  </ResourceCount>
-                  {" "}TL /{" "}
-                  <ResourceCount variant="primary">
-                    {resource?.ex_count || 0}
-                  </ResourceCount>
-                  {" "}EX
-                </ResourcesValue>
-              {/* </ResourcesRow> */}
-            </Td>
+                      {/* Planned Resource */}
+                      <Td>
+                        {/* <ResourcesRow variant="primary"> */}
+                        <ResourcesValue>
+                          <ResourceCount variant="primary">
+                            {resource?.tl_count || 0}
+                          </ResourceCount>
+                          {" "}TL /{" "}
+                          <ResourceCount variant="primary">
+                            {resource?.ex_count || 0}
+                          </ResourceCount>
+                          {" "}EX
+                        </ResourcesValue>
+                        {/* </ResourcesRow> */}
+                      </Td>
 
-            {/* Status */}
-            <Td>
-              <Badge
-                variant={getStatusVariant(
-                  item.activityStatus
-                )}
-              >
-                {item.statusDisplay}
-              </Badge>
-            </Td>
+                      {/* Status */}
+                      <Td>
+                        <Badge
+                          variant={getStatusVariant(
+                            item.activityStatus
+                          )}
+                        >
+                          {item.statusDisplay}
+                        </Badge>
+                      </Td>
 
-            {/* Action */}
-            <Td>
-              <Button size='sm'
-                variant={
-                  isResourceAssigned
-                    ? "outline"
-                    : "primary"
-                }
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAssignResources1(item, e);
+                      {/* Action */}
+                      <Td>
+                        <Button
+                          size="sm"
+                          variant={
+                            !isResourceAssigned &&
+                              (item.activityStatus === "NS" || item.activityStatus === "NP")
+                              ? "primary"
+                              : "outline"
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAssignResources1(item, e);
+                          }}
+                        >
+                          {!isResourceAssigned &&
+                            (item.activityStatus === "NS" || item.activityStatus === "NP") ? (
+                            <FaUserPlus />
+                          ) : (
+                            <FaEye />
+                          )}
+
+                          {!isResourceAssigned &&
+                            (item.activityStatus === "NS" || item.activityStatus === "NP")
+                            ? "Assign"
+                            : "View"}{" "}
+                          Resources
+                        </Button>
+                      </Td>
+                    </>
+                  );
                 }}
-              >
-                {isResourceAssigned ? <FaEye /> : <FaUserPlus />}
-                {isResourceAssigned ? "View" : "Assign"}{" "}Resources
-              </Button>
-            </Td>
-          </>
-        );
-      }}
-    />
-  );
-}}
-/>
+              />
+            );
+          }}
+        />
         <PaginationComponent
           totalItems={totalItems}
           itemsPerPage={itemsPerPage}

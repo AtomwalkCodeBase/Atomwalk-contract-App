@@ -197,7 +197,6 @@ const [dateRange, setDateRange] = useState(() => {
 	useEffect(() => {
         if (emp_id && dateRange?.start && dateRange?.end) {
             getAuditAllocationData();
-			getResourceAllocationData();
         }
     }, [dateRange, emp_id]);
 
@@ -222,24 +221,12 @@ useEffect(() => {
 			end_date: formatToDDMMYYYY(end),
 		}
 		try {
-			await fetchEmpActivityAllocations(payload)
+			const resourceData = await fetchContractAllocations(payload);
+			setResourcePlannedList(resourceData);
+			await fetchEmpActivityAllocations(payload, resourceData);
 		} catch (error) {
 			toast.error(error?.response?.data?.message || "Failed to fetch activity allocations");
 		}
-	}
-	const getResourceAllocationData = async (startOverride, endOverride) => {
-		const start = startOverride || dateRange.start
-    	const end = endOverride || dateRange.end
-		const payload = {
-			emp_id : emp_id,
-			start_date: formatToDDMMYYYY(start),
-			end_date: formatToDDMMYYYY(end),
-		}
-		try {
-			const data = await fetchContractAllocations(payload);
-			setResourcePlannedList(data)
-		} catch (error) {
-			toast.error(error?.response?.data?.message || "Failed to fetch resource allocations");		}
 	}
 
 	const handleRangeChange = (type) => {
@@ -442,7 +429,8 @@ useEffect(() => {
             <div style={{ width: '100px' }} />  
         )}
 									  
-									  {employee.total_planned_item === 1 ? (
+									  {employee.total_planned_item === 1 &&
+									   (employee.activityStatus === "NS" || employee.activityStatus === "NP") ? (
 										  <Button
 											  size='sm'
 											  variant="primary"
@@ -519,8 +507,8 @@ useEffect(() => {
 									handleAssignResources(item, e);
 								  }}
 								>
-								  {isResourceAssigned ? <FaEye /> : <FaUserPlus />}
-								  {isResourceAssigned ? "View" : "Assign"}{" "}Resources
+								  {isResourceAssigned && (item.activityStatus === "NS" || item.activityStatus === "NP")  ? <FaUserPlus /> : <FaEye />}
+								  {isResourceAssigned &&  (item.activityStatus === "NS" || item.activityStatus === "NP") ? "Assign" : "View"}{" "}Resources
 								</Button>
 							  </Td>
 							</>

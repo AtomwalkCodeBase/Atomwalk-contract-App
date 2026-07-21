@@ -365,7 +365,7 @@ export const getActivityOrderItemId = (activity) => {
   if (!raw) return "";
 
   const parts = String(raw).split("_");
-  const id = parts.length > 1 ? parts[1] : parts[0];
+  const id = parts[parts.length - 1];
 
   return String(id).replace(/^0+/, "");
 };
@@ -388,10 +388,7 @@ export const matchClaimsToActivity = (claims = [], activity) => {
     .filter(Boolean);
 };
 
-export const formatRetainerActivities = (
-  apiData = [],
-  resourcePlannedList = []
-) => {
+export const formatRetainerActivities = (apiData = [], resourcePlannedList = []) => {
   const grouped = buildActivityGroupMap(apiData);
 
   const isSameId = (id1, id2) =>
@@ -465,7 +462,6 @@ export const formatRetainerActivities = (
         (resource) => resource?.is_approved === true
       );
 
-
     // =====================================================
     // STATUS PRIORITY
     //
@@ -525,24 +521,11 @@ export const formatRetainerActivities = (
       activityStatus = "C";
     }
 
+    const completed = activityStatus === "C" ? "Completed" : "In Progress";
 
-    // =====================================================
-    // EXISTING LOGIC
-    // =====================================================
+    const ui = getTodayActionFlags({ allAEntries, });
 
-    const completed =
-      activityStatus === "C"
-        ? "Completed"
-        : "In Progress";
-
-    const ui = getTodayActionFlags({
-      allAEntries,
-    });
-
-    const day_logs =
-      buildDayLogsFromAEntriesForRetainer(
-        allAEntries
-      );
+    const day_logs = buildDayLogsFromAEntriesForRetainer(allAEntries);
 
     return {
       key,
@@ -550,64 +533,45 @@ export const formatRetainerActivities = (
       p_id: original_P?.id ?? null,
       a_id: original_A?.id ?? null,
 
-      employee_name:
-        original_P?.employee_name ?? "",
+      employee_name: original_P?.employee_name ?? "",
 
-      emp_id:
-        original_P?.emp_id ?? "",
+      emp_id: original_P?.emp_id ?? "",
 
-      customer_name:
-        original_P?.customer_name ?? "",
+      customer_name: original_P?.customer_name ?? "",
 
-      product_name:
-        original_P?.product_name ?? "",
+      product_name: original_P?.product_name ?? "",
 
-      project_name:
-        original_P?.project_name ?? "",
+      project_name: original_P?.project_name ?? "",
 
-      activity_name:
-        original_P?.activity_name ?? "",
+      activity_name: original_P?.activity_name ?? "",
 
-      order_item_id:
-        original_P?.order_item_id ?? "",
+      order_item_id: original_P?.order_item_id ?? "",
 
-      order_item_key:
-        original_P?.order_item_key ?? "",
+      order_item_key: original_P?.order_item_key ?? "",
 
-      planned_start_date:
-        original_P?.start_date || null,
+      planned_start_date: original_P?.start_date || null,
 
-      planned_end_date:
-        original_P?.end_date || null,
+      planned_end_date: original_P?.end_date || null,
 
-      planned_start_time:
-        original_P?.start_time || null,
+      planned_start_time: original_P?.start_time || null,
 
-      planned_end_time:
-        original_P?.end_time || null,
+      planned_end_time: original_P?.end_time || null,
 
-      actual_start_date:
-        original_A?.start_date || null,
+      actual_start_date: original_A?.start_date || null,
 
-      actual_end_date:
-        original_A?.end_date || null,
+      actual_end_date: original_A?.end_date || null,
 
-      is_file_applicable:
-        original_P?.is_file_applicable ?? false,
+      is_file_applicable: original_P?.is_file_applicable ?? false,
 
-      audit_type:
-        original_P?.audit_type ?? "",
+      audit_type: original_P?.audit_type ?? "",
 
-      store_name:
-        original_P?.store_name ?? "",
+      store_name: original_P?.store_name ?? "",
 
-      store_remarks:
-        original_P?.store_remarks ?? "",
+      store_remarks: original_P?.store_remarks ?? "",
 
       complete: completed,
 
-      is_complete:
-        activityStatus === "C",
+      is_complete: activityStatus === "C",
 
       // New calculated status
       statusDisplay,
@@ -1275,11 +1239,13 @@ export const mergeAdjacentRows = (allocations) => {
     const sorted = [...rows].sort((a, b) => a.start_date.localeCompare(b.start_date));
     let current = null;
     sorted.forEach((row) => {
+      const sameRate = Number(current?.contract_rate ?? 0) === Number(row.contract_rate ?? 0);
       const sameFields =
         current &&
         isNextDay(current.end_date, row.start_date) &&
         current.emp_type === row.emp_type &&
         (current.remarks || "") === (row.remarks || "") &&
+        sameRate &&
         (current.id == null || row.id == null || current.id === row.id);
 
       if (sameFields) {
@@ -1309,15 +1275,93 @@ export const getRowStatus = (row, originalById) => {
     row.start_date !== original.start_date ||
     row.end_date !== original.end_date ||
     row.emp_type !== original.emp_type ||
-    (row.remarks || "") !== (original.remarks || "");
+    (row.remarks || "") !== (original.remarks || "") ||
+    Number(row.contract_rate ?? 0) !== Number(original.contract_rate ?? 0);
   return changed ? "UPDATE" : "ORIGINAL";
 };
 
 /** The actual diff. This is the only place ADD/UPDATE/DELETE get decided. */
+// export const buildPayloads = (workingAllocations, originalAllocations) => {
+//   const originalById = {};
+//   originalAllocations.forEach((r) => {
+//     originalById[r.id] = r;
+//   });
+
+//   const unclaimedOriginalsByKey = {};
+//   originalAllocations.forEach((r) => {
+//     unclaimedOriginalsByKey[`${r.emp_id}|${r.start_date}|${r.end_date}`] = r;
+//   });
+
+//   const addPayload = [];
+//   const updatePayload = [];
+//   const unchangedPayload = [];
+//   const seenIds = new Set();
+
+//   workingAllocations.forEach((row) => {
+//     const rateNum = Number.isFinite(Number(row.contract_rate)) ? Number(row.contract_rate) : 0;
+
+//     if (row.id == null) {
+//       addPayload.push({
+//         emp_id: row.emp_id,
+//         emp_type: row.emp_type,
+//         start_date: DateForApiFormate(row.start_date),
+//         end_date: DateForApiFormate(row.end_date),
+//         remarks: row.remarks || "",
+//         contract_rate: rateNum,
+//       });
+//       return;
+//     }
+
+//     seenIds.add(row.id);
+//     const original = originalById[row.id];
+//     if (!original) return; // defensive: id present but not in snapshot
+
+//     const changed =
+//       row.start_date !== original.start_date ||
+//       row.end_date !== original.end_date ||
+//       row.emp_type !== original.emp_type ||
+//       (row.remarks || "") !== (original.remarks || "") ||
+//       Number(row.contract_rate ?? 0) !== Number(original.contract_rate ?? 0);
+
+//     if (changed) {
+//       updatePayload.push({
+//         id: row.id,
+//         emp_id: row.emp_id,
+//         emp_type: row.emp_type,
+//         start_date: DateForApiFormate(row.start_date),
+//         end_date: DateForApiFormate(row.end_date),
+//         remarks: row.remarks || "",
+//         contract_rate: rateNum,
+//         is_updated: true,
+//       });
+//     } else {
+//       // NEW — unchanged, but backend needs it present to count toward active TL/EX
+//       unchangedPayload.push({
+//         id: row.id,
+//         emp_id: row.emp_id,
+//         emp_type: row.emp_type,
+//       });
+//     }
+//   });
+
+//   const deletePayload = originalAllocations
+//     .filter((o) => !seenIds.has(o.id))
+//     .map((o) => ({ id: o.id, is_deleted: true, emp_type: o.emp_type }));
+
+//   return { addPayload, updatePayload, deletePayload, unchangedPayload };
+// };
+
 export const buildPayloads = (workingAllocations, originalAllocations) => {
   const originalById = {};
   originalAllocations.forEach((r) => {
     originalById[r.id] = r;
+  });
+
+  // NEW — fallback lookup for rows that lost their id but still match an
+  // original by emp/date-range. Prevents a false ADD+DELETE pair.
+  const unclaimedOriginalsByKey = {};
+  originalAllocations.forEach((r) => {
+    unclaimedOriginalsByKey[`${r.emp_id}|${r.start_date}|${r.end_date}`] = r;
   });
 
   const addPayload = [];
@@ -1326,9 +1370,20 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
   const seenIds = new Set();
 
   workingAllocations.forEach((row) => {
-    const rateNum = row.contract_rate ? parseFloat(row.contract_rate) : 0;
+    const rateNum = Number.isFinite(Number(row.contract_rate)) ? Number(row.contract_rate) : 0;
 
-    if (row.id == null) {
+    let effectiveId = row.id;
+
+    // NEW — id missing but this row still matches an original 1:1 on
+    // emp_id + dates → it's an edit (e.g. contract_rate), not a new row.
+    if (effectiveId == null) {
+      const recovered = unclaimedOriginalsByKey[`${row.emp_id}|${row.start_date}|${row.end_date}`];
+      if (recovered && !seenIds.has(recovered.id)) {
+        effectiveId = recovered.id;
+      }
+    }
+
+    if (effectiveId == null) {
       addPayload.push({
         emp_id: row.emp_id,
         emp_type: row.emp_type,
@@ -1340,8 +1395,8 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
       return;
     }
 
-    seenIds.add(row.id);
-    const original = originalById[row.id];
+    seenIds.add(effectiveId);
+    const original = originalById[effectiveId];
     if (!original) return; // defensive: id present but not in snapshot
 
     const changed =
@@ -1349,11 +1404,11 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
       row.end_date !== original.end_date ||
       row.emp_type !== original.emp_type ||
       (row.remarks || "") !== (original.remarks || "") ||
-      String(row.contract_rate ?? "") !== String(original.contract_rate ?? "");
+      Number(row.contract_rate ?? 0) !== Number(original.contract_rate ?? 0);
 
     if (changed) {
       updatePayload.push({
-        id: row.id,
+        id: effectiveId,
         emp_id: row.emp_id,
         emp_type: row.emp_type,
         start_date: DateForApiFormate(row.start_date),
@@ -1363,9 +1418,8 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
         is_updated: true,
       });
     } else {
-      // NEW — unchanged, but backend needs it present to count toward active TL/EX
       unchangedPayload.push({
-        id: row.id,
+        id: effectiveId,
         emp_id: row.emp_id,
         emp_type: row.emp_type,
       });
@@ -1534,23 +1588,23 @@ export const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
     acc[key].audit_type += ` ${item.audit_type || ""}`;
 
     if (
-  item.planned_start_date &&
-  (!acc[key].planned_start_date ||
-    new Date(item.planned_start_date) <
-      new Date(acc[key].planned_start_date))
-) {
-  acc[key].planned_start_date = item.planned_start_date;
-}
+      item.planned_start_date &&
+      (!acc[key].planned_start_date ||
+        new Date(item.planned_start_date) <
+        new Date(acc[key].planned_start_date))
+    ) {
+      acc[key].planned_start_date = item.planned_start_date;
+    }
 
-// Get overall latest end date
-if (
-  item.planned_end_date &&
-  (!acc[key].planned_end_date ||
-    new Date(item.planned_end_date) >
-      new Date(acc[key].planned_end_date))
-) {
-  acc[key].planned_end_date = item.planned_end_date;
-}
+    // Get overall latest end date
+    if (
+      item.planned_end_date &&
+      (!acc[key].planned_end_date ||
+        new Date(item.planned_end_date) >
+        new Date(acc[key].planned_end_date))
+    ) {
+      acc[key].planned_end_date = item.planned_end_date;
+    }
 
     acc[key].grouped_data.push(item);
 
@@ -1558,11 +1612,23 @@ if (
   }, {});
 
   return Object.values(grouped).map((group) => {
-  const groupStatus = getGroupStatus(group.grouped_data, resourcePlannedList);
+    const groupStatus = getGroupStatus(group.grouped_data, resourcePlannedList);
 
-  return {
-    ...group,
-    ...groupStatus,
-  };
-});
+    return {
+      ...group,
+      ...groupStatus,
+    };
+  });
+};
+
+export const extractOrderNumber = (orderItemId, keepLeadingZeros = false) => {
+  if (!orderItemId) return "";
+
+  const str = String(orderItemId);
+
+  const digits = str.replace(/\D/g, '');
+
+  if (!digits) return "";
+
+  return keepLeadingZeros ? digits : parseInt(digits, 10).toString();
 };

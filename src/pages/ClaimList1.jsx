@@ -447,7 +447,6 @@ const ClamList1 = () => {
         .sort((a, b) => (a.earliestPlannedDate || "").localeCompare(b.earliestPlannedDate || ""));
     }, [activitiesWithClaims]);
 
-
   const handleRangeChange = (type) => {
     setActiveRangeType(type);
     setOffset(0);
@@ -530,9 +529,6 @@ const stats_card = useMemo(
   const handleRowClick = (group) => {
   setExpandedRowId((prev) => (prev === group.order_item_key ? null : group.order_item_key));
 };
-
-
-console.log("paginatedData",paginatedData)
 
   return (
     <Layout title="Clam screen">
@@ -623,8 +619,6 @@ console.log("paginatedData",paginatedData)
             const ClaimItem = group.claimsItem[0]
             const { variant, label } = getClaimStatusVariant(ClaimItem?.expense_status);
 
-            console.log("group", group)
-
             return (
             <>
                 <Td>
@@ -658,7 +652,7 @@ console.log("paginatedData",paginatedData)
                 {/* <Td>—</Td>
                 <Td>—</Td> */}
                 <Td>
-                   <ButtonGroup>
+                   {group.activityStatus === "C" &&  <ButtonGroup>
                     {group?.claimsItem.length === 0 ? (
                       <Button size='sm' onClick={() => navigate('/clamDetails', { state: { data: { ...group, mode: "ADD" } } })}>
                        <FaPlus /> Add Clam
@@ -668,7 +662,7 @@ console.log("paginatedData",paginatedData)
                         <FaEye /> View Clam
                       </Button>
                     )}
-                  </ButtonGroup>
+                  </ButtonGroup>}
                 </Td>
             </>
             );

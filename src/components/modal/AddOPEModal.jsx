@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { FaCalendarAlt, FaFileAlt, FaListUl, FaRupeeSign, FaTimes, FaUpload } from 'react-icons/fa';
 import { FiFileText } from 'react-icons/fi';
 import { getExpenseItem, postClaim } from '../../services/productServices';
-import { DateForApiFormate } from '../../utils/utils';
+import { DateForApiFormate, extractOrderNumber } from '../../utils/utils';
 
 const FormGroup = styled.div`
   margin-bottom: 1rem;
@@ -180,6 +180,8 @@ const UploadedFile = styled.div`
 const AddOPEModal = ({ isOpen, onClose, claimData = null , onSaved}) => {
   const loggedEmpId = localStorage.getItem("cust_emp_id");
 
+  console.log("claimData", claimData)
+
   const [ isLoading, setIsLoading ] = useState(false);
   const [ isFileError, setIsFileError ] = useState(false);
   const [expenseItemList, setExpenseItemList] = useState([]);
@@ -191,7 +193,7 @@ const AddOPEModal = ({ isOpen, onClose, claimData = null , onSaved}) => {
     claim_remarks: "",
     file: null,
     emp_id: loggedEmpId,
-    o_item_id: claimData?.o_item_id
+    o_item_id: extractOrderNumber(claimData?.o_item_id || claimData?.order_item_id)
   };
 
   const [formData, setFormData] = useState(initialFormData);

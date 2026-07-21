@@ -295,16 +295,26 @@ const ClamDetailsScreen = () => {
   const activityData = location.state?.data;
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const ViewMode = activityData.mode;
-  const [claimStatus, setClaimStatus] = useState("")
-
-  console.log("activityData", activityData)
-
   const [loading, setLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [openOpeModal, setOpenOpeModal] = useState(false);
   const [openSubmitAllModal, setOpenSubmitAllModal] = useState(false);
 
   const [claimList, setClaimList] = useState(() => activityData?.claims || []);
+
+  const claimStatus = useMemo(() => {
+    for (const claim of claimList) {
+      for (const item of (claim?.claim_items || [])) {
+        const { label } = getStatusVariant(item.expense_status);
+        if (label === "Submitted") {
+          return "Submitted";
+        }
+      }
+    }
+    return "";
+  }, [claimList]);
+
+
   const [resourceList, setResourceList] = useState([]);
   const [expandedDate, setExpandedDate] = useState(null);
   const [selectedClaim, setSelectedClaim] = useState(null);
@@ -334,9 +344,9 @@ const ClamDetailsScreen = () => {
     }
   }, [loggedEmpId, activityData]);
 
-  const dateRows = useMemo(() => groupResourcesByDate(resourceList),[resourceList]);
+  const dateRows = useMemo(() => groupResourcesByDate(resourceList), [resourceList]);
 
-  const totals = useMemo(() => 
+  const totals = useMemo(() =>
     dateRows.reduce((acc, row) => ({
       resource: acc.resource + row.tl_amount + row.ex_amount,
       claim: acc.claim + row.claim_amount,
@@ -344,64 +354,64 @@ const ClamDetailsScreen = () => {
     [dateRows]
   );
 
-    const totalClaim = useMemo(() => {
-  return claimList.reduce(
-    (acc, claim) => {
-      acc.totalOPE += Number(claim?.expense_amt || 0);
-      acc.totalSettlement += Number(claim?.settlement_amt || 0);
+  const totalClaim = useMemo(() => {
+    return claimList.reduce(
+      (acc, claim) => {
+        acc.totalOPE += Number(claim?.expense_amt || 0);
+        acc.totalSettlement += Number(claim?.settlement_amt || 0);
 
-      return acc;
-    },
-    { totalOPE: 0, totalSettlement: 0 }
-  );
-}, [claimList]);
+        return acc;
+      },
+      { totalOPE: 0, totalSettlement: 0 }
+    );
+  }, [claimList]);
 
   const grandTotal = totals.resource + totalClaim.totalOPE;
 
   const fetchResourceData = useCallback(async () => {
-      const startDate = activityData?.planned_start_date || activityData.earliestPlannedDate;
-      const endDate = activityData?.planned_end_date || activityData.latestPlannedDate;
-      const allocationIds = [
-        ...new Set(
-          (
-            activityData?.grouped_data?.length
-              ? activityData.grouped_data.flatMap(
-                  item => item?.allAEntries || []
-                )
-              : activityData?.allAEntries || []
-          )
-            .map(item => item?.id)
-            .filter(Boolean)
+    const startDate = activityData?.planned_start_date || activityData.earliestPlannedDate;
+    const endDate = activityData?.planned_end_date || activityData.latestPlannedDate;
+    const allocationIds = [
+      ...new Set(
+        (
+          activityData?.grouped_data?.length
+            ? activityData.grouped_data.flatMap(
+              item => item?.allAEntries || []
+            )
+            : activityData?.allAEntries || []
         )
-      ];
+          .map(item => item?.id)
+          .filter(Boolean)
+      )
+    ];
 
-      if (!startDate || !endDate || !allocationIds.length) {
+    if (!startDate || !endDate || !allocationIds.length) {
       // if (!startDate || !endDate) {
-        setResourceList([]);
-        return;
-      }
+      setResourceList([]);
+      return;
+    }
 
-      try {
-        setLoading(true);
-        const responses = await Promise.all(allocationIds.map(allocationId => 
+    try {
+      setLoading(true);
+      const responses = await Promise.all(allocationIds.map(allocationId =>
         getContractAllocationData({
-              emp_id: loggedEmpId,
-              allocation_id: allocationId,
-              start_date: DateForApiFormate(startDate),
-              end_date: DateForApiFormate(endDate),
-            })
-          )
-        );
-        const mergedData = responses.flatMap((response) => Array.isArray(response?.data) ? response.data : []);
-        setResourceList(mergedData);
-      } catch (error) {
-        console.error("Failed to fetch resource data:", error);
-        toast.error("Failed to load resource data");
-        setResourceList([]);
-      } finally {
-        setLoading(false);
-      }
-    }, [activityData, loggedEmpId]);
+          emp_id: loggedEmpId,
+          allocation_id: allocationId,
+          start_date: DateForApiFormate(startDate),
+          end_date: DateForApiFormate(endDate),
+        })
+      )
+      );
+      const mergedData = responses.flatMap((response) => Array.isArray(response?.data) ? response.data : []);
+      setResourceList(mergedData);
+    } catch (error) {
+      console.error("Failed to fetch resource data:", error);
+      toast.error("Failed to load resource data");
+      setResourceList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activityData, loggedEmpId]);
 
   useEffect(() => {
     fetchResourceData();
@@ -429,38 +439,37 @@ const ClamDetailsScreen = () => {
   //   handleOpenClaimModal(existingClaim ? {...activityData, master_data: existingClaim}: null);
   // };
 
-  console.log("totalClaim.totalOPE", totalClaim.totalOPE)
-  console.log("activityData", activityData)
-
   const handleAddClaim = () => {
-  const existingClaim = claimList?.[0] || null;
-  handleOpenClaimModal({ activityData, ...(existingClaim && {master_data: existingClaim,}),});
-};
+    const existingClaim = claimList?.[0] || null;
+    handleOpenClaimModal({ ...activityData, ...(existingClaim && { master_data: existingClaim, }), });
+  };
 
-const handleSubmitAll = async(masterClaimId) => {
-  try {
-    const payload = {
-      m_claim_id: masterClaimId,
-      call_mode: "SUBMIT_ALL"
+  const handleSubmitAll = async (masterClaimId) => {
+    try {
+      const payload = {
+        m_claim_id: masterClaimId,
+        call_mode: "SUBMIT_ALL"
+      }
+      const res = await postClaimAction(payload);
+      if (res.status === 200) {
+        toast.success("All claim items submitted successfully");
+      }
+     await fetchClaimsForActivity();
+
+    } catch (error) {
+      toast.error(error.data.message || error.data || "Failed to submit the claims. Please try again later !!!");
+    } finally {
+      setSelectedMasterClaimId(null);
+      setOpenSubmitAllModal(false);
     }
-    const res = await postClaimAction(payload);
-    if(res.status === 200){
-      toast.success("All claim items submitted successfully");
-    }
-  } catch (error) {
-    toast.error(error.data.message || error.data || "Failed to submit the claims. Please try again later !!!");
-  }finally{
-    setSelectedMasterClaimId(null);
-    setOpenSubmitAllModal(false);
   }
-}
 
   const matchingRetainer = (activityData?.original_P?.retainer_list || []).find((r) => r.a_type === "P" && r.start_date === activityData?.original_P?.start_date && r.end_date === activityData?.original_P?.end_date,);
 
   const plannedTL = matchingRetainer?.tl_count || 0;
   const plannedEX = matchingRetainer?.ex_count || 0;
 
-  console.log("c,aim", claimStatus)
+  // console.log("selectedClaim", selectedClaim)
 
   return (
     <Layout title="Clam Details ">
@@ -473,151 +482,153 @@ const handleSubmitAll = async(masterClaimId) => {
           </Button>
         </div>
       </ClaimsHeader>
-     <Card title="Activity Details" hoverable={false}>
-  <DetailsGrid>
-    <DetailItem>
-      <DetailIconWrap><FaCalendarAlt size={13} /></DetailIconWrap>
-      <DetailText>
-        <DetailLabel>Duration</DetailLabel>
-        <DetailValue>{formatDate(activityData.planned_start_date)} – {formatDate(activityData.planned_end_date)}</DetailValue>
-      </DetailText>
-    </DetailItem>
-
-    <DetailItem>
-      <DetailIconWrap><FaFileAlt size={13} /></DetailIconWrap>
-      <DetailText>
-        <DetailLabel>Customer</DetailLabel>
-        <DetailValue>{activityData.customer_name}</DetailValue>
-      </DetailText>
-    </DetailItem>
-
-    <DetailItem>
-      <DetailIconWrap><FaFileAlt size={13} /></DetailIconWrap>
-      <DetailText>
-        <DetailLabel>Order Item</DetailLabel>
-        <DetailValue>{activityData.order_item_key}</DetailValue>
-      </DetailText>
-    </DetailItem>
-
-    <DetailItem>
-      <DetailIconWrap><FaUserTie size={13} /></DetailIconWrap>
-      <DetailText>
-        <DetailLabel>Required TL</DetailLabel>
-        <DetailValue>{plannedTL ?? '—'}</DetailValue>
-      </DetailText>
-    </DetailItem>
-
-    <DetailItem>
-      <DetailIconWrap><FaUser size={13} /></DetailIconWrap>
-      <DetailText>
-        <DetailLabel>Required EX</DetailLabel>
-        <DetailValue>{plannedEX?? '—'}</DetailValue>
-      </DetailText>
-    </DetailItem>
-
-    <DetailItem>
-      <DetailIconWrap><FaMapMarkerAlt size={13} /></DetailIconWrap>
-      <DetailText>
-        <DetailLabel>Location</DetailLabel>
-        <DetailValue>{activityData.store_name  || '—'}</DetailValue>
-      </DetailText>
-    </DetailItem>
-  </DetailsGrid>
-
-         {activityData.store_remarks && <DetailItem style={{marginTop: "1rem"}}>
-            <DetailIconWrap><FaPenToSquare size={13} /></DetailIconWrap>
+      <Card title="Activity Details" hoverable={false}>
+        <DetailsGrid>
+          <DetailItem>
+            <DetailIconWrap><FaCalendarAlt size={13} /></DetailIconWrap>
             <DetailText>
-              <DetailLabel>Remark</DetailLabel>
-              <DetailValue>{activityData.store_remarks  || '—'}</DetailValue>
+              <DetailLabel>Duration</DetailLabel>
+              <DetailValue>{formatDate(activityData.planned_start_date)} – {formatDate(activityData.planned_end_date)}</DetailValue>
             </DetailText>
-          </DetailItem>}
-</Card>
+          </DetailItem>
+
+          <DetailItem>
+            <DetailIconWrap><FaFileAlt size={13} /></DetailIconWrap>
+            <DetailText>
+              <DetailLabel>Customer</DetailLabel>
+              <DetailValue>{activityData.customer_name}</DetailValue>
+            </DetailText>
+          </DetailItem>
+
+          <DetailItem>
+            <DetailIconWrap><FaFileAlt size={13} /></DetailIconWrap>
+            <DetailText>
+              <DetailLabel>Order Item</DetailLabel>
+              <DetailValue>{activityData.order_item_key}</DetailValue>
+            </DetailText>
+          </DetailItem>
+
+          <DetailItem>
+            <DetailIconWrap><FaUserTie size={13} /></DetailIconWrap>
+            <DetailText>
+              <DetailLabel>Required TL</DetailLabel>
+              <DetailValue>{plannedTL ?? '—'}</DetailValue>
+            </DetailText>
+          </DetailItem>
+
+          <DetailItem>
+            <DetailIconWrap><FaUser size={13} /></DetailIconWrap>
+            <DetailText>
+              <DetailLabel>Required EX</DetailLabel>
+              <DetailValue>{plannedEX ?? '—'}</DetailValue>
+            </DetailText>
+          </DetailItem>
+
+          <DetailItem>
+            <DetailIconWrap><FaMapMarkerAlt size={13} /></DetailIconWrap>
+            <DetailText>
+              <DetailLabel>Location</DetailLabel>
+              <DetailValue>{activityData.store_name || '—'}</DetailValue>
+            </DetailText>
+          </DetailItem>
+        </DetailsGrid>
+
+        {activityData.store_remarks && <DetailItem style={{ marginTop: "1rem" }}>
+          <DetailIconWrap><FaPenToSquare size={13} /></DetailIconWrap>
+          <DetailText>
+            <DetailLabel>Remark</DetailLabel>
+            <DetailValue>{activityData.store_remarks || '—'}</DetailValue>
+          </DetailText>
+        </DetailItem>}
+      </Card>
 
       <Card hoverable={false} style={{ marginTop: "1rem" }} title={
         <>
           <FaFileInvoiceDollar size={12} style={{ marginRight: "0.4rem" }} />
-          Claims { claimList[0]?.claim_items?.length && `(${claimList[0]?.claim_items?.length})`}
+          Claims {claimList[0]?.claim_items?.length && `(${claimList[0]?.claim_items?.length})`}
         </>
       }
-        headerAction={(ViewMode !== "VIEW" && activityData?.activityStatus === "C" && claimStatus !== "Submitted") &&
-        <Button variant="primary" onClick={handleAddClaim}>
-          <FaPlus size={11} style={{ marginRight: "0.35rem" }} />
-          Add Claim
-        </Button>}
+        headerAction={(ViewMode !== "VIEW" && (activityData?.activityStatus === "C" || activityData?.activityStatus === "AS" || activityData?.activityStatus === "AP") && claimStatus !== "Submitted") &&
+          <Button variant="primary" onClick={handleAddClaim}>
+            <FaPlus size={11} style={{ marginRight: "0.35rem" }} />
+            Add Claim
+          </Button>}
       >
         {claimList.length > 0 && (
-        <InfoPill style={{marginBottom: "0.8rem", fontSize: "1rem"}}>
-          <FaFileInvoiceDollar size={12} style={{ marginRight: "0.4rem" }} />
-          <span>Master Clam Id:</span>
-          {claimList[0].master_claim_id}
-        </InfoPill>
+          <InfoPill style={{ marginBottom: "0.8rem", fontSize: "1rem" }}>
+            <FaFileInvoiceDollar size={12} style={{ marginRight: "0.4rem" }} />
+            <span>Master Clam Id:</span>
+            {claimList[0].master_claim_id}
+          </InfoPill>
         )}
 
-        {activityData.activityStatus !== "C" ?
-          (<EmptyRow style={{fontWeight: "600", fontSize: "0.8rem"}}>Activity not completed yet</EmptyRow>) :
+        {(activityData.activityStatus !== "AP" && activityData.activityStatus !== "AS" && activityData.activityStatus !== "C") ?
+          (<EmptyRow style={{ fontWeight: "600", fontSize: "0.8rem" }}>Activity not completed yet</EmptyRow>) :
           claimList.length === 0 ? (
             <EmptyRow>No claims submitted yet</EmptyRow>
           ) : (
-          <DataTable
-          emptyMessage="No claims submitted yet"
-          isLoading={isLoading}
-          columns={[ "Claim ID", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" && claimStatus !== "Submitted" ? "Action" : ""}`]}
-            data={claimList.flatMap((claim) =>
-              (claim?.claim_items || []).map((item) => ({...item,master_data: claim,}))
-          )}
-          renderRow={((item) => {
-                const {variant, label} = getStatusVariant(item.expense_status)
-                setClaimStatus(label || "")
-                return(
-              <>
-                <Td>{item.claim_id}</Td>
-                <Td><Badge variant="info" style={{ fontSize: "0.62rem" }}>{item.item_name}</Badge></Td>
-                <Td>{item.expense_date}</Td>
-                <Td>{currency(item.expense_amt)}</Td>
-                <Td><Badge variant={variant}>{label}</Badge></Td>
-                <Td>
-                  <RemarkField title={item.remarks || "--"}>
-                    {item.remarks || "--"}
-                  </RemarkField>
-                </Td>
-                <Td><FileLink href={item.submitted_file_1} target="_blank" rel="noreferrer" disabled={!item.submitted_file_1}>{item.submitted_file_1 ? "View" : "Not Submitted"}</FileLink></Td>
-                {ViewMode !== "VIEW" || label !== "Submitted" && <Td><Button size="sm" onClick={() => handleOpenClaimModal(item)}>Update</Button></Td>}
-              </>
-        )})}
-          
-          />
-        )}
+            <DataTable
+              emptyMessage="No claims submitted yet"
+              isLoading={isLoading}
+              columns={["Claim ID", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" && claimStatus !== "Submitted" ? "Action" : ""}`]}
+              data={claimList.flatMap((claim) =>
+                (claim?.claim_items || []).map((item) => ({ ...item, master_data: claim, }))
+              )}
+              renderRow={((item) => {
+                const { variant, label } = getStatusVariant(item.expense_status)
 
-         <ClaimGrandTotalBar>
-            {/* <span>Total settled Amount: {currency(totalClaim.totalSettlement)}</span> */}
-            <span>Total Claim Amount: {currency(totalClaim.totalOPE)}</span>
+                return (
+                  <>
+                    <Td>{item.claim_id}</Td>
+                    <Td><Badge variant="info" style={{ fontSize: "0.62rem" }}>{item.item_name}</Badge></Td>
+                    <Td>{item.expense_date}</Td>
+                    <Td>{currency(item.expense_amt)}</Td>
+                    <Td><Badge variant={variant}>{label}</Badge></Td>
+                    <Td>
+                      <RemarkField title={item.remarks || "--"}>
+                        {item.remarks || "--"}
+                      </RemarkField>
+                    </Td>
+                    <Td><FileLink href={item.submitted_file_1} target="_blank" rel="noreferrer" disabled={!item.submitted_file_1}>{item.submitted_file_1 ? "View" : "Not Submitted"}</FileLink></Td>
+                    {(ViewMode !== "VIEW" && label !== "Submitted") && <Td><Button size="sm" onClick={() => handleOpenClaimModal(item)}>Update</Button></Td>}
+                  </>
+                )
+              })}
+
+            />
+          )}
+
+        <ClaimGrandTotalBar>
+          {/* <span>Total settled Amount: {currency(totalClaim.totalSettlement)}</span> */}
+          <span>Total Claim Amount: {currency(totalClaim.totalOPE)}</span>
         </ClaimGrandTotalBar>
 
 
 
-       {claimList.length > 0 && ViewMode !== "VIEW" && claimStatus !== "Submitted" && <div style={{display: "flex", justifyContent: "flex-end", marginTop: "1rem"}}>
-          <Button  onClick={() => {
+        {claimList.length > 0 && ViewMode !== "VIEW" && claimStatus !== "Submitted" &&
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
+            <Button onClick={() => {
               setSelectedMasterClaimId(claimList?.[0]?.master_claim_id || null);
               setOpenSubmitAllModal(true);
             }}>Submit All Claims</Button>
-        </div>}
+          </div>}
       </Card>
 
-          <Card hoverable={false} style={{ marginTop: "1rem" }} title="Resource & Claim Summary (Date-wise)">
+      <Card hoverable={false} style={{ marginTop: "1rem" }} title="Resource & Claim Summary (Date-wise)">
 
         {dateRows.length === 0 ? (
           <EmptyRow>No data available</EmptyRow>
         ) : (
           dateRows.map((row) => {
-            const { tl_amount: tlTotal, ex_amount: exTotal, claim_amount: claimTotal} = row;
+            const { tl_amount: tlTotal, ex_amount: exTotal, claim_amount: claimTotal } = row;
             const dayTotal = tlTotal + exTotal + claimTotal;
-            
+
             const isOpen = expandedDate === row.date;
 
             return (
               <DateBlock key={row.date}>
                 {/* <DateHeader onClick={() => toggleDate(row.date)}> */}
-                <DateHeader onClick={(e) => {e.stopPropagation();  toggleDate(row.date)}}>
+                <DateHeader onClick={(e) => { e.stopPropagation(); toggleDate(row.date) }}>
                   <HeaderDate>{formatDayLabel(row.date)}</HeaderDate>
                   <HeaderSummary>
                     <Badge variant="forward" style={{ fontSize: "0.72rem", fontWeight: "600" }}>TL {row.tl_count}</Badge>
@@ -630,7 +641,7 @@ const handleSubmitAll = async(masterClaimId) => {
                 {isOpen && (
                   <>
                     <DateBody>
-                      <StatBox pointer={true} onClick={() => navigate("/resource-list", {state: { data: activityData },}) } >
+                      <StatBox pointer={true} onClick={() => navigate("/resource-list", { state: { data: activityData }, })} >
                         <StatLabel>Total TL</StatLabel>
                         {/* <StatValue>{row.tl_count} × {currency(row.tl_rate)}</StatValue> */}
                         <StatValue>{row.tl_count} Resources</StatValue>
@@ -639,7 +650,7 @@ const handleSubmitAll = async(masterClaimId) => {
                         <StatLabel>TL Total Amount</StatLabel>
                         <StatValue>{currency(tlTotal)}</StatValue>
                       </StatBox>
-                      <StatBox pointer={true} onClick={() => navigate("/resource-list", {state: { data: activityData },}) }>
+                      <StatBox pointer={true} onClick={() => navigate("/resource-list", { state: { data: activityData }, })}>
                         <StatLabel>Total EX</StatLabel>
                         <StatValue>{row.ex_count} Resources</StatValue>
                       </StatBox>
@@ -666,31 +677,31 @@ const handleSubmitAll = async(masterClaimId) => {
 
         <GrandTotalBar>
           <span>Resource Cost (TL + EX): {currency(totals.resource)}</span>
-            <span>Claims: {currency(totalClaim.totalOPE)}</span>
+          <span>Claims: {currency(totalClaim.totalOPE)}</span>
           <span>Grand Total (incl. Claims): {currency(grandTotal)}</span>
         </GrandTotalBar>
       </Card>
 
-     {openOpeModal &&
-      <AddOPEModal
-        isOpen={openOpeModal}
-        onClose={() => setOpenOpeModal(false)}
-        claimData={selectedClaim}
-        onSaved={fetchClaimsForActivity}
-      />}
+      {openOpeModal &&
+        <AddOPEModal
+          isOpen={openOpeModal}
+          onClose={() => setOpenOpeModal(false)}
+          claimData={selectedClaim}
+          onSaved={fetchClaimsForActivity}
+        />}
 
-     {openSubmitAllModal && 
-     <ConfirmPopup
-        isOpen={openSubmitAllModal}
-        title="Confirmation"
-        message="Are you sure you want to submit the claim items?"
-        onConfirm={() => handleSubmitAll(selectedMasterClaimId)}
-        onClose={() => {
-          setOpenSubmitAllModal(false);
-          setSelectedMasterClaimId(null);
-        }}
-        confirmLabel="Yes"
-      />}
+      {openSubmitAllModal &&
+        <ConfirmPopup
+          isOpen={openSubmitAllModal}
+          title="Confirmation"
+          message="Are you sure you want to submit the claim items?"
+          onConfirm={() => handleSubmitAll(selectedMasterClaimId)}
+          onClose={() => {
+            setOpenSubmitAllModal(false);
+            setSelectedMasterClaimId(null);
+          }}
+          confirmLabel="Yes"
+        />}
     </Layout>
   );
 };
@@ -744,7 +755,7 @@ const groupResourcesByDate = (list = []) => {
       if (item.emp_type === "T") {
         acc[date].tl_count += 1;
         acc[date].tl_amount += rate;
-      }else if (item.emp_type === "E") {
+      } else if (item.emp_type === "E") {
         acc[date].ex_count += 1;
         acc[date].ex_amount += rate;
       }

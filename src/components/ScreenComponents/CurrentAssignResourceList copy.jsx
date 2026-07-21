@@ -422,7 +422,7 @@ const handleStartActivityOnce = async () => {
     }
 
     const now = new Date();
-    const activity_date = DateForApiFormate(toInputDate(activityEndDateOnly || today));
+    const activity_date = DateForApiFormate(toInputDate(today));
     const start_time = now.toTimeString().slice(0, 5);
 
     const fd = new FormData();
@@ -596,7 +596,7 @@ const handleSubmitAllActuals = async () => {
     //     // }
     // }
 
-    const allGroups = groupByAId([...addPayload, ...updatePayload, ...deletePayload, ...unchangedPayload]);
+  const allGroups = groupByAId([...addPayload, ...updatePayload, ...deletePayload, ...unchangedPayload]);
     for (const [aIdForDate, rows] of Object.entries(allGroups)) {
       const fd = new FormData();
       fd.append("emp_id", loggedEmpId);
@@ -608,6 +608,22 @@ const handleSubmitAllActuals = async () => {
       for (let [key, value] of fd.entries()) {
         console.log(key, value);
       }
+
+      // if (hasAddOrUpdate) {
+      //   const activityCompleteFd = new FormData();
+      //   activityCompleteFd.append("emp_id", loggedEmpId);
+      //   activityCompleteFd.append("a_id", aIdForDate);
+      //   activityCompleteFd.append("call_mode", "UPDATE");
+      //   activityCompleteFd.append("activity_date", DateForApiFormate(rows[0]?.start_date));
+      //   activityCompleteFd.append("geo_type", "O");
+      //   activityCompleteFd.append("is_complete", "1");
+
+      //   await postActivityAllocationData(activityCompleteFd);
+
+      //   for (let [key, value] of activityCompleteFd.entries()) {
+      //     console.log(key, value);
+      //   }
+      // }
     }
 
     // setActualDraftsByDate((prev) => {
@@ -1963,6 +1979,17 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
           <option value="T">Team Lead (TL)</option>
         </FormSelect>
       </FormField>
+      
+      <FormField>
+        <FormLabel>Contract Rate</FormLabel>
+        <FormInput
+          type="number"
+          value={row.contract_rate || ""}
+          placeholder="Enter rate"
+          onChange={(e) => onChange(row.rowKey, "contract_rate", e.target.value)}
+        />
+      </FormField>
+
       <FormField style={{ gridColumn: "span 2" }}>
         <FormLabel>Remarks</FormLabel>
         <FormInput
