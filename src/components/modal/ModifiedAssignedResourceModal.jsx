@@ -25,7 +25,6 @@ import { ResourceAvailability } from "../ScreenComponents/ResourceAvaiblityCard 
 import CurrentAssignments from "../ScreenComponents/CurrentAssignResourceList copy";
 import { FaArrowLeft, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaUser, FaUserTie } from "react-icons/fa";
 import styled from "styled-components";
-import NewCurrentAssugnmentList from "../ScreenComponents/NewCurrentAssugnmentList";
 import { FaPenToSquare } from "react-icons/fa6";
 import ConfirmPopup from "../ConfirmPopup";
 
@@ -697,22 +696,6 @@ const ResourceAllocation = () => {
           lastAutoAssign={lastAutoAssign}
         />}
 
-        {/* <NewCurrentAssugnmentList
-         dateWiseAssignments={dateWiseAssignments}
-          dayWindow={dayWindow}
-          editingId={editingId?.rowKey}
-          handleEditDate={handleEditDate}
-          handleDeleteDate={handleDeleteDate}
-          handleFieldChange={handleFieldChange}
-          handleConfirmUpdate={handleConfirmUpdate}
-          handleCancelEdit={handleCancelEdit}
-          activityStart={activityStart}
-          activityEnd={activityEnd}
-          activityData={activityData}
-          isActual={false}
-          employees={employees}
-        
-        /> */}
 
       {/* </Card> */}
 

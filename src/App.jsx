@@ -34,6 +34,7 @@ import ClamDetailsScreen from "./pages/ClamDetailsScreen";
 import ClamList1 from "./pages/ClaimList1";
 import ClamList from "./pages/New/ClaimList1";
 import { ActivityProvider } from "./context/ActivityClaimContext";
+// import AllocationPlanScreen from "./components/NEWMODAL/AllocationPlanScreen";
 
 function App() {
   const url = "https://www.atomwalk.com/rest-auth/login/";
@@ -88,15 +89,16 @@ function App() {
 
                   <Route path="/dashboard" element={<RetainerScreen />} />
                   <Route path="/activity" element={<ActivityListScreen />} />
-                  <Route path="/activity1" element={<ActivityListScreen1 />} />
+                  {/* <Route path="/activity1" element={<ActivityListScreen1 />} /> */}
                   <Route path="/profitability-dashboard" element={<ProfitabilityDashboard />} />
                   {/* <Route path="/clam-list" element={<ClamList />} /> */}
                   <Route path="/clam-list" element={<ClamList1 />} />
-                  <Route path="/clam-list1" element={<ClamList />} />
+                  {/* <Route path="/clam-list1" element={<ClamList />} /> */}
                   <Route path="/clamDetails" element={<ClamDetailsScreen />} />
                   {/* <Route path="/resource-list" element={<ResourceAllocationList />} /> */}
                   {/* <Route path="/resource-list" element={<ResourceAllocation />} /> */}
                   <Route path="/resource-list" element={<ResourceAllocation />} />
+                  {/* <Route path="/allocation-screen" element={<AllocationPlanScreen />} /> */}
                   <Route path="/profile" element={<Profile />} />
                 </Route>
 

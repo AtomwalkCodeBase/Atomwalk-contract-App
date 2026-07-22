@@ -261,10 +261,18 @@ useEffect(() => {
       setExpandedRow((prev) => prev === row.order_item_id ? null : row.order_item_id,);
     };
 
-	const handleAssignResources = (employee, e) => {
+	const handleAssignResources1 = (employee, e) => {
+		e.stopPropagation();
+		setSelectedActivity(employee);
+		// navigate('/resource-list', { state: { data: employee } });
+		navigate('/allocation-screen', { state: { data: employee } });
+  	};
+
+	const handleAssignResources2 = (employee, e) => {
 		e.stopPropagation();
 		setSelectedActivity(employee);
 		navigate('/resource-list', { state: { data: employee } });
+		// navigate('/allocation-screen', { state: { data: employee } });
   	};
 
 	const groupedData = groupByOrderItemId(assignedActivity, resourcePlannedList);
@@ -437,7 +445,7 @@ useEffect(() => {
 											  onClick={(e) => {
 												  e.stopPropagation();
 												  const firstItem = employee?.grouped_data?.[0] || {};
-												  handleAssignResources(firstItem, e);
+												  handleAssignResources1(firstItem, e);
 											  }}
 										  >
 											  <FaUserPlus size={16} />
@@ -504,11 +512,21 @@ useEffect(() => {
 								  variant={ isResourceAssigned ? "outline" : "primary"}
 								  onClick={(e) => {
 									e.stopPropagation();
-									handleAssignResources(item, e);
+									handleAssignResources1(item, e);
 								  }}
 								>
 								  {isResourceAssigned && (item.activityStatus === "NS" || item.activityStatus === "NP")  ? <FaUserPlus /> : <FaEye />}
-								  {isResourceAssigned &&  (item.activityStatus === "NS" || item.activityStatus === "NP") ? "Assign" : "View"}{" "}Resources
+								  {isResourceAssigned &&  (item.activityStatus === "NS" || item.activityStatus === "NP") ? "Assign" : "View"}{" "}Resources allocation screen
+								</Button>
+								<Button size='sm'
+								  variant={ isResourceAssigned ? "outline" : "primary"}
+								  onClick={(e) => {
+									e.stopPropagation();
+									handleAssignResources2(item, e);
+								  }}
+								>
+								  {isResourceAssigned && (item.activityStatus === "NS" || item.activityStatus === "NP")  ? <FaUserPlus /> : <FaEye />}
+								  {isResourceAssigned &&  (item.activityStatus === "NS" || item.activityStatus === "NP") ? "Assign" : "View"}{" "}Resources resource-list
 								</Button>
 							  </Td>
 							</>

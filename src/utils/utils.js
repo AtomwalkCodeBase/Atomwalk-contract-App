@@ -1458,7 +1458,7 @@ export const generateDateRange = (startDate, endDate, { format = false, maxDays 
   return dates;
 };
 
-export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations = [], originalById = {}, getRowStatus, }) => {
+export const useDateWiseAssignments = ({ activityStart, activityEnd, allocations = [], originalById = {}, }) => {
   const activityDates = useMemo(() => generateDateRange(activityStart, activityEnd),
     [activityStart, activityEnd]
   );
