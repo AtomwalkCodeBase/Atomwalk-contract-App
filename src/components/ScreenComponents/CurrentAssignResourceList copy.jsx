@@ -50,8 +50,11 @@ const HeaderDate = styled.div`
 
 const CountPill = styled.div`
   font-size: 0.8rem;
-  color: #555;
-  strong { color: #222; }
+  color:  ${({ theme }) => theme.colors?.card || '#333'};
+  strong { color: ${({ theme }) => theme.colors?.card || '#333'}; }
+  background-color: ${({ $variant }) => ($variant ? theme.colors.success : theme.colors.error)};
+  padding: ${({ theme }) => theme.spacing.xs || '0.75rem'};
+  border-radius: ${({ theme }) => theme.borderRadius.md || '0.25rem'};
 `;
 
 const Section = styled.div`
@@ -228,6 +231,15 @@ const ButtonRows = styled.div`
   gap: ${({ theme }) => theme.spacings?.md || '0.5rem'};
 `;
 
+const CountPill1 = styled.div`
+  font-size: 0.8rem;
+  color:  ${({ theme }) => theme.colors?.text || '#333'};
+  /* strong { color: ${({ theme }) => theme.colors?.text || '#333'}; } */
+  background-color: ${({ $variant }) => ($variant ? theme.colors.backgroundAlt : "")};
+  padding: ${({ theme }) => theme.spacing.xs || '0.75rem'};
+  border-radius: ${({ theme }) => theme.borderRadius.md || '0.25rem'};
+`;
+
 /* ---------------------------------- */
 /* Helpers                             */
 /* ---------------------------------- */
@@ -338,7 +350,15 @@ const CurrentAssignments = ({
   activityEnd,
   activityData,
   employees = [],
-  loadAllData
+  loadAllData,
+  plannedTL,
+  plannedEX,
+  plannedTLRate,
+  plannedEXRate,
+  tlContractRate,
+  setTlContractRate,
+  exContractRate,
+  setExContractRate,
 }) => {
   const loggedEmpId = localStorage.getItem("cust_emp_id");
 
@@ -390,7 +410,12 @@ const hasAnyActivityStarted = allAEntries.length > 0;
   const [startedDates, setStartedDates] = useState(() => new Set());
 
   // last date (string) that has been started — used as the cutoff for "Copy Actual (All Dates)"
-const lastStartedDate = startedDates.size ? [...startedDates].sort().at(-1) : null;
+const lastStartedDate = startedDates.size
+  ? [...startedDates]
+      .map((d) => DateForApiFormate(d, true))
+      .sort()
+      .at(-1)
+  : null;
 
 const activityIdByDate = useMemo(() => {
   const map = {};
@@ -412,6 +437,24 @@ useEffect(() => {
     return next;
   });
 }, [allAEntries]);
+
+  useEffect(() => {
+    if (plannedTLRate != null) {
+      setTlContractRate(plannedTLRate);
+    }
+
+    if (plannedEXRate != null) {
+      setExContractRate(plannedEXRate);
+    }
+  }, [plannedTLRate, plannedEXRate]);
+
+  const getContractRateByType = (empType) => {
+  if (empType === "T") {
+    return tlContractRate === "" ? "" : Number(tlContractRate);
+  }
+
+  return exContractRate === "" ? "" : Number(exContractRate);
+};
 
 const handleStartActivityOnce = async () => {
   try {
@@ -858,7 +901,7 @@ const handleConfirmActualRange = () => {
               employee_name: employees[0]?.name || "",
               emp_type: Number(employees[0]?.grade_level) > 1 ? "T" : "E",
               remarks: "",
-              contract_rate: 0,
+              contract_rate: getContractRateByType(Number(employees[0]?.grade_level) > 1 ? "T" : "E"),
               start_date: dStr,
               end_date: dStr,
             },
@@ -880,7 +923,7 @@ const handleCopyActual = (dStr, planAssignments) => {
         employee_name: row.employee_name,
         emp_type: row.emp_type,
         remarks: row.remarks || "",
-        contract_rate: row.contract_rate,
+        contract_rate: getContractRateByType(row.emp_type),
         start_date: dStr,
         end_date: dStr,
       })),
@@ -904,12 +947,14 @@ const handleCopyAllActual = () => {
 
   setActualDraftsByDate((prev) => {
     const next = { ...prev };
-    dayWindow.forEach((d) => {          // CHANGED — was plannedDates
+    dayWindow.forEach((d) => {
       const dStr = formatToApiDate(d);
-      if (dStr > lastStartedDate) return;
+      const dStrComparable = DateForApiFormate(dStr, true);
+
+      if (dStrComparable > lastStartedDate) return;
       const currentDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       if (currentDate > todayDate) return;
-      if (next[dStr]) return;
+      if (next[dStr]?.rows?.length) return; // FIXED — only skip if it actually has data, not an empty leftover draft
       const planAssignments = dateWiseAssignments[dStr] || [];
       if (planAssignments.length === 0) return;
       next[dStr] = {
@@ -921,7 +966,7 @@ const handleCopyAllActual = () => {
           employee_name: row.employee_name,
           emp_type: row.emp_type,
           remarks: row.remarks || "",
-          contract_rate: row.contract_rate,
+          contract_rate: getContractRateByType(row.emp_type),
           start_date: dStr,
           end_date: dStr,
         })),
@@ -1298,6 +1343,12 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
   setIsActualRangeModalOpen(false);
 };
 
+  const hasLockedPlannedResource = Object.values(dateWiseAssignments || {}).flat().some(
+    (resource) => resource?.is_approved === true || resource?.is_present === true
+  );
+
+  const disableContractRateFields = hasAnyActivityStarted || hasLockedPlannedResource || plannedTLRate || plannedEXRate;
+
   return (
     <>
   <Card
@@ -1339,7 +1390,9 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
     </Button>
   </ButtonRows> */}
         <ScrollableTableWrapper>
-        {filteredPlannedDates.length !== 0 && <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", margin: "0.5rem 0" }}>
+          <div style={{display: "flex", justifyContent: "space-between"}}>
+        {filteredPlannedDates.length !== 0 && 
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", margin: "0.5rem 0" }}>
           <FormField>
             <FormLabel>From</FormLabel>
             <FormInput type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
@@ -1349,11 +1402,58 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
             <FormInput type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
           </FormField>
           {(filterStartDate || filterEndDate) && (
+            <FormField>
+              <FormLabel> </FormLabel>
             <Button size="sm" variant="outlines" onClick={() => { setFilterStartDate(""); setFilterEndDate(""); }}>
               Clear
             </Button>
+            </FormField>
           )}
         </div>}
+
+        
+
+          {filteredPlannedDates.length !== 0 && 
+          <CountPill1 $variant={false}>
+            🟢: <strong>Matched Resource</strong> &nbsp;&nbsp; 🔴: <strong>Not Matched Resource</strong>
+          </CountPill1>}
+
+          </div>
+
+         {filteredPlannedDates.length !== 0 && <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(180px, 240px))",
+    gap: "1rem",
+    margin: "0.75rem 0 1rem",
+  }}
+>
+{plannedTL !== 0 &&  <FormField>
+    <FormLabel>TL Contract Rate</FormLabel>
+
+    <FormInput
+      type="number"
+      min="0"
+      value={tlContractRate}
+      placeholder="Enter TL contract rate"
+      disabled={disableContractRateFields}
+      onChange={(e) => setTlContractRate(e.target.value)}
+    />
+  </FormField>}
+
+ {plannedEX !== 0 && <FormField>
+    <FormLabel>EX Contract Rate</FormLabel>
+
+    <FormInput
+      type="number"
+      min="0"
+      value={exContractRate}
+      placeholder="Enter EX contract rate"
+      disabled={disableContractRateFields}
+      onChange={(e) => setExContractRate(e.target.value)}
+    />
+  </FormField>}
+</div>}
 
           {filteredPlannedDates.filter(({ d }) => d instanceof Date && !isNaN(d)).length === 0 ? (
             <EmptyRow style={{ fontSize: "1rem", padding: "2rem" }}>
@@ -1463,13 +1563,17 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
                 0
               );
               // const actualTotal = actualResources.reduce((sum, r) => sum + (Number(r.rate) || 0),0);
-              const actualTotal = actualRows.reduce((sum, r) => sum + (Number(r.contract_rate) || 0), 0);
+              // const actualTotal = actualRows.reduce((sum, r) => sum + (Number(r.contract_rate) || 0), 0);
+              const actualTotal = displayedActualRows.reduce((sum, r) => sum + (Number(r.contract_rate) || 0), 0); // FIXED — total must match what's rendered
 
               const claims = getDummyClaims(dStr);
               const claimsTotal = claims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
               const grandTotal = planTotal + claimsTotal;
 
               const hasActual = allAEntries.some((entry) => entry.start_date === dStr);
+
+              const matchedPlanRequiredResource = plannedTL === tlCount && plannedEX === exCount;
+              // const matchedActualRequiredResource = plannedTL === actualTlCount && plannedEX === actualExCount;
 
               return (
                 <DateBlock key={dStr}>
@@ -1480,14 +1584,25 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
                           ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' }).toUpperCase()
                           : dStr}
                     </HeaderDate>
-                    <CountPill>
+
+                  <div style={{display: "flex", gap: "0.5rem"}}>
+
+                    {!matchedPlanRequiredResource && <CountPill1 $variant={true}>
+                     Required (TL: <strong>{plannedTL}</strong> &nbsp;&nbsp; EX: <strong>{plannedEX}</strong>)
+                    </CountPill1>}
+
+                    <CountPill $variant={matchedPlanRequiredResource}>
                       TL: <strong>{tlCount}</strong> &nbsp;&nbsp; EX: <strong>{exCount}</strong>
                     </CountPill>
+                  </div>
+
                   </DateHeader>
+
 
                   {/* Plan / Actual */}
                   <Section>
                     <SectionTitle>Resource Details</SectionTitle>
+
                     <PlanActualGrid>
                       {/* PLAN */}
     <SubPanel>
@@ -1537,6 +1652,8 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
             activityStart={activityStart}
             activityEnd={activityEnd}
             openConfirmation={openConfirmation}
+            tlContractRate={tlContractRate}
+            exContractRate={exContractRate}
           />
         );
       }
@@ -1559,7 +1676,9 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
             </ResourceMeta>
           </ResourceInfo>
           <RateActionsCol>
-            <RateTag>{row.contract_rate != null ? `₹${row.contract_rate}` : '—'}</RateTag>
+            <RateTag>
+              ₹{Number(row.contract_rate) > 0 ? row.contract_rate : row.emp_type === "T" ? tlContractRate || 0 : exContractRate || 0}
+            </RateTag>
             <RowActions onClick={(e) => e.stopPropagation()}>
               <Button iconOnly variant="primary" title="Edit" disabled={disableAction} onClick={() => handleEditDate(row, dStr)}>
                 <FaEdit size={11} />
@@ -1677,6 +1796,15 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
             field,
             value
           );
+
+          if (field === "emp_type") {
+          handleActualFieldChange(
+            dStr,
+            row.rowKey,
+            "contract_rate",
+            getContractRateByType(value)
+          );
+        }
         }}
 
          disableActualAction={disableActualAction}
@@ -1941,11 +2069,9 @@ const ActualButtonGroup = styled.div`
   gap: 12px;
   margin-top: 20px;
 `;
-const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, activityEnd, openConfirmation }) => {
+const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, activityEnd, openConfirmation, tlContractRate, exContractRate, }) => {
   const formattedStart = activityStart ? DateForApiFormate(activityStart, true) : "";
   const formattedEnd = activityEnd ? DateForApiFormate(activityEnd, true) : "";
-
-  console.log("row", row)
 
   return (
     <EditRowContainer onClick={(e) => e.stopPropagation()}>
@@ -1973,7 +2099,16 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
         <FormLabel>Employee Type</FormLabel>
         <FormSelect
           value={row.emp_type || "E"}
-          onChange={(e) => onChange(row.rowKey, "emp_type", e.target.value)}
+         onChange={(e) => {
+          const empType = e.target.value;
+
+          onChange(row.rowKey, "emp_type", empType);
+          onChange(
+            row.rowKey,
+            "contract_rate",
+            empType === "T" ? tlContractRate : exContractRate
+          );
+        }}
         >
           <option value="E">Executive (EX)</option>
           <option value="T">Team Lead (TL)</option>
@@ -1984,9 +2119,8 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
         <FormLabel>Contract Rate</FormLabel>
         <FormInput
           type="number"
-          value={row.contract_rate || ""}
-          placeholder="Enter rate"
-          onChange={(e) => onChange(row.rowKey, "contract_rate", e.target.value)}
+          value={row.emp_type === "T" ? tlContractRate : exContractRate}
+          disabled
         />
       </FormField>
 
@@ -2052,6 +2186,7 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
  const getEndDateField = (row) => row.end_date ? 'end_date' : 'e_date';
  
   return (
+    <>
     <EditRowContainer>
       <FormField>
         <FormLabel>Resource {isReplaced && <Badge variant="warning" style={{ fontSize: '0.55rem' }}>Replaced</Badge>}</FormLabel>
@@ -2100,6 +2235,15 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
         />
       </FormField>
 
+        <FormField>
+        <FormLabel>Contract Rate</FormLabel>
+        <FormInput
+          type="number"
+          value={row.contract_rate ?? ""}
+          disabled
+        />
+      </FormField>
+
  
       <FormField style={{ gridColumn: "span 2" }}>
         <FormLabel>Remarks</FormLabel>
@@ -2111,14 +2255,15 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
         />
       </FormField>
  
-      <div style={{ display: "flex", alignItems: "flex-end" }}>
+    </EditRowContainer>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem" }}>
           {onSave && (
             <Button size="sm" variant="success" onClick={onSave}>Save</Button>
           )}
           {onCancel && <Button size="sm" variant="outlines" onClick={onCancel}>Cancel</Button>}
         <Button size="sm" variant="outlines" onClick={onRemove}> <FaUserSlash /> Remove</Button>
       </div>
-    </EditRowContainer>
+    </>
   );
 };
 

@@ -535,8 +535,8 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
   const menuItems =  [
     { path: "/activity", name: "Activity List", icon: <FaHome /> },
       { path: "/dashboard", name: "Retainer Dashboard", icon: <FaListUl /> },
-      { path: "/clam-list", name: "clams", icon: <FaMoneyBill /> },
-      { path: "/profitability-dashboard", name: "Profitability Dashboard", icon: <FaMoneyBillWaveAlt /> },
+      // { path: "/clam-list", name: "clams", icon: <FaMoneyBill /> },
+      // { path: "/profitability-dashboard", name: "Profitability Dashboard", icon: <FaMoneyBillWaveAlt /> },
     ]
    
 

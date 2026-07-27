@@ -375,7 +375,7 @@ export const getActivityOrderItemId = (activity) => {
   if (!raw) return "";
 
   const parts = String(raw).split("_");
-  const id = parts.length > 1 ? parts[1] : parts[0];
+  const id = parts[parts.length - 1];
 
   return String(id).replace(/^0+/, "");
 };

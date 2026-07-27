@@ -7,9 +7,10 @@ const MONTH_MAP = MONTH_SHORT_NAMES.reduce((acc, m, i) => {
   return acc;
 }, {});
 
-export const formatDate = (dateString) => {
+export const formatDate = (dateString, onlyDate = false) => {
   if (!dateString) return 'N/A';
   try {
+    if (onlyDate) return new Date(dateString).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   } catch (error) {
     return 'Invalid Date';

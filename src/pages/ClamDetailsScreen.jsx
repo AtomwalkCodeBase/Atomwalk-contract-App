@@ -464,7 +464,33 @@ const ClamDetailsScreen = () => {
     }
   }
 
+  // const matchingRetainer = (activityData?.original_P?.retainer_list || []).find((r) => r.a_type === "P" && r.start_date === activityData?.original_P?.start_date && r.end_date === activityData?.original_P?.end_date,);
   const matchingRetainer = (activityData?.original_P?.retainer_list || []).find((r) => r.a_type === "P" && r.start_date === activityData?.original_P?.start_date && r.end_date === activityData?.original_P?.end_date,);
+
+  const allocationResources = useMemo(() => {
+  return (activityData?.grouped_data || []).map((allocation) => {
+    const matchingRetainer = (
+      allocation?.original_P?.retainer_list || []
+    ).find(
+      (r) =>
+        r.a_type === "P" &&
+        r.start_date === allocation?.original_P?.start_date &&
+        r.end_date === allocation?.original_P?.end_date
+    );
+
+    return {
+      allocationId:
+        allocation?.allocation_id ||
+        allocation?.id ||
+        allocation?.allAEntries?.[0]?.id,
+
+      start_date: matchingRetainer?.start_date,
+      end_date: matchingRetainer?.end_date,
+      tl_count: matchingRetainer?.tl_count || 0,
+      ex_count: matchingRetainer?.ex_count || 0,
+    };
+  });
+}, [activityData]);
 
   const plannedTL = matchingRetainer?.tl_count || 0;
   const plannedEX = matchingRetainer?.ex_count || 0;
@@ -472,7 +498,7 @@ const ClamDetailsScreen = () => {
   // console.log("selectedClaim", selectedClaim)
 
   return (
-    <Layout title="Clam Details ">
+    <Layout title="Clam Details">
       <ClaimsHeader>
         <Tagline>Claim Detailed view</Tagline>
 
@@ -507,8 +533,9 @@ const ClamDetailsScreen = () => {
               <DetailValue>{activityData.order_item_key}</DetailValue>
             </DetailText>
           </DetailItem>
-
-          <DetailItem>
+          {allocationResources.length === 1 &&   ( 
+            <>
+                <DetailItem>
             <DetailIconWrap><FaUserTie size={13} /></DetailIconWrap>
             <DetailText>
               <DetailLabel>Required TL</DetailLabel>
@@ -523,6 +550,8 @@ const ClamDetailsScreen = () => {
               <DetailValue>{plannedEX ?? '—'}</DetailValue>
             </DetailText>
           </DetailItem>
+          </>
+          )}
 
           <DetailItem>
             <DetailIconWrap><FaMapMarkerAlt size={13} /></DetailIconWrap>
@@ -541,6 +570,34 @@ const ClamDetailsScreen = () => {
           </DetailText>
         </DetailItem>}
       </Card>
+
+      {allocationResources.length > 1 &&
+      <Card title="Allocation Dates">
+              <DetailsGrid style={{marginTop: "1rem"}}>
+         {allocationResources.map((allocation, index) => (
+        <DetailItem key={allocation.allocationId || index}>
+          <DetailIconWrap>
+            <FaUserTie size={13} />
+          </DetailIconWrap>
+
+          <DetailText>
+            <DetailLabel>
+              Allocation {index + 1}
+            </DetailLabel>
+
+            <DetailValue>
+              {formatDate(allocation.start_date)} –{" "}
+              {formatDate(allocation.end_date)}
+            </DetailValue>
+
+            <DetailValue>
+              TL: {allocation.tl_count} &nbsp; | &nbsp; EX: {allocation.ex_count}
+            </DetailValue>
+          </DetailText>
+        </DetailItem>
+      ))}
+      </DetailsGrid>
+      </Card>}
 
       <Card hoverable={false} style={{ marginTop: "1rem" }} title={
         <>
@@ -570,16 +627,22 @@ const ClamDetailsScreen = () => {
             <DataTable
               emptyMessage="No claims submitted yet"
               isLoading={isLoading}
-              columns={["Claim ID", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" && claimStatus !== "Submitted" ? "Action" : ""}`]}
+              columns={["Sl no.", "Category", "Date", "Amount", "Status", "Remarks", "Attachment", `${ViewMode !== "VIEW" && claimStatus !== "Submitted" ? "Action" : ""}`]}
               data={claimList.flatMap((claim) =>
                 (claim?.claim_items || []).map((item) => ({ ...item, master_data: claim, }))
               )}
               renderRow={((item) => {
+                  console.log(item)
                 const { variant, label } = getStatusVariant(item.expense_status)
+                const index = item?.master_data?.claim_items?.findIndex(
+                    (data) => data.claim_id === item.claim_id
+                  );
+
 
                 return (
                   <>
-                    <Td>{item.claim_id}</Td>
+                    {/* <Td>{item.claim_id}</Td> */}
+                    <Td style={{marginLeft: "1rem"}}>{index >= 0 ? index + 1 : "—"}</Td>
                     <Td><Badge variant="info" style={{ fontSize: "0.62rem" }}>{item.item_name}</Badge></Td>
                     <Td>{item.expense_date}</Td>
                     <Td>{currency(item.expense_amt)}</Td>
@@ -614,73 +677,7 @@ const ClamDetailsScreen = () => {
           </div>}
       </Card>
 
-      <Card hoverable={false} style={{ marginTop: "1rem" }} title="Resource & Claim Summary (Date-wise)">
-
-        {dateRows.length === 0 ? (
-          <EmptyRow>No data available</EmptyRow>
-        ) : (
-          dateRows.map((row) => {
-            const { tl_amount: tlTotal, ex_amount: exTotal, claim_amount: claimTotal } = row;
-            const dayTotal = tlTotal + exTotal + claimTotal;
-
-            const isOpen = expandedDate === row.date;
-
-            return (
-              <DateBlock key={row.date}>
-                {/* <DateHeader onClick={() => toggleDate(row.date)}> */}
-                <DateHeader onClick={(e) => { e.stopPropagation(); toggleDate(row.date) }}>
-                  <HeaderDate>{formatDayLabel(row.date)}</HeaderDate>
-                  <HeaderSummary>
-                    <Badge variant="forward" style={{ fontSize: "0.72rem", fontWeight: "600" }}>TL {row.tl_count}</Badge>
-                    <Badge variant="info" style={{ fontSize: "0.72rem", fontWeight: "600" }}>EX {row.ex_count}</Badge>
-                    <span>Total: <strong>{currency(dayTotal)}</strong></span>
-                    {isOpen ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
-                  </HeaderSummary>
-                </DateHeader>
-
-                {isOpen && (
-                  <>
-                    <DateBody>
-                      <StatBox pointer={true} onClick={() => navigate("/resource-list", { state: { data: activityData }, })} >
-                        <StatLabel>Total TL</StatLabel>
-                        {/* <StatValue>{row.tl_count} × {currency(row.tl_rate)}</StatValue> */}
-                        <StatValue>{row.tl_count} Resources</StatValue>
-                      </StatBox>
-                      <StatBox>
-                        <StatLabel>TL Total Amount</StatLabel>
-                        <StatValue>{currency(tlTotal)}</StatValue>
-                      </StatBox>
-                      <StatBox pointer={true} onClick={() => navigate("/resource-list", { state: { data: activityData }, })}>
-                        <StatLabel>Total EX</StatLabel>
-                        <StatValue>{row.ex_count} Resources</StatValue>
-                      </StatBox>
-                      <StatBox>
-                        <StatLabel>EX Total Amount</StatLabel>
-                        <StatValue>{currency(exTotal)}</StatValue>
-                      </StatBox>
-                      {/* <StatBox>
-                        <StatLabel>Claims ({dayClaims.length})</StatLabel>
-                        <StatValue>{currency(claimTotal)}</StatValue>
-                      </StatBox> */}
-                    </DateBody>
-                    <TotalsFooter>
-                      <FooterText>Resource Cost: {currency(tlTotal + exTotal)}</FooterText>
-                      {/* <FooterText>Claim Amount: {currency(claimTotal)}</FooterText> */}
-                      {/* <FooterText>Day Total: {currency(dayTotal)}</FooterText> */}
-                    </TotalsFooter>
-                  </>
-                )}
-              </DateBlock>
-            );
-          })
-        )}
-
-        <GrandTotalBar>
-          <span>Resource Cost (TL + EX): {currency(totals.resource)}</span>
-          <span>Claims: {currency(totalClaim.totalOPE)}</span>
-          <span>Grand Total (incl. Claims): {currency(grandTotal)}</span>
-        </GrandTotalBar>
-      </Card>
+      {/* Paste Resource & Claim Summary (Date-wise) code if required*/}
 
       {openOpeModal &&
         <AddOPEModal

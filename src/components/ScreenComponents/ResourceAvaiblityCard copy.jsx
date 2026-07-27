@@ -39,6 +39,28 @@ const InfoPill = styled.div`
   }
 `;
 
+const InfoPill1 = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 99px;
+  /* background: ${({ theme }) => theme.colors?.backgroundAlt || "#f4f5f7"}; */
+  background: ${({ theme, variant }) => variant ? theme.colors?.success : theme.colors?.error };
+  border: 1px solid ${({ theme }) => theme.colors?.border || "#e5e7eb"};
+  font-size: ${({ theme }) => theme.fontSizes?.sm || "0.5rem"};
+  color: ${({ theme }) => theme.colors?.card || "#333"};
+
+  svg {
+    color: ${({ theme }) => theme.colors?.primary || "#6C5CE7"};
+  }
+
+  span {
+    color: ${({ theme }) => theme.colors?.card || "#888"};
+    margin-right: 0.15rem;
+  }
+`;
+
 const SearchWrap = styled.div`
   position: relative;
   display: inline-block;
@@ -316,10 +338,12 @@ export const ResourceAvailability = ({
           const dStr = formatToApiDate(d);
           const { num, dow } = shortDay(d);
           const c = selectedCountsByDate[dStr] || { tl: 0, ex: 0 };
+
+          const matchedPlanRequiredResource = plannedTL === c.tl && plannedEX === c.ex;
           return (
-            <InfoPill key={dStr} style={{ fontSize: "0.75rem" }}>
+            <InfoPill1 key={dStr} style={{ fontSize: "0.75rem" }} variant={matchedPlanRequiredResource}>
               <span style={{fontWeight: 600}}>{num} {dow}:</span> TL {c.tl} · EX {c.ex}
-            </InfoPill>
+            </InfoPill1>
           );
         })}
         {needsPaging && (

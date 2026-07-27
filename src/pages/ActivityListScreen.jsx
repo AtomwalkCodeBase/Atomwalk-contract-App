@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
 import styled from 'styled-components';
 import Card from '../components/Card';
@@ -19,9 +19,10 @@ import { theme } from '../styles/Theme';
 import { useFilter } from '../hooks/useFilter';
 import { AssignEmployee } from '../components/modal/Assignemployee';
 import { useNavigate } from 'react-router-dom';
-import { FaCheck, FaChevronDown, FaChevronUp, FaClipboardList, FaEye, FaEyeSlash, FaMinusCircle, FaMoneyBillWave, FaUserCheck, FaUserPlus, FaUsers, FaUserTimes } from 'react-icons/fa';
+import { FaCheck, FaChevronDown, FaChevronUp, FaClipboardList, FaEye, FaEyeSlash, FaHourglassEnd, FaMinusCircle, FaMoneyBillWave, FaUserCheck, FaUserPlus, FaUsers, FaUserTimes } from 'react-icons/fa';
 import StatsCard from '../components/StatsCard';
 import Tabs from '../components/Tabs';
+import { BsListCheck } from 'react-icons/bs';
 
 const Tagline = styled.p`
  color: ${({ theme }) => theme.colors.textLight};
@@ -259,7 +260,7 @@ const SearchBox = styled.input`
 
 const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: ${({ theme }) => theme.spacing.lg};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
 
@@ -661,7 +662,21 @@ const ActivityListScreen = () => {
     },
   });
 
-  const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(FilteredData, 10)
+const sortedFilteredData = useMemo(() => {
+  return [...FilteredData].sort((a, b) => {
+    // 1. NS status always comes first
+    if (a.activityStatus === "NS" && b.activityStatus !== "NS") return -1;
+    if (a.activityStatus !== "NS" && b.activityStatus === "NS") return 1;
+
+    // 2. Within same status priority, latest start date first
+    const dateA = new Date(a.planned_start_date);
+    const dateB = new Date(b.planned_start_date);
+
+    return dateB - dateA;
+  });
+}, [FilteredData]);
+
+  const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(sortedFilteredData, 10)
 
 
   const handleExpandRow = (row) => {
@@ -686,7 +701,7 @@ const ActivityListScreen = () => {
   const handleAssignResources1 = (employee, e) => {
     e.stopPropagation();
     setSelectedActivity(employee);
-    navigate('/resource-list', { state: { data: employee } });
+    navigate('/resource-list', { state: { data: employee, resourcePlannedList: resourcePlannedList } });
     // setAssignEmployeeModal(true);
 
   };
@@ -743,10 +758,12 @@ const ActivityListScreen = () => {
   }
 
 
-  const notAssignedCount = getStatusCount(groupedData, "Not Assigned");
+  const notAssignedCount = getStatusCount(groupedData, "Not Planned");
   // const assignedCount = getStatusCount(filteredActivities, "Not Started", "Completed");
   const notStartedCount = getStatusCount(groupedData, "Not Started");
-  const completedCount = getStatusCount(groupedData, "Completed");
+  const actualSubmittedCount = getStatusCount(groupedData, "Actual Submitted");
+  const planApprovedCount = getStatusCount(groupedData, "Plan Approved");
+  const planSubmittedCount = getStatusCount(groupedData, "Plan Submitted");
 
   const statsData = [
     // value={filter.status}
@@ -760,24 +777,38 @@ const ActivityListScreen = () => {
     },
     {
       icon: <FaUserTimes />,
-      label: "Resource Not Assigned",
+      label: "Resource Not Planned",
       value: notAssignedCount,
       color: "error",
-      onClick: (prev) => setFilter({ ...prev, status: "NA" }),
+      onClick: (prev) => setFilter({ ...prev, status: "NS" }),
+    },
+    {
+      icon: <FaUserCheck />,
+      label: "Resource Planned Submitted",
+      value: planSubmittedCount,
+      color: "info",
+      onClick: (prev) => setFilter({ ...prev, status: "PS" }),
     },
     {
       icon: <FaCheck />,
-      label: "Audit Completed",
-      value: completedCount,
+      label: "Audit Actual Submitted",
+      value: actualSubmittedCount,
       color: "success",
-      onClick: (prev) => setFilter({ ...prev, status: "C" }),
+      onClick: (prev) => setFilter({ ...prev, status: "AS" }),
     },
     {
-      icon: <FaMinusCircle />,
-      label: "Not Stared",
+      icon: <FaHourglassEnd />,
+      label: "In Progress",
       value: notStartedCount,
-      color: "warning",
-      onClick: (prev) => setFilter({ ...prev, status: "NS" }),
+      color: "info",
+      onClick: (prev) => setFilter({ ...prev, status: "P" }),
+    },
+    {
+      icon: <BsListCheck />,
+      label: "Planned Approved",
+      value: planApprovedCount,
+      color: "info",
+      onClick: (prev) => setFilter({ ...prev, status: "PA" }),
     }
   ]
 
@@ -880,7 +911,8 @@ const ActivityListScreen = () => {
 
         <DataTable
           columns={activityColumn}
-          data={[...paginatedData].reverse()}
+          // data={[...paginatedData].reverse()}
+          data={[...paginatedData]}
           isLoading={isLoading}
           modifiedId
           modifiedIdName="order_item_id"
@@ -982,8 +1014,6 @@ const ActivityListScreen = () => {
                       )}
                   </ButtonGroup>
                 </Td>
-                {/* <Td>{employee.original_P?.store_name || '-'}</Td> */}
-                {/* <Td>BM: {PlannedResource[0].}</Td> */}
 
               </>
             )
@@ -1101,39 +1131,6 @@ const ActivityListScreen = () => {
           siblingCount={2}
         />
 
-
-        {/* <AssignEmployee
-          isOpen={assignEmployeeModal}
-          onClose={() => setAssignEmployeeModal(false)}
-          activityData={selectedActivity}
-          refreshData={fetchEmpActivityAllocations}
-        /> */}
-
-        <AssignEmployee
-          isOpen={assignEmployeeModal}
-          onClose={() => setAssignEmployeeModal(false)}
-          activityData={selectedActivity}
-          refreshData={fetchEmpAllocationData}
-        />
-
-
-        <AddOPEModal
-          isOpen={openOpeModal}
-          onClose={() => setOpenOpeModal(false)}
-        />
-
-        <OpeListModal
-          isOpen={isOpeModalOpen}
-          onClose={() => setIsOpeModalOpen(false)}
-          // opeList={selectedActivity?.ope_list || []}
-          opeList={[
-            { id: 'OPE-001', submitted_date: '03-Jun-2026', amount: '1250.00', submitted_file: 'https://example.com/file1.pdf', file_name: 'receipt_june.pdf' },
-            { id: 'OPE-002', submitted_date: '05-Jun-2026', amount: '340.50', submitted_file: null },
-          ]}
-        />
-
-
-
       </Card>
 
     </Layout>
@@ -1141,26 +1138,3 @@ const ActivityListScreen = () => {
 }
 
 export default ActivityListScreen
-
-// {/* <Td>
-//                   <ResourcesRow variant="primary">
-//                     {/* <ResourcesLabel variant="primary">BM:</ResourcesLabel> */}
-//                     <ResourcesValue>
-//                       <ResourceCount variant="primary">{PlannedResource[0].tl_count || 0}</ResourceCount> TL /
-//                       <ResourceCount variant="primary">{PlannedResource[0].ex_count || 0}</ResourceCount> EX
-//                     </ResourcesValue>
-//                   </ResourcesRow>
-//                 </Td>
-//                 <Td><Badge variant={getStatusVariant(employee.activityStatus)}>{employee.statusDisplay}</Badge></Td>
-//                 <Td>
-//                   <ButtonGroup>
-//                     {/* <Button variant={`${isResourceAssigned ? 'outline' : 'primary'}`} onClick={(e) => handleAssignResources(employee, e)}>
-//                       {isResourceAssigned ? "Planned" : "Assign"} Resources
-//                     </Button> */}
-//                     <Button variant={`${isResourceAssigned ? 'outline' : 'primary'}`} onClick={(e) => handleAssignResources1(employee, e)}>
-//                       {/* {isResourceAssigned ? "Planned" : "Assign"} Resources */}
-//                       {isResourceAssigned ? "View" : "Assign"} Resources
-//                       {/* Assign Resources */}
-//                     </Button>
-//                   </ButtonGroup>
-//                 </Td> */}

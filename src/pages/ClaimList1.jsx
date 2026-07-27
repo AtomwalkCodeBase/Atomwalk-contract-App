@@ -652,7 +652,8 @@ const stats_card = useMemo(
                 {/* <Td>—</Td>
                 <Td>—</Td> */}
                 <Td>
-                   {group.activityStatus === "C" &&  <ButtonGroup>
+                   {/* {group.activityStatus === "" &&  <ButtonGroup> */}
+                   {["AA", "AS", "C", "PA"].includes(group.activityStatus) && <ButtonGroup>
                     {group?.claimsItem.length === 0 ? (
                       <Button size='sm' onClick={() => navigate('/clamDetails', { state: { data: { ...group, mode: "ADD" } } })}>
                        <FaPlus /> Add Clam

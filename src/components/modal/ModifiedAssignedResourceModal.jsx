@@ -5,6 +5,7 @@ import {
   buildPayloads,
   DateForApiFormate,
   datesBetweenComparable,
+  formatDate,
   formatRetainerActivities,
   formatToApiDate,
   generateDatesBetween,
@@ -27,6 +28,27 @@ import { FaArrowLeft, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaUser, FaUserTi
 import styled from "styled-components";
 import { FaPenToSquare } from "react-icons/fa6";
 import ConfirmPopup from "../ConfirmPopup";
+
+const Tagline = styled.p`
+ color: ${({ theme }) => theme.colors.textLight};
+`
+
+const ClaimsHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.5rem;
+  }
+`;
+
 
 const InfoStrip = styled.div`
   display: flex;
@@ -95,17 +117,10 @@ const DetailValue = styled.span`
   color: ${({ theme }) => theme.colors?.text || "#333"};
 `;
 
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-};
-
 const ResourceAllocation = () => {
   const location = useLocation();
   const [activityData, setActivityData] = useState(location.state?.data);
-
-  console.log("activityData", activityData)
+  const resourcePlannedList = location.state?.resourcePlannedList;
 
   const loggedEmpId = localStorage.getItem("cust_emp_id");
   const { start, end } = getMonthRange();
@@ -115,7 +130,9 @@ const ResourceAllocation = () => {
   const [loading, setLoading] = useState(false);
   const [showResourceAvailability, setShowResourceAvailability] = useState(false);
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [confirmPopupMode, setConfirmPopupMode] = useState("save"); // "save" | "missingDates"
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [missingDatesForConfirm, setMissingDatesForConfirm] = useState([]);
 
   const [employees, setEmployees] = useState([]);
 
@@ -222,7 +239,7 @@ const ResourceAllocation = () => {
         end_date: DateForApiFormate(end),
       };
       const response = await getEmpAllocationData(payload);
-      const formatted = formatRetainerActivities(response.data);
+      const formatted = formatRetainerActivities(response.data, resourcePlannedList);
       const fresh = formatted.find((a) => a?.original_P?.id === p_id);
       if (fresh) setActivityData(fresh);
     } catch (err) {
@@ -276,6 +293,14 @@ const ResourceAllocation = () => {
 
   // ---- Mutations — every one of these only ever touches workingAllocations ----
 
+  const getContractRateByType = (empType) => {
+    if (empType === "T") {
+      return tlContractRate === "" ? 0 : Number(tlContractRate);
+    }
+
+    return exContractRate === "" ? 0 : Number(exContractRate);
+  };
+
   const handleToggleAllocation = (emp, targetDate, checked) => {
     const targetDateComparable = DateForApiFormate(targetDate, true);
     setWorkingAllocations((prev) => {
@@ -286,15 +311,18 @@ const ResourceAllocation = () => {
         ? [...currentDates, targetDateComparable]
         : currentDates.filter((d) => d !== targetDateComparable);
 
+        const empType = Number(emp.grade_level) > 1 ? "T" : "E";
+
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
         activeDates: nextDates,
         ownershipMap,
         employeeMeta: {
           employee_name: emp.name,
-          emp_type: Number(emp.grade_level) > 1 ? "T" : "E",
+          emp_type: empType,
           remarks: "",
-          contract_rate: 0,
+          // contract_rate: 0,
+          contract_rate:  getContractRateByType(empType),
           is_approved: false,
         },
         existingRowsForEmp: empRows,
@@ -325,15 +353,16 @@ const ResourceAllocation = () => {
       const others = prev.filter((r) => r.emp_id !== emp.emp_id);
       const empRows = prev.filter((r) => r.emp_id === emp.emp_id);
       const currentDates = empRows.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date));
+      const empType = Number(emp.grade_level) > 1 ? "T" : "E";
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
         activeDates: [...currentDates, ...freeDatesComparable],
         ownershipMap,
         employeeMeta: {
           employee_name: emp.name,
-          emp_type: Number(emp.grade_level) > 1 ? "T" : "E",
+          emp_type: empType,
           remarks: "",
-          contract_rate: 0,
+          contract_rate: getContractRateByType(empType),
           is_approved: false,
         },
         existingRowsForEmp: empRows,
@@ -369,15 +398,16 @@ const ResourceAllocation = () => {
         .flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
         .filter((d) => !removeSet.has(d));
 
+      const empType = Number(emp.grade_level) > 1 ? "T" : "E";
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
         activeDates: remainingDates,
         ownershipMap,
         employeeMeta: {
           employee_name: emp.name,
-          emp_type: Number(emp.grade_level) > 1 ? "T" : "E",
+          emp_type: empType,
           remarks: "",
-          contract_rate: 0,
+          contract_rate: getContractRateByType(empType),
           is_approved: false,
         },
         existingRowsForEmp: empRows,
@@ -417,11 +447,32 @@ const ResourceAllocation = () => {
     setEditingId(editTarget ? { rowKey: editTarget.rowKey, groupId } : null);
   };
 
+  // const handleFieldChange = (rowKey, field, value) => {
+  //   setWorkingAllocations((prev) =>
+  //     prev.map((row) => (row.rowKey === rowKey ? { ...row, [field]: value } : row))
+  //   );
+  // };
+
   const handleFieldChange = (rowKey, field, value) => {
-    setWorkingAllocations((prev) =>
-      prev.map((row) => (row.rowKey === rowKey ? { ...row, [field]: value } : row))
-    );
-  };
+  setWorkingAllocations((prev) =>
+    prev.map((row) => {
+      if (row.rowKey !== rowKey) return row;
+
+      if (field === "emp_type") {
+        return {
+          ...row,
+          emp_type: value,
+          contract_rate: getContractRateByType(value),
+        };
+      }
+
+      return {
+        ...row,
+        [field]: value,
+      };
+    })
+  );
+};
 
   const handleConfirmUpdate = (rowKey) => {
     const row = workingAllocations.find((r) => r.rowKey === rowKey);
@@ -503,11 +554,137 @@ const ResourceAllocation = () => {
 
   // ---- Save ----
 
+  const handleSaveClick = () => {
+    const plannedDateSet = new Set(
+      workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
+    );
+
+    const mismatchedDates = [...plannedDateSet].filter((dComparable) => {
+      const dayAssignments = workingAllocations.filter((r) =>
+        datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+      );
+      const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+      const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+      return tlCount < plannedTL || exCount < plannedEX;
+    });
+
+    // if (mismatchedDates.length > 0) {
+    //   toast.error(`Required TL/EX not met for: ${mismatchedDates.sort().join(", ")}`);
+    //   return;
+    // }
+
+    const missedDates = dayWindow
+      .map((d) => formatToApiDate(d))
+      .filter((dStr) => !plannedDateSet.has(DateForApiFormate(dStr, true)));
+
+    if (missedDates.length > 0) {
+      setMissingDatesForConfirm(missedDates);
+      setConfirmPopupMode("missingDates");
+      setShowConfirmPopup(true);
+      return;
+    }
+
+    setConfirmPopupMode("save");
+    setShowConfirmPopup(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setIsWaringSubmitting(true);
+    await handleSubmit();
+    setIsSubmitting(false);
+    setShowConfirmPopup(false);
+  };
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
       const p_id = activityData?.original_P?.id;
       if (!p_id) return;
+
+          // NEW — every date in the plan must meet required TL/EX before saving
+      // const missingDates = dayWindow.filter((d) => {
+      //   const dStr = formatToApiDate(d);
+      //   const dayAssignments = dateWiseAssignments[dStr] || [];
+      //   const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+      //   const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+      //   return tlCount < plannedTL || exCount < plannedEX;
+      // });
+
+      // if (missingDates.length > 0) {
+      //   const dateList = missingDates.map((d) => formatToApiDate(d)).join(", ");
+      //   toast.error(`Required TL/EX not met for: ${dateList}`);
+      //   return;
+      // }
+
+const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
+  const dayAssignments = workingAllocations.filter((r) =>
+    datesBetweenComparable(r.start_date, r.end_date).includes(date)
+  );
+  const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+  const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+  
+  const issues = [];
+  if (tlCount !== plannedTL) {
+    const diff = tlCount - plannedTL;
+    if (diff > 0) {
+      issues.push(`Remove ${diff} Team Lead${diff > 1 ? 's' : ''}`);
+    } else {
+      issues.push(`Add ${Math.abs(diff)} Team Lead${Math.abs(diff) > 1 ? 's' : ''}`);
+    }
+  }
+  if (exCount !== plannedEX) {
+    const diff = exCount - plannedEX;
+    if (diff > 0) {
+      issues.push(`Remove ${diff} Executive${diff > 1 ? 's' : ''}`);
+    } else {
+      issues.push(`Add ${Math.abs(diff)} Executive${Math.abs(diff) > 1 ? 's' : ''}`);
+    }
+  }
+  return issues;
+};
+
+      const plannedDateSet = new Set(
+        workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
+      );
+
+      const missingDates = [...plannedDateSet].filter((dComparable) => {
+        const dayAssignments = workingAllocations.filter((r) =>
+          datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+        );
+        const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+        const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+        return tlCount !== plannedTL || exCount !== plannedEX;
+      });
+
+      if (missingDates.length > 0) {
+          let errorMessage = '';
+          if (missingDates.length === 1) {
+            // Single date format
+            const date = missingDates[0];
+            const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
+            const formattedDate = formatDate(date, true);
+            
+            errorMessage = `Resource requirement not met for ${formattedDate}\n`;
+            errorMessage += issues.join('\n');
+          }  else {
+            // Multiple dates format
+            errorMessage = 'Resource requirements not met\n';
+            const details = missingDates.sort().map(date => {
+              const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
+              const formattedDate = formatDate(date, true);
+              return `${formattedDate}: ${issues.join(', ')}`;
+            });
+            // errorMessage += details.join('\n');
+            errorMessage += details.join('; ');
+          }
+      
+          toast.warning(errorMessage);
+          return;
+
+        // const dateList = missingDates.sort().join(", ");
+        // toast.error(`Required TL/EX not met for: ${DateForApiFormate(dateList)}`);
+        // return;
+      }
 
       const activeResources = workingAllocations;
 
@@ -577,14 +754,31 @@ const ResourceAllocation = () => {
 
   const plannedTL = matchingRetainer?.tl_count || 0;
   const plannedEX = matchingRetainer?.ex_count || 0;
+  const plannedTLRate = matchingRetainer?.tl_rate ;
+  const plannedEXRate = matchingRetainer?.ex_rate ;
+
+  useEffect(() => {
+  if (workingAllocations.length !== 0) return;
+
+  setTlContractRate(plannedTLRate ?? 0);
+  setExContractRate(plannedEXRate ?? 0);
+}, [workingAllocations.length, plannedTLRate, plannedEXRate]);
+
+  const [tlContractRate, setTlContractRate] = useState(plannedTLRate ?? "");
+  const [exContractRate, setExContractRate] = useState(plannedEXRate ?? "");
+
+  // console.log(activityData)
 
   return (
-    <Layout>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <Button size="md" onClick={() => window.history.back()}>
-          <FaArrowLeft />Back
-        </Button>
-      </div>
+    <Layout title="Allocation Plan Overview">
+      <ClaimsHeader>
+        <Tagline>Track and manage your assigned audit tasks</Tagline>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: "flex-end" }}>
+          <Button size="md" onClick={() => window.history.back()}>
+            <FaArrowLeft />Back
+          </Button>
+        </div>
+      </ClaimsHeader>
 
      <Card title="Activity Details" hoverable={false}>
       <DetailsGrid>
@@ -617,6 +811,7 @@ const ResourceAllocation = () => {
           <DetailText>
             <DetailLabel>Required TL</DetailLabel>
             <DetailValue>{plannedTL ?? '—'}</DetailValue>
+            {plannedTLRate && <DetailValue>{plannedTLRate ?? '—'}/per day</DetailValue>}
           </DetailText>
         </DetailItem>
 
@@ -625,6 +820,7 @@ const ResourceAllocation = () => {
           <DetailText>
             <DetailLabel>Required EX</DetailLabel>
             <DetailValue>{plannedEX?? '—'}</DetailValue>
+           {plannedEXRate && <DetailValue>{plannedEXRate?? '—'}/per day</DetailValue>}
           </DetailText>
         </DetailItem>
 
@@ -661,9 +857,23 @@ const ResourceAllocation = () => {
           isActual={false}
           employees={employees}
           loadAllData={loadAllData}
-        />
+          plannedTL={plannedTL}
+          plannedEX={plannedEX}
+          plannedTLRate={plannedTLRate}
+          plannedEXRate={plannedEXRate}
+          tlContractRate={tlContractRate}
+          setTlContractRate={setTlContractRate}
+          exContractRate={exContractRate}
+          setExContractRate={setExContractRate}
+       />
 
-        {!["AA", "AS", "C", "PA"].includes(activityData.activityStatus) &&
+        {pendingCount > 0 && (
+          <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Button onClick={handleSaveClick} color="primary" style={{ marginLeft: "auto" }}>{saveLabel} Resources in plan </Button>
+          </div>
+        )}
+
+        {!["AA", "AS", "C", "PA"].includes(activityData.activityStatus) && !activityData.a_id  &&
           <div style={{display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem"}}>
 
             <Button onClick={() => setShowResourceAvailability(true)}>Add Resources</Button>
@@ -672,11 +882,6 @@ const ResourceAllocation = () => {
           </div>
         }
         
-        {pendingCount > 0 && (
-          <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Button onClick={() => setShowConfirmPopup(true)} color="primary" style={{ marginLeft: "auto" }}>{saveLabel} Resources in plan </Button>
-          </div>
-        )}
 
 
 
@@ -699,15 +904,19 @@ const ResourceAllocation = () => {
 
       {/* </Card> */}
 
-      <ConfirmPopup
-        isOpen={showConfirmPopup}
-        isLoading={isSubmitting}
-        onConfirm={handleSubmit}
-        onClose={() => setShowConfirmPopup(false)}
-        title="Confirm Resource Plan"
-        message="Are you sure you want to save these resources in the plan?"
-        confirmLabel="Yes, Save"
-      />
+    <ConfirmPopup
+      isOpen={showConfirmPopup}
+      isLoading={isSubmitting}
+      onConfirm={handleSubmit}
+      onClose={() => setShowConfirmPopup(false)}
+      title="Confirm Resource Plan"
+      message={
+        confirmPopupMode === "missingDates"
+          ? `No resources are planned for: ${missingDatesForConfirm.join(", ")}. Are you sure you want to save anyway?`
+          : "Are you sure you want to save these resources in the plan?"
+      }
+      confirmLabel="Yes, Save"
+   />
     </Layout>
   );
 };
