@@ -678,6 +678,7 @@ const sortedFilteredData = useMemo(() => {
 
   const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(sortedFilteredData, 10)
 
+  console.log("paginatedData", paginatedData)
 
   const handleExpandRow = (row) => {
     setExpandedRow((prev) =>
@@ -838,7 +839,7 @@ const sortedFilteredData = useMemo(() => {
             >
               Week
             </Button>
-          </div>
+          </div> */}
 
           <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.1rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
             <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(-1)}>
@@ -850,7 +851,7 @@ const sortedFilteredData = useMemo(() => {
             <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(1)}>
               Next &gt;
             </Button>
-          </div> */}
+          </div>
 
         </div>
       </ClaimsHeader>
@@ -862,11 +863,11 @@ const sortedFilteredData = useMemo(() => {
           />)}
       </StatsGrid>
 
-      <Card>
-        <Tabs tabs={TABS} activeTab={tab} setActiveTab={(value) => {
+      <Card title="Audit/Order Item List">
+        {/* <Tabs tabs={TABS} activeTab={tab} setActiveTab={(value) => {
           setTab(value);
           handleRangeChange(value);
-        }} />
+        }} /> */}
         {/* {tab === "week" && 
        <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.1rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
             <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(-1)}>
@@ -885,9 +886,9 @@ const sortedFilteredData = useMemo(() => {
 
         <FilterRow style={{ marginBottom: "1rem" }}>
           <SearchBox type="text" placeholder="Search Auditor's name, ID..." value={filter.search} onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value, }))} />
-          {tab === "month" && (<DateInput type="month" value={selectedMonth} onChange={handleMonthChange} />)}
+          {/* {tab === "month" && (<DateInput type="month" value={selectedMonth} onChange={handleMonthChange} />)}
 
-          {tab === "week" && (<DateInput type="week" value={selectedWeek} onChange={handleWeekChange} />)}
+          {tab === "week" && (<DateInput type="week" value={selectedWeek} onChange={handleWeekChange} />)} */}
 
           <FilterSelect
             name="status"

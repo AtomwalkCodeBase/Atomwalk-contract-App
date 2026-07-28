@@ -1,126 +1,102 @@
 import { useEffect, useState } from "react"
 import styled, { keyframes } from "styled-components"
-import { FaUser, FaLock, FaBuilding } from "react-icons/fa"
+import { FaUser, FaLock, FaShieldAlt, FaEye, FaEyeSlash } from "react-icons/fa"
 import { useAuth } from "../context/AuthContext"
 import { toast } from "react-toastify"
 import { getCompanyName } from "../services/productServices"
 import { useNavigate } from "react-router-dom"
+import logo from '../assets/logo2.png';
 
 const fadeIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 `
 
-const LoginContainer = styled.div`
-  display: flex;
+const PageWrap = styled.div`
   min-height: 100vh;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-  }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, ${({ theme }) => theme.colors.primaryLight}, ${({ theme }) => theme.colors.background});
+  padding: 2rem 1rem;
 `
 
-const LoginBanner = styled.div`
-  flex: 1;
+const LoginCard = styled.form`
+  width: 100%;
+  max-width: 420px;
+  background: ${({ theme }) => theme.colors.card};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.xl};
+  padding: 2.5rem 2rem 2rem;
+  animation: ${fadeIn} 0.6s ease;
+`
+
+const IconBadge = styled.div`
+  width: 56px;
+  height: 56px;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
   background: linear-gradient(135deg, ${({ theme }) => theme.colors.primary}, ${({ theme }) => theme.colors.secondary});
   display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-items: center;
-  padding: 2rem;
+  justify-content: center;
   color: white;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-  }
+  font-size: 1.4rem;
+  margin: 0 auto 1rem;
+  box-shadow: 0 6px 16px ${({ theme }) => theme.colors.shadow};
 `
 
-const BannerContent = styled.div`
-  max-width: 500px;
-  animation: ${fadeIn} 1s ease;
-     @media (max-width: 768px) {
-    margin-top: 100px;
-  }
-`
-
-const BannerTitle = styled.h1`
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-  
-  @media (max-width: 768px) {
-    font-size: 1.8rem;
-  }
-`
-
-const BannerText = styled.p`
-  font-size: 1.1rem;
-  margin-bottom: 2rem;
-  opacity: 0.9;
-  
-  @media (max-width: 768px) {
-    font-size: 1rem;
-  }
-`
-
-const LoginFormContainer = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
-  background: ${({ theme }) => theme.colors.background};
-  animation: ${fadeIn} 1s ease 0.3s backwards;
-
-  @media (max-width: 768px) {
-    padding: 1rem;
-  }
-`
-
-const LoginForm = styled.form`
-  width: 100%;
-  max-width: 400px;
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  margin-top: 80px;
+const PortalName = styled.div`
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.primary};
+  margin-bottom: 0.4rem;
 `
 
 const FormTitle = styled.h2`
   text-align: center;
+  font-size: ${({ theme }) => theme.fontSizes["2xl"]};
+  color: ${({ theme }) => theme.colors.text};
+  margin-bottom: 0.4rem;
+`
+
+const FormSubtitle = styled.p`
+  text-align: center;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.textLight};
   margin-bottom: 2rem;
-  color: ${({ theme }) => theme.colors.primary};
+  line-height: 1.4;
 `
 
 const FormGroup = styled.div`
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 `
 
 const FormLabel = styled.label`
   display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.textLight};
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
 `
 
 const InputGroup = styled.div`
   display: flex;
   align-items: center;
   border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 4px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background: ${({ theme }) => theme.colors.backgroundAlt};
   overflow: hidden;
-  transition: all 0.3s ease;
-  
+  transition: ${({ theme }) => theme.transitions.normal};
+
   &:focus-within {
     border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primaryLight};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primaryLight};
+    background: ${({ theme }) => theme.colors.card};
   }
 `
 
@@ -128,89 +104,134 @@ const InputIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 1rem;
-  background: ${({ theme }) => theme.colors.backgroundAlt};
+  padding: 0 0.9rem;
   color: ${({ theme }) => theme.colors.textLight};
 `
 
 const Input = styled.input`
   flex: 1;
-  padding: 0.75rem;
+  padding: 0.75rem 0.5rem 0.75rem 0;
   border: none;
   outline: none;
-  font-size: 1rem;
+  background: transparent;
+  font-size: ${({ theme }) => theme.fontSizes.md};
+  font-family: ${({ theme }) => theme.fonts.body};
+  color: ${({ theme }) => theme.colors.text};
+
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.border};
+  }
+`
+
+const EyeToggle = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.9rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  display: flex;
+  align-items: center;
 `
 
 const LoginButton = styled.button`
   width: 100%;
-  padding: 0.75rem;
-  background: ${({ theme }) => theme.colors.primary};
+  padding: 0.85rem;
+  margin-top: 0.5rem;
+  background: linear-gradient(135deg, ${({ theme }) => theme.colors.primary}, ${({ theme }) => theme.colors.secondary});
   color: white;
   border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 500;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.fontSizes.md};
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  
+  transition: ${({ theme }) => theme.transitions.normal};
+
   &:hover {
-    background: ${({ theme }) => theme.colors.primary}dd;
+    opacity: 0.92;
+    transform: translateY(-1px);
   }
-  
+
   &:disabled {
-    opacity: 0.7;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
   }
 `
 
-const FormFooter = styled.div`
-  text-align: center;
-  margin-top: 1.5rem;
-  font-size: 0.875rem;
+const Divider = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 1rem;
   color: ${({ theme }) => theme.colors.textLight};
-  
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  letter-spacing: 0.05em;
+
+  &::before, &::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: ${({ theme }) => theme.colors.border};
+  }
+`
+
+const FormFooterLinks = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+
   a {
     color: ${({ theme }) => theme.colors.primary};
     text-decoration: none;
-    
+    cursor: pointer;
+    font-weight: 500;
+
     &:hover {
       text-decoration: underline;
     }
   }
 `
 
-const FormSelect = styled.select`
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 4px;
-  
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primaryLight};
+const BrandHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+`
+
+const CompanyLogo = styled.img`
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+`
+
+const CompanyName = styled.span`
+  font-size: ${({ theme }) => theme.fontSizes.xl};
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.text};
+
+  span {
+    color: ${({ theme }) => theme.colors.primary};
   }
 `
-const Link = styled.a`
-  color: ${({ theme }) => theme.colors.primary};
-  text-decoration: none;
-  cursor: pointer;
-  &:hover {
-    text-decoration: underline;
-  }`
+
+const PageFooter = styled.div`
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.textLight};
+  letter-spacing: 0.04em;
+`
 
 const Logins = () => {
-  const [formData, setFormData] = useState({
-    mobile: "",
-    password: "",
-    company: "",
-  })
-  // const [company, setCompany] = useState("")
+  const [formData, setFormData] = useState({ mobile: "", password: "" })
   const [loading, setLoading] = useState(false)
+  const [showPin, setShowPin] = useState(false)
   const [companies, setCompanies] = useState([])
-  const [placeholderdatas, setPlaceholderdatas] = useState("Mobile Number");
   const { customerlogin } = useAuth()
-  const path = window.location.pathname;
+  const path = window.location.pathname
   const navigation = useNavigate()
 
   useEffect(() => {
@@ -218,59 +239,33 @@ const Logins = () => {
       const company = await getCompanyName()
       if (company.status === 200) {
         if (path === "/retainer/login") {
-
           const filter = company.data?.filter(
             (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
-            // (data) => data.ref_cust_name === "Allocation Project Management (Matrix)"
-          );
-
-          setCompanies(filter);
-
-          // auto select demo area
+          )
+          setCompanies(filter)
           if (filter.length > 0) {
-            setFormData((prev) => ({
-              ...prev,
-              company: filter[0].name,
-            }));
-
-            localStorage.setItem(
-              "dbName",
-              filter[0].name.split("_").slice(1).join("_")
-            );
+            setFormData((prev) => ({ ...prev, company: filter[0].name }))
+            localStorage.setItem("dbName", filter[0].name.split("_").slice(1).join("_"))
           }
         } else {
           setCompanies(company.data)
-          // console.log(company.data)
         }
       }
     }
     fetchCompanyName()
-    if(localStorage.getItem("customerToken")){
-        navigation("/dashboard")
-      }
+    if (localStorage.getItem("customerToken")) {
+      navigation("/dashboard")
+    }
   }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handleCompanyChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      company: e.target.value,
-    }))
-    localStorage.setItem("dbName", e.target.value.split("_").slice(1).join("_"))
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-
-    // Simulate API call
     setTimeout(async () => {
       if (formData.mobile && formData.password) {
         const userData = {
@@ -287,97 +282,67 @@ const Logins = () => {
   }
 
   return (
-    <LoginContainer>
-      <LoginBanner>
-        <BannerContent>
-          <BannerTitle>Welcome to Atomwalk</BannerTitle>
-          <BannerText>
-            A comprehensive retainer and associate auditors management portal.
-          </BannerText>
-        </BannerContent>
-      </LoginBanner>
+    <PageWrap>
+      <LoginCard onSubmit={handleSubmit}>
+      <BrandHeader>
+        <CompanyLogo src={logo} alt="Atomwalk logo" />
+        {/* <CompanyName>Atom<span>walk</span></CompanyName> */}
+      </BrandHeader>
+        <FormTitle>Retainer & Associate Portal</FormTitle>
+        <FormSubtitle>
+          Manage assigned audits and update resource allocations securely.
+        </FormSubtitle>
 
-      <LoginFormContainer>
-        <LoginForm onSubmit={handleSubmit}>
-          <FormTitle>Login to your account</FormTitle>
-          {/* <FormGroup>
-            <FormLabel htmlFor="company">Company</FormLabel>
-            <InputGroup>
-              <InputIcon>
-                <FaBuilding />
-              </InputIcon>
-              <FormSelect
-                id="company"
-                name="company"
-                value={formData.company}
-                onChange={handleCompanyChange}
-                required
-              >
-                <option value="" disabled>
-                  Select your company
-                </option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.name}>
-                    {company.ref_cust_name}
-                  </option>
-                ))}
-              </FormSelect>
-            </InputGroup>
-          </FormGroup> */}
-          <FormGroup>
-            <FormLabel htmlFor="mobile">{placeholderdatas}</FormLabel>
-            <InputGroup>
-              <InputIcon>
-                <FaUser />
-              </InputIcon>
-              <Input
-                type="text"
-                id="mobile"
-                name="mobile"
-                placeholder={"Enter your " + placeholderdatas}
-                value={formData.mobile}
-                onChange={handleChange}
-                required
-              />
-            </InputGroup>
-          </FormGroup>
+        <FormGroup>
+          <FormLabel htmlFor="mobile">Mobile Number</FormLabel>
+          <InputGroup>
+            <InputIcon><FaUser /></InputIcon>
+            <Input
+              type="text"
+              id="mobile"
+              name="mobile"
+              placeholder="Enter your mobile number"
+              value={formData.mobile}
+              onChange={handleChange}
+              required
+            />
+          </InputGroup>
+        </FormGroup>
 
-          <FormGroup>
-            <FormLabel htmlFor="password">Pin</FormLabel>
-            <InputGroup>
-              <InputIcon>
-                <FaLock />
-              </InputIcon>
-              <Input
-                type="password"
-                id="password"
-                name="password"
-                placeholder="Enter your pin"
-                value={formData.password}
-                onChange={handleChange}
-                required
-              />
-            </InputGroup>
-          </FormGroup>
+        <FormGroup>
+          <FormLabel htmlFor="password">Security Pin</FormLabel>
+          <InputGroup>
+            <InputIcon><FaLock /></InputIcon>
+            <Input
+              type={showPin ? "text" : "password"}
+              id="password"
+              name="password"
+              placeholder="Enter your pin"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+            <EyeToggle type="button" onClick={() => setShowPin((v) => !v)}>
+              {showPin ? <FaEyeSlash /> : <FaEye />}
+            </EyeToggle>
+          </InputGroup>
+        </FormGroup>
 
-          <LoginButton type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
-          </LoginButton>
-          {/* { placeholderdatas==="Employee ID" ?
+        <LoginButton type="submit" disabled={loading}>
+          {loading ? "Logging in..." : "Login to Portal"}
+        </LoginButton>
 
-          <FormFooter onClick={() => setPlaceholderdatas("Mobile Number")}>
-            <Link>Login With Mobile Number</Link>
-          </FormFooter>
-          :
-          <FormFooter onClick={() => setPlaceholderdatas("Employee ID")}>
-            <Link>Login With Employee ID</Link>
-          </FormFooter>
-          } */}
-        </LoginForm>
-      </LoginFormContainer>
-    </LoginContainer>
+        <Divider></Divider>
+
+        <FormFooterLinks>
+          <a>Forgot Pin?</a>
+          <a>Need Help?</a>
+        </FormFooterLinks>
+      </LoginCard>
+
+      {/* <PageFooter>© 2024 ATOMWALK MANAGEMENT SOLUTIONS</PageFooter> */}
+    </PageWrap>
   )
 }
 
 export default Logins
-

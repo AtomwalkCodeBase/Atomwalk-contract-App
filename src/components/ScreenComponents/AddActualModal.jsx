@@ -138,7 +138,7 @@ const [individualRemarks, setIndividualRemarks] = useState({}); // { emp_id: rem
         <ActualFormGroup>
           <ActualLabel>Select Resources</ActualLabel>
           <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid #eee", borderRadius: 6, padding: "0.5rem" }}>
-            {employees.map((emp) => {
+            {employees.filter((emp) => emp.is_active !== false && emp.is_active !== 0 && emp.is_active !== "false").map((emp) => {
               const checked = selectedEmpIds.includes(emp.emp_id);
               return (
                 <div

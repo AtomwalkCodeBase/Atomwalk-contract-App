@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { FaCalendarAlt, FaMapMarkerAlt, FaUserTie, FaUser, FaPlus, FaFileInvoiceDollar, FaFileAlt, FaChevronDown, FaChevronUp, FaArrowLeft } from "react-icons/fa";
+import { FaCalendarAlt, FaMapMarkerAlt, FaUserTie, FaUser, FaPlus, FaFileInvoiceDollar, FaFileAlt, FaChevronDown, FaChevronUp, FaArrowLeft, FaTrash, FaEdit } from "react-icons/fa";
 import Layout from "../components/Layout";
 import Card from "../components/Card";
 import Badge from "../components/Badge";
@@ -319,6 +319,8 @@ const ClamDetailsScreen = () => {
   const [expandedDate, setExpandedDate] = useState(null);
   const [selectedClaim, setSelectedClaim] = useState(null);
   const [selectedMasterClaimId, setSelectedMasterClaimId] = useState(null);
+  const [selectedDeleteClaimId, setSelectedDeleteClaimId] = useState(null);
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
 
   const fetchClaimsForActivity = useCallback(async () => {
     if (!loggedEmpId || !activityData) return;
@@ -461,6 +463,26 @@ const ClamDetailsScreen = () => {
     } finally {
       setSelectedMasterClaimId(null);
       setOpenSubmitAllModal(false);
+    }
+  }
+
+  const handleDelete = async (claimId) => {
+    try {
+      const payload = {
+        claim_id: claimId,
+        call_mode: "DELETE"
+      }
+      const res = await postClaimAction(payload);
+      if (res.status === 200) {
+        toast.success("claim item deleted successfully");
+      }
+      await fetchClaimsForActivity();
+
+    } catch (error) {
+      toast.error(error.data.message || error.data || "Failed to delete the claims. Please try again later !!!");
+    } finally {
+      setSelectedDeleteClaimId(null);
+      setOpenDeleteModal(false);
     }
   }
 
@@ -653,7 +675,11 @@ const ClamDetailsScreen = () => {
                       </RemarkField>
                     </Td>
                     <Td><FileLink href={item.submitted_file_1} target="_blank" rel="noreferrer" disabled={!item.submitted_file_1}>{item.submitted_file_1 ? "View" : "Not Submitted"}</FileLink></Td>
-                    {(ViewMode !== "VIEW" && label !== "Submitted") && <Td><Button size="sm" onClick={() => handleOpenClaimModal(item)}>Update</Button></Td>}
+                    {(ViewMode !== "VIEW" && label !== "Submitted") && <Td><Button size="sm" title="Update claim" onClick={() => handleOpenClaimModal(item)}><FaEdit /></Button></Td>}
+                    {(ViewMode !== "VIEW" && label !== "Submitted" ) && <Td><Button size="sm" variant="outlines" iconOnly ={true} title="Delete claim" onClick={() => {
+                      setSelectedDeleteClaimId(item?.claim_id || null);
+                      setOpenDeleteModal(true);
+                    }}><FaTrash /></Button></Td>}
                   </>
                 )
               })}
@@ -698,6 +724,19 @@ const ClamDetailsScreen = () => {
             setSelectedMasterClaimId(null);
           }}
           confirmLabel="Yes"
+        />}
+
+      {openDeleteModal &&
+        <ConfirmPopup
+          isOpen={openDeleteModal}
+          title="Delete Claim"
+          message="Are you sure you want to delete this claim item?"
+          onConfirm={() => handleDelete(selectedDeleteClaimId)}
+          onClose={() => {
+            setOpenDeleteModal(false);
+            setSelectedDeleteClaimId(null);
+          }}
+          confirmLabel="Delete"
         />}
     </Layout>
   );

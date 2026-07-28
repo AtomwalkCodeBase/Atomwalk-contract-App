@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
 import StatsCard from '../components/StatsCard'
-import { FaBoxes, FaFileInvoice, FaHandHoldingUsd, FaWallet } from 'react-icons/fa'
-import { DateForApiFormate, formatMonthLabel, formatRetainerActivities, formatToDDMMYYYY, formatWeekLabel, getMonthRange, matchClaimsToActivity } from '../utils/utils'
+import { FaBoxes, FaEye, FaFileInvoice, FaHandHoldingUsd, FaWallet } from 'react-icons/fa'
+import { DateForApiFormate, formatDate, formatMonthLabel, formatRetainerActivities, formatToDDMMYYYY, formatWeekLabel, getMonthRange, getStatusVariant, groupByOrderItemId, matchClaimsToActivity } from '../utils/utils'
 import { getContractAllocationData, getEmpAllocationData, getEmpClaim, getemployeeLists } from '../services/productServices'
 import Button from '../components/Button'
 import styled from 'styled-components'
+import DataTable, { Td } from '../components/DataTable'
+import { usePagination } from '../hooks/usePagination'
+import { useFilter } from '../hooks/useFilter'
+import Badge from '../components/Badge'
+import PaginationComponent from '../components/Pagination'
+import { toast } from 'react-toastify'
 
 const ClaimsHeader = styled.div`
   display: flex;
@@ -38,6 +44,41 @@ const StatsGrid = styled.div`
   }
 `;
 
+const CustomerName = styled.div`
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 0.875rem;
+  line-height: 1.3;
+`;
+
+const OrderItemId = styled.div`
+  font-size: 0.75rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  font-family: monospace;
+  background: ${({ theme }) => theme.colors.backgroundAlt};
+  padding: 0.2rem 0.2rem;
+  border-radius: 4px;
+  display: inline-block;
+  width: fit-content;
+`;
+
+const StoreLocation = styled.div`
+  font-size: 0.75rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  font-family: monospace;
+  background: ${({ theme }) => theme.colors.accentLight};
+  padding: 0.2rem 0.2rem;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 150px; /* Adjust this value as needed */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const column = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>, "Plan Allocation Slots", "Activity status", "Payment Status", "Payout Amount", "OPE Amount", "Actions"]
+
+
 const ProfitabilityDashboard = () => {
     const [assignedActivity, setAssignedActivity] = useState([]);
     const [claimList, setClaimList] = useState([]);
@@ -47,14 +88,29 @@ const ProfitabilityDashboard = () => {
     const [resourcePlannedList , setResourcePlannedList] = useState([]);
     const [dateRange, setDateRange] = useState(() => getMonthRange({ type: "current", mode: "month" }));
     const [offset, setOffset] = useState(0);
+    const [filter, setFilter] = useState({ search: "", status: "" });
+    const [expandedRow, setExpandedRow] = useState(null);
 
     useEffect(() => {
         if (emp_id) {
-            fetchEmpAllocationData();
-            fetchProfileAndClaims();
-            fetchEmpPlannedAllocation();
+          fetchEmpAllocationData(dateRange.start, dateRange.end);
+          fetchProfileAndClaims();
         }
-    }, [emp_id]);
+    }, [emp_id, dateRange.start, dateRange.end]);
+
+    // console.log("claimList", claimList)
+
+    const enrichActivitiesWithClaims = useCallback((activities, claims = claimList) => {
+      if (!Array.isArray(activities)) return [];
+      return activities.map((activity) => {
+        const matchedClaims = matchClaimsToActivity(claims, activity);
+        return {
+          ...activity,
+          claims: matchedClaims,
+          hasClaim: matchedClaims.length > 0,
+        };
+      });
+    }, [claimList]);
 
     const fetchEmpAllocationData = async (startOverride, endOverride) => {
         const emp_id = localStorage.getItem("cust_emp_id")
@@ -76,11 +132,21 @@ const ProfitabilityDashboard = () => {
 
         setIsLoading(true);
 
-        try {
-            const response = await getEmpAllocationData(payload);
-            setAssignedActivity(formatRetainerActivities(response.data))
-            // console.log("normalizeProjects(response.data)", formatRetainerActivities(response.data))
-        } catch (error) {
+       try {
+      const [allocationResponse, plannedResponse] = await Promise.all([
+        getEmpAllocationData(payload),
+        getContractAllocationData(payload),
+      ]);
+
+      const plannedList = plannedResponse?.data || [];
+      setResourcePlannedList(plannedList);
+
+      const formatted = formatRetainerActivities(
+        allocationResponse?.data || [],
+        plannedList
+      );
+      setAssignedActivity(enrichActivitiesWithClaims(formatted, claimList));
+    } catch (error) {
             toast.error("No data found...")
             setIsLoading(false)
         } finally {
@@ -130,13 +196,14 @@ const ProfitabilityDashboard = () => {
             if (profile.id) {
                 const claimRes = await getEmpClaim("GET", profile.id, "CY");
                 setClaimList(claimRes?.data || []);
+                setAssignedActivity((prev) => enrichActivitiesWithClaims(prev, claimRes?.data));
             }
         } catch (error) {
             console.error(error);
             toast.error("Failed to load profile or claims");
             setClaimList([]);
         }
-    }, [emp_id]);
+    }, [emp_id, enrichActivitiesWithClaims]);
 
     const filteredClaimsByDate = useMemo(() => {
         if (!Array.isArray(claimList)) return [];
@@ -158,6 +225,8 @@ const ProfitabilityDashboard = () => {
         });
     }, [claimList, dateRange.start, dateRange.end]);
 
+    // console.log("filteredClaimsByDate", filteredClaimsByDate)
+
 
 
     const activitiesWithClaims = useMemo(() => {
@@ -174,7 +243,77 @@ const ProfitabilityDashboard = () => {
         });
     }, [assignedActivity, filteredClaimsByDate]);
 
-    console.log("activitiesWithClaims", activitiesWithClaims)
+    // console.log("activitiesWithClaims", activitiesWithClaims)
+
+    const groupedData = useMemo(() => {
+  // same grouping used in ActivityListScreen
+  const grouped = groupByOrderItemId(assignedActivity, resourcePlannedList);
+
+  return grouped.map((group) => {
+    const items = group.grouped_data || [];
+
+    // earliest / latest planned dates
+    const dates = items
+      .flatMap((i) => [i.planned_start_date, i.planned_end_date])
+      .filter(Boolean)
+      .sort();
+    const earliestPlannedDate = dates[0] || null;
+    const latestPlannedDate = dates[dates.length - 1] || null;
+
+    // unique claims (same claim can be matched to several activities)
+    const claimsMap = new Map();
+    items.forEach((item) => {
+      (item.claims || []).forEach((c) => {
+        const id = c?.id ?? c?.claim_id;
+        if (id != null && !claimsMap.has(id)) {
+          claimsMap.set(id, c);
+        }
+      });
+    });
+    const claims = Array.from(claimsMap.values());
+
+    // totalOPE & totalSettlement from claim_items
+    let totalOPE = 0;
+    let totalSettlement = 0;
+    claims.forEach((claim) => {
+      (claim.claim_items || []).forEach((ci) => {
+        const expense = Number(ci.expense_amt ?? ci.claim_amt ?? ci.amount ?? 0);
+        const settlement = Number(ci.settlement_amt ?? 0);
+        totalOPE += expense;
+        totalSettlement += expense - settlement; // as you requested
+      });
+    });
+
+    // status / activityStatus – take from the group (already calculated by groupByOrderItemId)
+    // or fall back to first item
+    const activityStatus = group.activityStatus || items[0]?.activityStatus || "NS";
+    const statusDisplay =
+      group.statusDisplay || items[0]?.statusDisplay || "Not Started";
+
+    return {
+      activityStatus,
+      audit_type: group.audit_type || items[0]?.audit_type || "",
+      claims,
+      customer_name: group.customer_name || items[0]?.customer_name || "-",
+      grouped_data: items,
+      earliestPlannedDate,
+      latestPlannedDate,
+      order_item_key: group.order_item_key || group.order_item_id,
+      totalOPE,
+      totalSettlement,
+      statusDisplay,
+      total_planned_item: group.total_planned_item || items.length,
+      // keep any extra fields groupByOrderItemId already added
+      ...group,
+    };
+  });
+}, [assignedActivity, resourcePlannedList]);
+
+  const handleExpandRow = (row) => {
+    setExpandedRow((prev) =>
+      prev === row.order_item_id ? null : row.order_item_id
+    );
+  };
 
 const profitabilityData = useMemo(() => {
   if (!Array.isArray(activitiesWithClaims)) return [];
@@ -467,9 +606,9 @@ const profitabilityData = useMemo(() => {
   filteredClaimsByDate,
 ]);
 
-console.log("activitiesWithClaims", activitiesWithClaims);
-console.log("resourcePlannedList", resourcePlannedList);
-console.log("profitabilityData", profitabilityData);
+// console.log("activitiesWithClaims", activitiesWithClaims);
+// console.log("resourcePlannedList", resourcePlannedList);
+// console.log("profitabilityData", profitabilityData);
 
     // ADD — group activitiesWithClaims by order_item_key
     const groupedActivities = useMemo(() => {
@@ -561,22 +700,48 @@ console.log("profitabilityData", profitabilityData);
           fetchEmpAllocationData(range.start, range.end);
         };
 
+        
+              const FilteredData = useFilter({
+                data: groupedData, fields: ["customer_name", "order_item_key", "store_name", "audit_type"],
+                search: filter.search,
+                extraFilters: {
+                  activityStatus: filter.status,
+                },
+              });
+
+              const sortedFilteredData = useMemo(() => {
+                return [...FilteredData].sort((a, b) => {
+                  // 1. NS status always comes first
+                  if (a.activityStatus === "AS" && b.activityStatus !== "AS") return -1;
+                  if (a.activityStatus !== "AS" && b.activityStatus === "AS") return 1;
+              
+                  // 2. Within same status priority, latest start date first
+                  const dateA = new Date(a.planned_start_date);
+                  const dateB = new Date(b.planned_start_date);
+              
+                  return dateB - dateA;
+                });
+              }, [FilteredData]);
+        
+            
+              const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(sortedFilteredData, 10)
+
     const stats_card = [
-        { label: "Total Order Items", value: groupedActivities.length, color: "primary", icon: <FaBoxes /> },
+        { label: "Total Order Items", value: groupedData.length, color: "primary", icon: <FaBoxes /> },
         { label: "Total Cost", value: "120,000", color: "warning", icon: <FaWallet /> },
         { label: "Total OPE", value: "15,000", color: "success", icon: <FaFileInvoice /> },
         { label: "AMOUNT TO BE PAID", value: "135,000", color: "error", icon: <FaHandHoldingUsd /> }
     ]
 
-    console.log("groupedActivities", groupedActivities)
+    console.log("groupedData", paginatedData)
 
     return (
-        <Layout>
+        <Layout title="Receivable Dashboard">
              <ClaimsHeader>
         <Tagline>Track and manage your clams</Tagline>
         <div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: "flex-end" }}>
+          {/* <div style={{ display: 'flex', gap: '0.5rem', justifyContent: "flex-end" }}>
             <Button
               variant={activeRangeType === 'month' ? 'primary' : 'outline'}
               onClick={() => handleRangeChange('month')}
@@ -589,7 +754,7 @@ console.log("profitabilityData", profitabilityData);
             >
               Week
             </Button>
-          </div>
+          </div> */}
 
           <div style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '1.1rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
             <Button variant="outline" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => handleNavigate(-1)}>
@@ -613,8 +778,190 @@ console.log("profitabilityData", profitabilityData);
             </StatsGrid>
 
 
+            <DataTable
+              columns={column}
+              data={paginatedData}
+              isLoading={isLoading}
+              modifiedId
+              modifiedIdName="order_item_id"
+              expandedRow={expandedRow}
+              renderRow={(employee) => {
+                const claims = Array.isArray(employee.claims) ? employee.claims : [];
+                const firstClaim = claims[0];
+                const { variant, label } = getClaimStatusVariant(firstClaim?.expense_status);
+                return(
+                  <>
+                       <Td>
+                                    <CustomerName>{employee.customer_name}</CustomerName> <OrderItemId>{employee?.order_item_key}</OrderItemId>
+                                  </Td>
+                                  <Td>
+                  {employee.product_name}<br />
+                  <StoreLocation title={employee.store_name || '-'}>
+                    {employee?.store_name || '-'}
+                  </StoreLocation>
+                </Td>
+                {/* <Td>
+                  {employee.planned_start_date === employee.planned_end_date ? (
+                    formatDate(employee.planned_start_date)
+                  ) : (
+                    <>
+                      {formatDate(employee.planned_start_date)}
+                      <br />
+                      {formatDate(employee.planned_end_date)}
+                    </>
+                  )}
+                </Td> */}
+                <Td style={{ paddingLeft: "2.5rem" }}>
+                  {employee.total_planned_item || 0}
+                </Td>
+                <Td>
+                  <Badge variant={getStatusVariant(employee.activityStatus)}>
+                    {employee.statusDisplay}
+                  </Badge>
+                </Td>
+
+                <Td>
+                  <Badge variant={variant}>
+                    {label}
+                  </Badge>
+                </Td>
+                <Td>
+                  {employee.totalSettlement}
+                </Td>
+                <Td>
+                  {employee.totalOPE}
+                </Td>
+
+                <Td>
+                  <Button size='sm'>
+                    <FaEye />View
+                  </Button>
+                </Td>
+                  
+                  </>
+                )
+              }}
+            renderExpandedRow={(employee) => {
+            const groupedData = employee?.grouped_data || [];
+
+            return (
+              <DataTable
+                columns={[
+                  "Sl No.",
+                  "Planned Date",
+                  "Planned Resource",
+                  "Status",
+                ]}
+                data={groupedData}
+                renderRow={(item) => {
+                  const index = groupedData.findIndex(
+                    (data) => data === item
+                  );
+
+                  const plannedResource =
+                    getMatchingRetainerList(item?.original_P);
+
+                  const resource = plannedResource?.[0];
+
+                  const isResourceAssigned = item?.original_A?.resource_list?.length > 0;
+
+                  const displayPlannedDate =
+                    item.planned_start_date === item.planned_end_date
+                      ? formatDate(item.planned_start_date)
+                      : `${formatDate(
+                        item.planned_start_date
+                      )} to ${formatDate(
+                        item.planned_end_date
+                      )}`;
+
+                  return (
+                    <>
+                      {/* Serial No */}
+                      <Td style={{ paddingLeft: "1.5rem" }}>{index + 1}</Td>
+
+                      {/* Planned Date */}
+                      <Td>{displayPlannedDate}</Td>
+
+                      {/* Planned Resource */}
+                      <Td>
+                        {/* <ResourcesRow variant="primary"> */}
+                        <ResourcesValue>
+                          <ResourceCount variant="primary">
+                            {resource?.tl_count || 0}
+                          </ResourceCount>
+                          {" "}TL /{" "}
+                          <ResourceCount variant="primary">
+                            {resource?.ex_count || 0}
+                          </ResourceCount>
+                          {" "}EX
+                        </ResourcesValue>
+                        {/* </ResourcesRow> */}
+                      </Td>
+
+                      {/* Status */}
+                      <Td>
+                        <Badge
+                          variant={getStatusVariant(
+                            item.activityStatus
+                          )}
+                        >
+                          {item.statusDisplay}
+                        </Badge>
+                      </Td>
+                    </>
+                  );
+                }}
+              />
+            );
+          }}
+
+
+
+            
+            
+            
+            
+            />
+
+                    <PaginationComponent
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+          siblingCount={2}
+        />
+
+
         </Layout>
     )
 }
 
 export default ProfitabilityDashboard
+
+const getClaimStatusVariant = (expense_status) => {
+  const statusMap = {
+    'N': { variant: 'warning', label: 'Not Submitted' },
+    'S': { variant: 'success', label: 'Submitted' },
+    'A': { variant: 'info', label: 'Approved' },
+    'R': { variant: 'error', label: 'Rejected' },
+    // 'P': { variant: 'info', label: 'Pending' },
+  };
+
+  return statusMap[expense_status] || { variant: 'warning', label: 'Not Submitted' };
+};
+
+function getMatchingRetainerList(original_P = {}) {
+  const {
+    start_date: originalStartDate,
+    end_date: originalEndDate,
+    retainer_list = []
+  } = original_P;
+
+  return retainer_list.filter(item => {
+    return (
+      item.a_type === "P" &&
+      item.start_date === originalStartDate &&
+      item.end_date === originalEndDate
+    );
+  });
+}

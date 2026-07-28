@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import Card from "../Card";
 import { buildDayWindow, DateForApiFormate, formatDate, formatToApiDate } from "../../utils/utils";
-import { FaCalendarAlt, FaCheck, FaChevronLeft, FaChevronRight, FaSearch, FaUndo, FaUser, FaUserPlus, FaUsers } from "react-icons/fa";
+import { FaCalendarAlt, FaCheck, FaChevronLeft, FaChevronRight, FaSearch, FaUndo, FaUser, FaUserPlus, FaUsers, FaUserSlash } from "react-icons/fa";
 import { useFilter } from "../../hooks/useFilter";
 import { usePagination } from "../../hooks/usePagination";
 import DataTable, { Td } from "../DataTable";
@@ -46,7 +46,7 @@ const InfoPill1 = styled.div`
   padding: 0.3rem 0.65rem;
   border-radius: 99px;
   /* background: ${({ theme }) => theme.colors?.backgroundAlt || "#f4f5f7"}; */
-  background: ${({ theme, variant }) => variant ? theme.colors?.success : theme.colors?.error };
+  background: ${({ theme, $variant }) => $variant ? theme.colors?.success : theme.colors?.error};
   border: 1px solid ${({ theme }) => theme.colors?.border || "#e5e7eb"};
   font-size: ${({ theme }) => theme.fontSizes?.sm || "0.5rem"};
   color: ${({ theme }) => theme.colors?.card || "#333"};
@@ -220,22 +220,22 @@ export const ResourceAvailability = ({
   const columns = useMemo(() => {
     const cols = ["Resource"];
 
-      if (needsPaging) {
-    cols.push(
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Button
-          size="sm"
-          variant="outline"
-          iconOnly
-          disabled={!canGoPrev}
-          onClick={handlePrevWeek}
-          title="Previous 7 days"
-        >
-          <FaChevronLeft size={11} />
-        </Button>
-      </div>
-    );
-  }
+    if (needsPaging) {
+      cols.push(
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <Button
+            size="sm"
+            variant="outline"
+            iconOnly
+            disabled={!canGoPrev}
+            onClick={handlePrevWeek}
+            title="Previous 7 days"
+          >
+            <FaChevronLeft size={11} />
+          </Button>
+        </div>
+      );
+    }
 
     displayedDayWindow.forEach((d) => {
       const { num, dow } = shortDay(d);
@@ -243,22 +243,22 @@ export const ResourceAvailability = ({
     });
 
 
-  if (needsPaging) {
-    cols.push(
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Button
-          size="sm"
-          variant="outline"
-          iconOnly
-          disabled={!canGoNext}
-          onClick={handleNextWeek}
-          title="Next 7 days"
-        >
-          <FaChevronRight size={11} />
-        </Button>
-      </div>
-    );
-  }
+    if (needsPaging) {
+      cols.push(
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <Button
+            size="sm"
+            variant="outline"
+            iconOnly
+            disabled={!canGoNext}
+            onClick={handleNextWeek}
+            title="Next 7 days"
+          >
+            <FaChevronRight size={11} />
+          </Button>
+        </div>
+      );
+    }
 
     cols.push("Action");
     return cols;
@@ -302,7 +302,7 @@ export const ResourceAvailability = ({
 
   return (
     <Card hoverable={false}
-      title={`Resource Availability (${formatDate(activityStart)} – ${formatDate(activityEnd)}})`}
+      title={`Resource Availability (${formatDate(activityStart)} – ${formatDate(activityEnd)})`}
     >
       <InfoStrip>
         <InfoPill>
@@ -312,7 +312,7 @@ export const ResourceAvailability = ({
         </InfoPill>
         <InfoPill>
           <FaUsers size={10} />TL
-          <span style={{fontWeight: 600}}>Planned:</span> {plannedTL}
+          <span style={{ fontWeight: 600 }}>Planned:</span> {plannedTL}
           {/* <span style={{ marginLeft: 6 , fontWeight: 600}}>Selected:</span> {selectedTLTotal} */}
           {/* {selectedTLTotal < plannedTL && (
             <ShortPill>Short {plannedTL - selectedTLTotal} TL</ShortPill>
@@ -320,7 +320,7 @@ export const ResourceAvailability = ({
         </InfoPill>
         <InfoPill>
           <FaUser size={10} />EX
-          <span style={{fontWeight: 600}}>Planned:</span> {plannedEX}
+          <span style={{ fontWeight: 600 }}>Planned:</span> {plannedEX}
           {/* <span style={{ marginLeft: 6, fontWeight: 600 }}>Selected:</span> {selectedEXTotal} */}
           {/* {selectedEXTotal < plannedEX && (
             <ShortPill>Short {plannedEX - selectedEXTotal} EX</ShortPill>
@@ -328,7 +328,7 @@ export const ResourceAvailability = ({
         </InfoPill>
       </InfoStrip>
 
-<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
         {needsPaging && (
           <Button size="sm" variant="outline" iconOnly disabled={!canGoPrev} onClick={handlePrevWeek} title="Previous 7 days">
             <FaChevronLeft size={11} />
@@ -341,8 +341,8 @@ export const ResourceAvailability = ({
 
           const matchedPlanRequiredResource = plannedTL === c.tl && plannedEX === c.ex;
           return (
-            <InfoPill1 key={dStr} style={{ fontSize: "0.75rem" }} variant={matchedPlanRequiredResource}>
-              <span style={{fontWeight: 600}}>{num} {dow}:</span> TL {c.tl} · EX {c.ex}
+            <InfoPill1 key={dStr} style={{ fontSize: "0.75rem" }} $variant={matchedPlanRequiredResource}>
+              <span style={{ fontWeight: 600 }}>{num} {dow}:</span> TL {c.tl} · EX {c.ex}
             </InfoPill1>
           );
         })}
@@ -418,7 +418,7 @@ export const ResourceAvailability = ({
                   </div>
                 </ResourceCell>
               </Td>
-             {needsPaging &&  <Td></Td>}
+              {needsPaging && <Td></Td>}
               {displayedDayWindow.map((d) => {
                 const dStr = formatToApiDate(d)
                 const isAssigned = !!employeeDateMap[emp.emp_id]?.[dStr];
@@ -426,7 +426,7 @@ export const ResourceAvailability = ({
                 const isBusy = !!busyDateMap[emp.emp_id]?.[dStr];
                 // console.log("busyDateMap", busyDateMap)
                 // console.log("employeeDateMap", JSON.stringify(employeeDateMap))
-                // console.log("dStr", dStr)
+                console.log("isAssigned", isAssigned)
 
                 const disabled = isBusy && !isAssigned;
                 const isAfterEnd = activityEnd ? (dStr > DateForApiFormate(activityEnd, true)) : false;
@@ -446,7 +446,7 @@ export const ResourceAvailability = ({
                   </Td>
                 );
               })}
-             {needsPaging && <Td></Td>}
+              {needsPaging && <Td></Td>}
               <Td>
                 <div style={{ marginLeft: '0.5rem' }}>
                   {hasAssignableDate ? (

@@ -1500,6 +1500,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
               // preserve API flags
               is_approved: Boolean(row.is_approved),
               is_present: Boolean(row.is_present),
+              is_active: Boolean(row.is_active),
 
               // useful later for update API
               allocation_id: row.allocation_id,

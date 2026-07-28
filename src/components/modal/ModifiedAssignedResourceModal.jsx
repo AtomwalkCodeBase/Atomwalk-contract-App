@@ -265,14 +265,13 @@ const ResourceAllocation = () => {
         start_date: item.start_date,
         end_date: item.end_date,
         is_approved: !!item.is_approved,
+        is_active: !!item.is_active,
       }));
 
       setOriginalAllocations(normalized);
-      setWorkingAllocations(normalized.map((r) => ({ ...r, rowKey: `existing_${r.id}` })));
+      setWorkingAllocations(normalized.filter((data) => data.is_active).map((r) => ({ ...r, rowKey: `existing_${r.id}` })));
 
-      setBusyAllocations(
-        busyData.filter((x) => x.allocation_id !== activityData?.original_P?.id)
-      );
+      setBusyAllocations(busyData.filter((x) => x.allocation_id !== activityData?.original_P?.id && x.is_active !== false));
       await refreshActivityData();
     } catch {
       toast.error("Failed to load allocation data");
@@ -555,6 +554,32 @@ const ResourceAllocation = () => {
   // ---- Save ----
 
   const handleSaveClick = () => {
+     const hasTLResource = workingAllocations.some(
+    (row) => row.emp_type === "T" && row.is_active !== false
+  );
+
+  const hasEXResource = workingAllocations.some(
+    (row) => row.emp_type === "E" && row.is_active !== false
+  );
+
+  // Validate TL Contract Rate
+  if (
+    hasTLResource &&
+    (!tlContractRate || Number(tlContractRate) <= 0)
+  ) {
+    toast.error("Please enter TL Contract Rate");
+    return;
+  }
+
+  // Validate EX Contract Rate
+  if (
+    hasEXResource &&
+    (!exContractRate || Number(exContractRate) <= 0)
+  ) {
+    toast.error("Please enter EX Contract Rate");
+    return;
+  }
+
     const plannedDateSet = new Set(
       workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
     );
@@ -596,6 +621,29 @@ const ResourceAllocation = () => {
   };
 
   const handleSubmit = async () => {
+    const hasTLResource = workingAllocations.some(
+    (row) => row.emp_type === "T" && row.is_active !== false
+  );
+
+  const hasEXResource = workingAllocations.some(
+    (row) => row.emp_type === "E" && row.is_active !== false
+  );
+
+  if (
+    hasTLResource &&
+    (!tlContractRate || Number(tlContractRate) <= 0)
+  ) {
+    toast.error("Please enter TL Contract Rate");
+    return;
+  }
+
+  if (
+    hasEXResource &&
+    (!exContractRate || Number(exContractRate) <= 0)
+  ) {
+    toast.error("Please enter EX Contract Rate");
+    return;
+  }
     try {
       setIsSubmitting(true);
       const p_id = activityData?.original_P?.id;
