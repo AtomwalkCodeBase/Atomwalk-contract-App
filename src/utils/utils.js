@@ -389,8 +389,9 @@ export const matchClaimsToActivity = (claims = [], activity) => {
     .filter(Boolean);
 };
 
-export const formatRetainerActivities = (apiData = [], resourcePlannedList = []) => {
+export const formatRetainerActivities = (apiData = [], resourcePlannedLists = []) => {
   const grouped = buildActivityGroupMap(apiData);
+  const resourcePlannedList = resourcePlannedLists.filter((item) => item.is_active === true);
 
   const isSameId = (id1, id2) =>
     id1 != null &&
@@ -1578,6 +1579,7 @@ export const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
 
         total_planned_item: 0,
         grouped_data: [],
+        claims: [],
       };
     }
 
@@ -1605,6 +1607,14 @@ export const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
         new Date(acc[key].planned_end_date))
     ) {
       acc[key].planned_end_date = item.planned_end_date;
+    }
+
+      if (item.claims && Array.isArray(item.claims)) {
+      item.claims.forEach((c) => {
+        if (!acc[key].claims.some((existing) => existing.master_claim_id === c.master_claim_id)) {
+          acc[key].claims.push(c);
+        }
+      });
     }
 
     acc[key].grouped_data.push(item);

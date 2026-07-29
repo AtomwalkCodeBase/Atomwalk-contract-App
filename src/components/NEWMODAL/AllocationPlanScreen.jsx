@@ -105,6 +105,19 @@ const AllocationPlanScreen = () => {
 
   const plannedTL = matchingRetainer?.tl_count || 0;
   const plannedEX = matchingRetainer?.ex_count || 0;
+  const plannedTLRate = matchingRetainer?.tl_rate ;
+  const plannedEXRate = matchingRetainer?.ex_rate ;
+
+  const [tlContractRate, setTlContractRate] = useState(plannedTLRate ?? "");
+  const [exContractRate, setExContractRate] = useState(plannedEXRate ?? "");
+
+    useEffect(() => {
+    if (workingAllocations.length !== 0) return;
+  
+    setTlContractRate(plannedTLRate ?? 0);
+    setExContractRate(plannedEXRate ?? 0);
+  }, [workingAllocations.length, plannedTLRate, plannedEXRate]);
+  
 
   const loadAllData = async () => {
     const { id: allocation_id } = ActivityDetails?.original_P || {};
@@ -114,22 +127,12 @@ const AllocationPlanScreen = () => {
         fetchContractAllocations({ emp_id: loggedEmpId, start_date: DateForApiFormate(start), end_date: DateForApiFormate(end) }),
       ]);
 
-      const normalized = currentAllocations.map((item) => ({
-        id: item.id,
-        emp_id: item.emp_id,
-        employee_name: item.employee_name,
-        emp_type: item.emp_type,
-        remarks: item.remarks || "",
-        contract_rate: item.contract_rate,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        is_approved: !!item.is_approved,
-      }));
+      const normalized = currentAllocations.filter((item) => item.is_active === true);
 
       setOriginalAllocations(normalized);
       setWorkingAllocations(normalized.map((r) => ({ ...r, rowKey: `existing_${r.id}` })));
 
-      setBusyAllocations(busyData.filter((x) => x.allocation_id !== ActivityDetails?.original_P?.id));
+      setBusyAllocations(busyData.filter((x) => x.allocation_id !== ActivityDetails?.original_P?.id && x.is_active === true));
       const payload = {
         emp_id: loggedEmpId,
         start_date: DateForApiFormate(start),
@@ -190,6 +193,13 @@ const AllocationPlanScreen = () => {
 
   const ownershipMap = useMemo(() => buildOwnershipMap(originalAllocations), [originalAllocations]);
 
+    const getContractRateByType = (empType) => {
+      if (empType === "T") {
+        return tlContractRate === "" ? 0 : Number(tlContractRate);
+      }
+      return exContractRate === "" ? 0 : Number(exContractRate);
+    };
+
   const handleToggleAllocation = (emp, targetDate, checked) => {
     const targetDateComparable = DateForApiFormate(targetDate, true);
     setWorkingAllocations((prev) => {
@@ -199,6 +209,7 @@ const AllocationPlanScreen = () => {
       const nextDates = checked
         ? [...currentDates, targetDateComparable]
         : currentDates.filter((d) => d !== targetDateComparable);
+      const empType = Number(emp.grade_level) > 1 ? "T" : "E";
 
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
@@ -206,9 +217,9 @@ const AllocationPlanScreen = () => {
         ownershipMap,
         employeeMeta: {
           employee_name: emp.name,
-          emp_type: Number(emp.grade_level) > 1 ? "T" : "E",
+          emp_type: empType,
           remarks: "",
-          contract_rate: 0,
+          contract_rate: getContractRateByType(empType),
           is_approved: false,
         },
         existingRowsForEmp: empRows,
@@ -235,15 +246,16 @@ const AllocationPlanScreen = () => {
       const others = prev.filter((r) => r.emp_id !== emp.emp_id);
       const empRows = prev.filter((r) => r.emp_id === emp.emp_id);
       const currentDates = empRows.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date));
+      const empType = Number(emp.grade_level) > 1 ? "T" : "E";
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
         activeDates: [...currentDates, ...freeDatesComparable],
         ownershipMap,
         employeeMeta: {
           employee_name: emp.name,
-          emp_type: Number(emp.grade_level) > 1 ? "T" : "E",
+          emp_type: empType,
           remarks: "",
-          contract_rate: 0,
+          contract_rate: getContractRateByType(empType),
           is_approved: false,
         },
         existingRowsForEmp: empRows,
@@ -274,6 +286,7 @@ const AllocationPlanScreen = () => {
       const remainingDates = empRows
         .flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
         .filter((d) => !removeSet.has(d));
+      const empType = Number(emp.grade_level) > 1 ? "T" : "E";
 
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
@@ -281,9 +294,9 @@ const AllocationPlanScreen = () => {
         ownershipMap,
         employeeMeta: {
           employee_name: emp.name,
-          emp_type: Number(emp.grade_level) > 1 ? "T" : "E",
+          emp_type: empType,
           remarks: "",
-          contract_rate: 0,
+          contract_rate: getContractRateByType(empType),
           is_approved: false,
         },
         existingRowsForEmp: empRows,
@@ -449,9 +462,11 @@ const AllocationPlanScreen = () => {
         handleCancelEdit={handleCancelEdit}
         activityStart={activityStart}
         activityEnd={activityEnd}
-        activityData={ActivityDetailCard}
+        activityData={ActivityDetails}
         isActual={false}
         employeeList={employeeState?.data?.filter((e) => e.is_verified) || []}
+        plannedTL={plannedTL}
+        plannedEX={plannedEX}
       />
 
       {!["AA", "AS", "C", "PA"].includes(ActivityDetails.activityStatus) &&

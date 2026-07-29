@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Card from '../Card'
-import { DateForApiFormate, formatToApiDate, getMonthRange } from '../../utils/utils';
+import { DateForApiFormate, formatDate, formatToApiDate, getMonthRange } from '../../utils/utils';
 import { useFilter } from '../../hooks/useFilter';
 import { useActivity } from '../../context/ActivityClaimContext';
 import { toast } from 'react-toastify';
 import styled from 'styled-components';
+import ResourceRowCard from '../ScreenComponents/ResourceRowCard';
 
 const ScrollableTableWrapper = styled.div`
   max-height: 800px;
@@ -50,18 +51,19 @@ const Section = styled.div`
 `;
 
 const SectionTitle = styled.div`
-  font-size: 1rem;
+  font-size: ${({ theme }) => theme.fontSizes.lg};
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors?.primary || '#888'};
-  margin-bottom: 8px;
+  margin-bottom: ${({ theme }) => theme.spacing.xs};
 `;
 
 const PlanActualGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  padding: ${({ theme }) => theme.spacing.sm};
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
@@ -113,6 +115,35 @@ const EmptyRow = styled.div`
   color: #999;
 `;
 
+const SubPanel = styled.div`
+  border: 1px solid #eee;
+  border-radius: 6px;
+  overflow: hidden;
+`;
+
+const SubPanelHeader = styled.div`
+  background: ${({ $variant, theme }) =>
+    $variant === 'plan'
+      ? (theme.colors?.backgroundAlt || '#f1f5f9')
+      : '#fff7ed'};
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: ${({ $variant }) => ($variant === 'plan' ? '#334155' : '#9a5b13')};
+`;
+
+const CountPill1 = styled.div`
+  font-size: 0.8rem;
+  color:  ${({ theme }) => theme.colors?.text || '#333'};
+  /* strong { color: ${({ theme }) => theme.colors?.text || '#333'}; } */
+  background-color: ${({ theme, $variant }) => ($variant ? theme.colors.backgroundAlt : "")};
+  padding: ${({ theme }) => theme.spacing.xs || '0.75rem'};
+  border-radius: ${({ theme }) => theme.borderRadius.md || '0.25rem'};
+`;
+
+
 
 const ResourceOverviewCard = ({
 	dateWiseAssignments,
@@ -128,6 +159,8 @@ const ResourceOverviewCard = ({
 	activityData,
 	isActual,
 	employeeList,
+  plannedTL,
+  plannedEX,
 }) => {
 	  const loggedEmpId = localStorage.getItem("cust_emp_id");
 	const { activityState, resourceAllocationState, employeeState, fetchEmpActivityAllocations, fetchContractAllocations, fetchEmployees, } = useActivity();
@@ -139,65 +172,53 @@ const ResourceOverviewCard = ({
 
 	const [filterDate, setFilterDate] = useState({ start: "", end: "" });
 	const [actualDraftsByDate, setActualDraftsByDate] = useState({});
-		const [resourceList, setResourceList] = useState([]);
+		// const [resourceList, setResourceList] = useState(resourceAllocationData || []);
 
+const allocationIds = useMemo(() => {
+		return [
+			...new Set(
+				(activityData?.allAEntries || [])
+					.map((item) => item.id)
+					.filter(Boolean)
+			),
+		];
+	}, [activityData]);
 
-const fetchResourceData = useCallback(async () => {
-  const allocationIds = [
-    ...new Set(
-      (activityData?.allAEntries || [])
-        .map((item) => item.id)
-        .filter(Boolean)
-    )
-  ];
+  useEffect(() => {
+		if (!allocationIds.length) return;
+		if (resourceAllocationData?.length > 0) return; // already have data → skip API
 
-  if (!allocationIds.length) {
-    setResourceList([]);
-    return;
-  }
+		const load = async () => {
+			try {
+				setLoading(true);
+				await fetchContractAllocations({
+					emp_id: loggedEmpId,
+					start_date: DateForApiFormate(start),
+					end_date: DateForApiFormate(end),
+				});
+			} catch (error) {
+				console.error("Failed to fetch resource data:", error);
+				toast.error("Failed to load resource data");
+			} finally {
+				setLoading(false);
+			}
+		};
 
-  try {
-    setLoading(true);
+		load();
+	}, [allocationIds, resourceAllocationData, loggedEmpId, start, end, fetchContractAllocations]);
 
-    // Call API only if data is not already available
-    if (!resourceAllocationData || resourceAllocationData.length === 0) {
-      await fetchContractAllocations({
-        emp_id: loggedEmpId,
-        start_date: DateForApiFormate(start),
-        end_date: DateForApiFormate(end),
-      });
-    }
+const resourceList = useMemo(() => {
+  if (!allocationIds.length || !activityData?.p_id) return [];
+  const rawData = resourceAllocationData || [];
+  const planId = activityData.p_id;
 
-    // Filter the data from context (do not set anything inside fetchContractAllocations)
-    const rawData = resourceAllocationData || [];
-
-    const filteredData = Array.isArray(rawData)
-      ? rawData.filter((item) =>
-          item?.is_active === true &&
-          allocationIds.includes(item?.allocation_id || item?.id)
-        )
-      : [];
-
-    setResourceList(filteredData);
-  } catch (error) {
-    console.error("Failed to fetch resource data:", error);
-    toast.error("Failed to load resource data");
-    setResourceList([]);
-  } finally {
-    setLoading(false);
-  }
-}, [
-  activityData,
-  loggedEmpId,
-  start,
-  end,
-  resourceAllocationData,
-  fetchContractAllocations,
-]);
-
-useEffect(() => {
-  fetchResourceData();
-}, [fetchResourceData]);
+  return rawData.filter(
+    (item) =>
+      item?.is_active === true && 
+      (item?.allocation_id === planId || 
+       allocationIds.includes(item?.allocation_id || item?.id))
+  );
+}, [resourceAllocationData, allocationIds, activityData?.p_id]);
 
 	const plannedDates = [
 		...dayWindow
@@ -222,6 +243,12 @@ useEffect(() => {
 			},
 		},
 	});
+
+  // console.log("plannedDates", plannedDates)
+  // console.log("dateWiseAssignments", dateWiseAssignments)
+  // console.log("resourceList", resourceList)
+  // console.log("resourceAllocationData", resourceAllocationData)
+  // console.log("activityData", activityData)
 
 	return (
 		<Card title="Resource Overview">
@@ -254,7 +281,9 @@ useEffect(() => {
 							const tlCount = planAssignments.filter((a) => a.emp_type === 'T').length;
 							const exCount = planAssignments.filter((a) => a.emp_type === 'E').length;
 
-							const actualResourcesForDate = resourceList.filter((row) => {
+              // console.log("planAssignments", planAssignments)
+
+							const allResourcesForDate = resourceList.filter((row) => {
 											if (!row?.s_date || !row?.e_date) return false;
 							
 											const currentDate = DateForApiFormate(dStr, true);
@@ -268,11 +297,110 @@ useEffect(() => {
 											  currentDate >= startDate &&
 											  currentDate <= endDate
 											);
-										  })
+										  }).map((row) => ({
+                        ...row,
+                        rowKey: `api-${row.id}-${row.allocation_id}-${dStr}`,
+                        original_emp_id: row.emp_id,
+                        resource_id: row.id,
+                      }));
 
-										  console.log("actualResourcesForDate", actualResourcesForDate)
+                const actualResourceData = allResourcesForDate.filter((data) => data.is_active && data.allocation_id !== activityData?.p_id)
 
-}))} 
+                      const matchedPlanRequiredResource = plannedTL === tlCount && plannedEX === exCount;
+                      
+                      console.log("actualResourceData", actualResourceData)
+
+                      return(
+                        <DateBlock key={dStr}>
+                          <DateHeader>
+                            <HeaderDate>{formatDate(d)}</HeaderDate>
+                  <div style={{display: "flex", gap: "0.5rem"}}>
+                    {!matchedPlanRequiredResource && <CountPill1 $variant={true}>
+                     Required (TL: <strong>{plannedTL}</strong> &nbsp;&nbsp; EX: <strong>{plannedEX}</strong>)
+                    </CountPill1>}
+
+                    <CountPill $variant={matchedPlanRequiredResource}>
+                      TL: <strong>{tlCount}</strong> &nbsp;&nbsp; EX: <strong>{exCount}</strong>
+                    </CountPill>
+                  </div>
+                          </DateHeader>
+
+                          {/* Allocation tabs(Plan and actual) */}
+                          <Section>
+                            <SectionTitle>Resource Details</SectionTitle>
+                          </Section>
+
+                          <PlanActualGrid>
+                            {/* PLAN */}
+                            <SubPanel>
+                                <SubPanelHeader $variant="plan" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <span>Plan</span>
+                                </SubPanelHeader>
+
+
+                            {planAssignments.length === 0 ? (
+                              <EmptyRow>No resources planned</EmptyRow>
+                            ) : (
+                              planAssignments.map((row) => {
+                                const disableAction = row.is_approved || activityData?.allAEntries?.length;
+                                const isEditing = editingId === row.rowKey;
+                                
+                                return(
+                                  <ResourceRowCard
+                                  row={row}
+                                    dateStr={dStr}
+                                    isEditing={isEditing}
+                                    onEdit={handleEditDate}
+                                    onRemove={handleDeleteDate}
+                                    disabled={disableAction}
+                                    />
+                                  )
+                                })
+                              )
+
+                            }
+                            
+                              </SubPanel>
+
+                            {/* ACTUAL */}
+                            <SubPanel>
+                                <SubPanelHeader $variant="actual" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <span>Actual</span>
+                                </SubPanelHeader>
+
+
+                            {actualResourceData.length === 0 ? (
+                              <EmptyRow>No resources planned</EmptyRow>
+                            ) : (
+                              actualResourceData.map((row) => {
+                              const disableAction = row.is_approved === true || row.is_present === true;
+                              const isEditing = editingId === row.rowKey;
+                                
+                                return(
+                                  <ResourceRowCard
+                                  row={row}
+                                    dateStr={dStr}
+                                    isEditing={isEditing}
+                                    onEdit={handleEditDate}
+                                    onRemove={handleDeleteDate}
+                                    disabled={disableAction}
+                                    />
+                                  )
+                                })
+                              )
+
+                            }
+                            
+                              </SubPanel>
+
+                          </PlanActualGrid>
+
+                          
+
+                        </DateBlock>
+
+                      )
+              }))}
 
 
 

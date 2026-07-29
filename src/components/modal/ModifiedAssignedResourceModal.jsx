@@ -255,18 +255,19 @@ const ResourceAllocation = () => {
         loadExisting({ emp_id: loggedEmpId, start_date: DateForApiFormate(start), end_date: DateForApiFormate(end) }),
       ]);
 
-      const normalized = currentAllocations.map((item) => ({
-        id: item.id,
-        emp_id: item.emp_id,
-        employee_name: item.employee_name,
-        emp_type: item.emp_type,
-        remarks: item.remarks || "",
-        contract_rate: item.contract_rate,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        is_approved: !!item.is_approved,
-        is_active: !!item.is_active,
-      }));
+      // const normalized = currentAllocations.map((item) => ({
+      //   id: item.id,
+      //   emp_id: item.emp_id,
+      //   employee_name: item.employee_name,
+      //   emp_type: item.emp_type,
+      //   remarks: item.remarks || "",
+      //   contract_rate: item.contract_rate,
+      //   start_date: item.start_date,
+      //   end_date: item.end_date,
+      //   is_approved: !!item.is_approved,
+      //   is_active: !!item.is_active,
+      // }));
+      const normalized = currentAllocations.filter((item) => item.is_active === true);
 
       setOriginalAllocations(normalized);
       setWorkingAllocations(normalized.filter((data) => data.is_active).map((r) => ({ ...r, rowKey: `existing_${r.id}` })));
