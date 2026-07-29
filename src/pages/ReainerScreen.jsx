@@ -117,6 +117,12 @@ const SearchBox = styled.input`
   }
 `;
 
+const Note = styled.span`
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors?.text || '#333'};
+`
+
 
 const RetainerScreen = () => {
   const { profile } = useAuth();
@@ -500,7 +506,7 @@ const RetainerScreen = () => {
         />)}
       </StatsGrid>
 
-      <Card hoverable={false}>
+      <Card hoverable={false} title="Resource List">
         <FilterRow>
           <SearchBox type="text" placeholder="Search Auditor's name, ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           <FilterSelect
@@ -523,6 +529,7 @@ const RetainerScreen = () => {
             Clear Filters
           </Button>
         </FilterRow>
+        <Note>**After Document Upload resource will verify</Note>
         <Table>
           <thead>
             <tr>

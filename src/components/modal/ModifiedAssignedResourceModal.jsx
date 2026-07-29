@@ -165,7 +165,11 @@ const ResourceAllocation = () => {
     workingAllocations.forEach((row) => {
       if (!map[row.emp_id]) map[row.emp_id] = {};
       generateDatesBetween(row.start_date, row.end_date).forEach((d) => {
-        map[row.emp_id][d] = row.rowKey;
+        map[row.emp_id][d] = {
+          rowKey: row.rowKey,
+          isAssigned: true,
+          emp_type: row.emp_type,
+        };
       });
     });
     return map;
@@ -296,12 +300,14 @@ const ResourceAllocation = () => {
   const getContractRateByType = (empType) => {
     if (empType === "T") {
       return tlContractRate === "" ? 0 : Number(tlContractRate);
+
+      return plannedTLRate != null ? Number(plannedTLRate) : "";
     }
 
     return exContractRate === "" ? 0 : Number(exContractRate);
   };
 
-  const handleToggleAllocation = (emp, targetDate, checked) => {
+  const handleToggleAllocation = (emp, targetDate, checked, selectedRole) => {
     const targetDateComparable = DateForApiFormate(targetDate, true);
     setWorkingAllocations((prev) => {
       const others = prev.filter((r) => r.emp_id !== emp.emp_id);
@@ -311,7 +317,9 @@ const ResourceAllocation = () => {
         ? [...currentDates, targetDateComparable]
         : currentDates.filter((d) => d !== targetDateComparable);
 
-        const empType = Number(emp.grade_level) > 1 ? "T" : "E";
+      const empType = Number(emp.grade_level) > 1 ? "T" : "E";
+      const dateEmpTypes = checked && selectedRole ? { [targetDateComparable]: selectedRole } : {};
+      const dateEmpRates = checked && selectedRole ? { [targetDateComparable]: getContractRateByType(selectedRole) } : {};
 
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
@@ -321,11 +329,12 @@ const ResourceAllocation = () => {
           employee_name: emp.name,
           emp_type: empType,
           remarks: "",
-          // contract_rate: 0,
-          contract_rate:  getContractRateByType(empType),
+          contract_rate: getContractRateByType(empType),
           is_approved: false,
         },
         existingRowsForEmp: empRows,
+        dateEmpTypes,
+        dateEmpRates,
       });
 
       return mergeAdjacentRows([...others, ...newRows]);
@@ -354,6 +363,14 @@ const ResourceAllocation = () => {
       const empRows = prev.filter((r) => r.emp_id === emp.emp_id);
       const currentDates = empRows.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date));
       const empType = Number(emp.grade_level) > 1 ? "T" : "E";
+      const dateEmpTypes = freeDatesComparable.reduce((acc, d) => {
+        acc[d] = empType;
+        return acc;
+      }, {});
+      const dateEmpRates = freeDatesComparable.reduce((acc, d) => {
+        acc[d] = getContractRateByType(empType);
+        return acc;
+      }, {});
       const newRows = recomputeEmployeeRows({
         empId: emp.emp_id,
         activeDates: [...currentDates, ...freeDatesComparable],
@@ -366,6 +383,8 @@ const ResourceAllocation = () => {
           is_approved: false,
         },
         existingRowsForEmp: empRows,
+        dateEmpTypes,
+        dateEmpRates,
       });
       return mergeAdjacentRows([...others, ...newRows]);
     });
@@ -474,6 +493,52 @@ const ResourceAllocation = () => {
   );
 };
 
+const handleRoleChange = (emp, dStr, nextRole) => {
+    const dStrComparable = DateForApiFormate(dStr, true);
+
+    setWorkingAllocations((prev) => {
+      const others = prev.filter((r) => r.emp_id !== emp.emp_id);
+      const empRows = prev.filter((r) => r.emp_id === emp.emp_id);
+
+      const activeDates = empRows.flatMap((r) =>
+        datesBetweenComparable(r.start_date, r.end_date)
+      );
+
+      if (!activeDates.includes(dStrComparable)) return prev;
+
+      // ADDED — preserve each date's CURRENT type/rate before overriding the one target date
+      const dateEmpTypes = {};
+      const dateEmpRates = {};
+      activeDates.forEach((d) => {
+        const ownerRow = empRows.find(
+          (r) => r.start_date <= d && r.end_date >= d
+        );
+        dateEmpTypes[d] = ownerRow?.emp_type || emp_type_default(emp);
+        dateEmpRates[d] = ownerRow?.contract_rate ?? getContractRateByType(dateEmpTypes[d]);
+      });
+      dateEmpTypes[dStrComparable] = nextRole;
+      dateEmpRates[dStrComparable] = getContractRateByType(nextRole);
+
+      const newRows = recomputeEmployeeRows({
+        empId: emp.emp_id,
+        activeDates,
+        ownershipMap,
+        employeeMeta: {
+          employee_name: emp.name,
+          emp_type: nextRole,
+          remarks: "",
+          contract_rate: getContractRateByType(nextRole),
+          is_approved: false,
+        },
+        existingRowsForEmp: empRows,
+        dateEmpTypes,   // CHANGED — now covers all dates, not just the target
+        dateEmpRates,   // CHANGED
+      });
+
+      return mergeAdjacentRows([...others, ...newRows]);
+    });
+  };
+
   const handleConfirmUpdate = (rowKey) => {
     const row = workingAllocations.find((r) => r.rowKey === rowKey);
     if (!row) {
@@ -492,8 +557,6 @@ const ResourceAllocation = () => {
       toast.error("Dates must fall within the activity's start and end dates");
       return;
     }
-
-    // console.log("workingAllocations", workingAllocations)
 
     const overlaps = workingAllocations.some(
       (r) =>
@@ -565,7 +628,7 @@ const ResourceAllocation = () => {
 
   // Validate TL Contract Rate
   if (
-    hasTLResource &&
+    hasTLResource && plannedTL !== 0 &&
     (!tlContractRate || Number(tlContractRate) <= 0)
   ) {
     toast.error("Please enter TL Contract Rate");
@@ -574,7 +637,7 @@ const ResourceAllocation = () => {
 
   // Validate EX Contract Rate
   if (
-    hasEXResource &&
+    hasEXResource && plannedEX !== 0 &&
     (!exContractRate || Number(exContractRate) <= 0)
   ) {
     toast.error("Please enter EX Contract Rate");
@@ -631,7 +694,7 @@ const ResourceAllocation = () => {
   );
 
   if (
-    hasTLResource &&
+    hasTLResource && plannedTL !== 0 &&
     (!tlContractRate || Number(tlContractRate) <= 0)
   ) {
     toast.error("Please enter TL Contract Rate");
@@ -639,7 +702,7 @@ const ResourceAllocation = () => {
   }
 
   if (
-    hasEXResource &&
+    hasEXResource && plannedEX !== 0 &&
     (!exContractRate || Number(exContractRate) <= 0)
   ) {
     toast.error("Please enter EX Contract Rate");
@@ -816,6 +879,17 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
   const [tlContractRate, setTlContractRate] = useState(plannedTLRate ?? "");
   const [exContractRate, setExContractRate] = useState(plannedEXRate ?? "");
 
+    useEffect(() => {
+    setWorkingAllocations((prev) =>
+      prev.map((row) => {
+        if (row.is_approved) return row; // never touch locked/approved rows
+        const rate = row.emp_type === "T" ? tlContractRate : exContractRate;
+        if (rate === "" || rate == null) return row;
+        return { ...row, contract_rate: Number(rate) };
+      })
+    );
+  }, [tlContractRate, exContractRate]);
+
   // console.log(activityData)
 
   return (
@@ -914,6 +988,8 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
           setTlContractRate={setTlContractRate}
           exContractRate={exContractRate}
           setExContractRate={setExContractRate}
+          getContractRateByType={getContractRateByType}
+          busyDateMap={busyDateMap}
        />
 
         {pendingCount > 0 && (
@@ -944,6 +1020,7 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
           busyDateMap={busyDateMap}
           employeeDateMap={employeeDateMap}
           handleToggleAllocation={handleToggleAllocation}
+          handleRoleChange={handleRoleChange}
           workingAllocations={workingAllocations}
           handleAutoAssign={handleAutoAssign}
           handleUndoAutoAssign={handleUndoAutoAssign}

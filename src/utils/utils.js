@@ -1119,11 +1119,23 @@ export const recomputeEmployeeRows = ({
   ownershipMap,
   employeeMeta,
   existingRowsForEmp,
+  dateEmpTypes = {},
+  dateEmpRates = {},
 }) => {
   const sortedDates = [...new Set(activeDates)].sort();
   if (sortedDates.length === 0) return [];
 
   const ownerOf = (d) => ownershipMap[empId]?.[d] ?? null;
+  const typeOf = (d) => {
+    if (dateEmpTypes[d]) return dateEmpTypes[d];
+    const owner = ownerOf(d);
+    if (owner != null && existingRowsForEmp) {
+      const baseRow = existingRowsForEmp.find((r) => r.id === owner);
+      if (baseRow?.emp_type) return baseRow.emp_type;
+    }
+    return employeeMeta.emp_type || "E";
+  };
+  const rateOf = (d, baseRate) => dateEmpRates[d] ?? baseRate ?? employeeMeta.contract_rate ?? 0;
 
   const byId = {};
   existingRowsForEmp.forEach((r) => {
@@ -1134,18 +1146,20 @@ export const recomputeEmployeeRows = ({
   const rows = [];
   let segStart = sortedDates[0];
   let segOwner = ownerOf(segStart);
+  let segType = typeOf(segStart);
   let prev = segStart;
 
-  const pushSeg = (start, end, owner) => {
+  const pushSeg = (start, end, owner, type) => {
     const base = (owner != null && byId[owner]) || fallback;
+    const baseRate = base.contract_rate ? base.contract_rate : employeeMeta.contract_rate;
     rows.push({
       rowKey: owner != null ? `existing_${owner}` : crypto.randomUUID(),
       id: owner,
       emp_id: empId,
       employee_name: base.employee_name || employeeMeta.employee_name,
-      emp_type: base.emp_type || employeeMeta.emp_type,
+      emp_type: type || base.emp_type || employeeMeta.emp_type,
       remarks: base.remarks || "",
-      contract_rate: base.contract_rate ?? employeeMeta.contract_rate ?? 0,
+      contract_rate: rateOf(start, baseRate),
       start_date: start,
       end_date: end,
       is_approved: !!base.is_approved,
@@ -1155,16 +1169,18 @@ export const recomputeEmployeeRows = ({
   for (let i = 1; i < sortedDates.length; i++) {
     const d = sortedDates[i];
     const owner = ownerOf(d);
-    if (isNextDay(prev, d) && owner === segOwner) {
+    const type = typeOf(d);
+    if (isNextDay(prev, d) && owner === segOwner && type === segType) {
       prev = d;
       continue;
     }
-    pushSeg(segStart, prev, segOwner);
+    pushSeg(segStart, prev, segOwner, segType);
     segStart = d;
     segOwner = owner;
+    segType = type;
     prev = d;
   }
-  pushSeg(segStart, prev, segOwner);
+  pushSeg(segStart, prev, segOwner, segType);
 
   return rows;
 };
@@ -1609,7 +1625,7 @@ export const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
       acc[key].planned_end_date = item.planned_end_date;
     }
 
-      if (item.claims && Array.isArray(item.claims)) {
+    if (item.claims && Array.isArray(item.claims)) {
       item.claims.forEach((c) => {
         if (!acc[key].claims.some((existing) => existing.master_claim_id === c.master_claim_id)) {
           acc[key].claims.push(c);

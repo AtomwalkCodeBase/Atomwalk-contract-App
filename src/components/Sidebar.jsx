@@ -498,7 +498,7 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
         icon: <FaUserCircle />,
         items: [
           { path: "/activity", name: "Activity List", icon: <FaHome /> },
-          { path: "/dashboard", name: "Retainer Dashboard", icon: <FaListUl /> },
+          { path: "/dashboard", name: "Retainer Dashboard", icon: <FaUsers /> },
           // { path: "/finance_user", name: "Approve Dashboard", icon: <FaHome /> },
         ],
       },
@@ -534,7 +534,7 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
   }
   const menuItems =  [
     { path: "/activity", name: "Activity List", icon: <FaHome /> },
-      { path: "/dashboard", name: "Retainer Dashboard", icon: <FaListUl /> },
+      { path: "/dashboard", name: "Retainer Dashboard", icon: <FaUsers /> },
       // { path: "/clam-list", name: "clams", icon: <FaMoneyBill /> },
       // { path: "/profitability-dashboard", name: "Profitability Dashboard", icon: <FaMoneyBillWaveAlt /> },
     ]

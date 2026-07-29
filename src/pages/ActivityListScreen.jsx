@@ -896,10 +896,11 @@ const sortedFilteredData = useMemo(() => {
             onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
           >
             <option value="ALL">All</option>
-            <option value="NA">Not Assigned</option>
+            <option value="NS">Not Planned</option>
+            <option value="PS">Planned Submitted</option>
+            <option value="AS">Actual Submitted</option>
             <option value="P">In Progress</option>
-            <option value="C">Completed</option>
-            <option value="NS">Not Started</option>
+            {/* <option value="NS">Not Started</option> */}
           </FilterSelect>
 
           <Button variant="outline" size='sm'

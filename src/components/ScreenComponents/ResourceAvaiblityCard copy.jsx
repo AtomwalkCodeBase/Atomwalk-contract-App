@@ -110,6 +110,22 @@ const FilterSelect = styled.select`
   }
 `
 
+const FormSelect = styled.select`
+  padding: ${({ theme }) => `${theme?.spacing?.sm || '0.35rem'} ${theme?.spacing?.md || '0.8rem'}`};
+  border: 1px solid ${({ theme }) => theme.colors?.border || '#e5e7eb'};
+  border-radius: 0.375rem;
+  font-size: 0.72rem;
+  background: ${({ theme }) => theme.colors?.card || '#fff'};
+  color: ${({ theme }) => theme.colors?.text || '#333'};
+  width: 100%;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors?.primary || '#6C5CE7'};
+  }
+`
+
 const ResourceCell = styled.div`
   display: flex;
   align-items: center;
@@ -141,6 +157,11 @@ const ShortPill = styled.span`
   color: #ef4444;
   margin-left: 0.25rem;
 `
+const Note = styled.span`
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors?.text || '#333'};
+`
 
 const shortDay = (date) => ({
   num: String(date.getDate()).padStart(2, "0"),
@@ -150,6 +171,11 @@ const shortDay = (date) => ({
 const AVATAR_COLORS = ['#6C5CE7', '#0984e3', '#00b894', '#e17055', '#fd79a8', '#74b9ff', '#55efc4']
 const avatarColor = (str) => AVATAR_COLORS[(str || '').charCodeAt(0) % AVATAR_COLORS.length]
 const initials = (name) => (name || '').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+
+const normalizeRole = (grade) => {
+  const val = String(grade ?? "").trim().toUpperCase();
+  return ["2", "T"].includes(val) ? "TL" : "EX";
+};
 
 export const ResourceAvailability = ({
   employees,
@@ -164,14 +190,16 @@ export const ResourceAvailability = ({
   employeeDateMap,
 
   handleToggleAllocation,
+  handleRoleChange,
   handleAutoAssign,
   handleUndoAutoAssign,
   lastAutoAssign,
 }) => {
   const [filter, setFilter] = useState({ search: "", roleFilter: "ALL" });
+  const [roleByDate, setRoleByDate] = useState({});
 
   const mappedEmployees = useMemo(() => employees.map((emp) => ({
-    ...emp, role: Number(emp.grade_level) > 1 ? "TL" : "EX",
+    ...emp, role: normalizeRole(emp.grade_level),
   })), [employees]);
 
   const WINDOW_SIZE = 6;               // was 7 — align with the 6-day pill strip
@@ -237,10 +265,24 @@ export const ResourceAvailability = ({
       );
     }
 
-    displayedDayWindow.forEach((d) => {
-      const { num, dow } = shortDay(d);
-      cols.push(`${num} ${dow}`);
-    });
+  displayedDayWindow.forEach((d, index) => {
+    const { num, dow } = shortDay(d);
+    cols.push(
+      <div 
+        key={index}
+        style={{ 
+          textAlign: "center",
+          padding: "0px 0",
+          margin: "0 0px",
+          minWidth: "40px"
+        }}
+      >
+        <div style={{ fontWeight: "bold" }}>
+          {num} {dow}
+        </div>
+      </div>
+    );
+  });
 
 
     if (needsPaging) {
@@ -272,24 +314,16 @@ export const ResourceAvailability = ({
     counts[dStr] = { tl: 0, ex: 0 };
   });
 
-  const empTypeById = {};
-  mappedEmployees.forEach((emp) => {
-    empTypeById[emp.emp_id] = emp.role; // "TL" | "EX"
-  });
-
-  Object.entries(employeeDateMap).forEach(([empId, dateMap]) => {
-    const role = empTypeById[empId];
-    if (!role) return;
-
-    Object.entries(dateMap).forEach(([dStr, isAssigned]) => {
-      if (!isAssigned || !counts[dStr]) return;
-      if (role === "TL") counts[dStr].tl += 1;
+  Object.values(employeeDateMap).forEach((dateMap) => {
+    Object.entries(dateMap).forEach(([dStr, info]) => {
+      if (!info?.isAssigned || !counts[dStr]) return;
+      if (info.emp_type === "T") counts[dStr].tl += 1;
       else counts[dStr].ex += 1;
     });
   });
 
     return counts;
-  }, [employeeDateMap, mappedEmployees, dayWindow]);
+  }, [employeeDateMap, dayWindow]);
 
   const selectedTLTotal = useMemo(
     () => workingAllocations.filter((x) => x.emp_type === "T" && x.action !== "DELETE").length,
@@ -382,6 +416,8 @@ export const ResourceAvailability = ({
         </FilterSelect>
       </div>
 
+      <Note>**If you want to change the emp type then 1st select the role then select the date.</Note>
+
       <DataTable
         columns={columns}
         data={paginatedEmployees}
@@ -420,29 +456,44 @@ export const ResourceAvailability = ({
               </Td>
               {needsPaging && <Td></Td>}
               {displayedDayWindow.map((d) => {
-                const dStr = formatToApiDate(d)
-                const isAssigned = !!employeeDateMap[emp.emp_id]?.[dStr];
+                const dStr = formatToApiDate(d);
+                const info = employeeDateMap[emp.emp_id]?.[dStr];
+                const isAssigned = !!info?.isAssigned;
+                const defaultRole = Number(emp.grade_level) > 1 ? "T" : "E";
+                const selectedRole = info?.emp_type || roleByDate[`${emp.emp_id}|${dStr}`] || defaultRole;
 
                 const isBusy = !!busyDateMap[emp.emp_id]?.[dStr];
-                // console.log("busyDateMap", busyDateMap)
-                // console.log("employeeDateMap", JSON.stringify(employeeDateMap))
-                console.log("isAssigned", isAssigned)
-
                 const disabled = isBusy && !isAssigned;
                 const isAfterEnd = activityEnd ? (dStr > DateForApiFormate(activityEnd, true)) : false;
 
                 return (
-                  <Td key={dStr} style={{ textAlign: "left" }}>
-                    {/* <Dot color={isBusy ? '#ef4444' : '#10b981'} /> */}
-                    {/* {isBusy ? '❌' : '✅' } */}
-                    <input
-                      type="checkbox"
-                      checked={isAssigned || isBusy}
-                      disabled={isBusy}
-                      onChange={(e) => handleToggleAllocation(emp, dStr, e.target.checked)}
-                      style={{ width: 16, height: 16, accentColor: '#6C5CE7', cursor: isBusy ? 'not-allowed' : 'pointer' }}
-                      title={isAssigned ? 'Already assigned on this date' : (isBusy ? 'Not available on this date' : (isAfterEnd ? 'After activity end date' : 'Click to select'))}
-                    />
+                  <Td key={dStr} style={{ textAlign: "center" }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={isAssigned || isBusy}
+                        disabled={isBusy}
+                        onChange={(e) => handleToggleAllocation(emp, dStr, e.target.checked, selectedRole)}
+                        style={{ width: 16, height: 16, accentColor: '#6C5CE7', cursor: isBusy ? 'not-allowed' : 'pointer', }}
+                        title={isAssigned ? 'Already assigned on this date' : (isBusy ? 'Not available on this date' : (isAfterEnd ? 'After activity end date' : 'Click to select'))}
+                      />
+                      <FormSelect
+                        value={selectedRole}
+                        disabled={isBusy}
+                        onChange={(e) => {
+                          const nextRole = e.target.value;
+                          setRoleByDate((prev) => ({
+                            ...prev,
+                            [`${emp.emp_id}|${dStr}`]: nextRole,
+                          }));
+                          handleRoleChange(emp, dStr, nextRole);
+                        }}
+                        style={{ width: '80%' }}
+                      >
+                        <option value="E">Executive (EX)</option>
+                        <option value="T">Team Lead (TL)</option>
+                      </FormSelect>
+                    </div>
                   </Td>
                 );
               })}

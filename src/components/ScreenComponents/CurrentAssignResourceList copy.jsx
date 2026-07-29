@@ -85,6 +85,9 @@ const SubPanel = styled.div`
   border: 1px solid #eee;
   border-radius: 6px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 `;
 
 const SubPanelHeader = styled.div`
@@ -359,6 +362,8 @@ const CurrentAssignments = ({
   setTlContractRate,
   exContractRate,
   setExContractRate,
+  getContractRateByType,
+  busyDateMap = {},
 }) => {
   const loggedEmpId = localStorage.getItem("cust_emp_id");
 
@@ -447,14 +452,6 @@ useEffect(() => {
       setExContractRate(plannedEXRate);
     }
   }, [plannedTLRate, plannedEXRate]);
-
-  const getContractRateByType = (empType) => {
-  if (empType === "T") {
-    return tlContractRate === "" ? "" : Number(tlContractRate);
-  }
-
-  return exContractRate === "" ? "" : Number(exContractRate);
-};
 
 const handleStartActivityOnce = async () => {
   try {
@@ -652,21 +649,21 @@ const handleSubmitAllActuals = async () => {
         console.log(key, value);
       }
 
-      // if (hasAddOrUpdate) {
-      //   const activityCompleteFd = new FormData();
-      //   activityCompleteFd.append("emp_id", loggedEmpId);
-      //   activityCompleteFd.append("a_id", aIdForDate);
-      //   activityCompleteFd.append("call_mode", "UPDATE");
-      //   activityCompleteFd.append("activity_date", DateForApiFormate(rows[0]?.start_date));
-      //   activityCompleteFd.append("geo_type", "O");
-      //   activityCompleteFd.append("is_complete", "1");
+      if (hasAddOrUpdate) {
+        const activityCompleteFd = new FormData();
+        activityCompleteFd.append("emp_id", loggedEmpId);
+        activityCompleteFd.append("a_id", aIdForDate);
+        activityCompleteFd.append("call_mode", "UPDATE");
+        activityCompleteFd.append("activity_date", DateForApiFormate(rows[0]?.start_date));
+        activityCompleteFd.append("geo_type", "O");
+        activityCompleteFd.append("is_complete", "1");
 
-      //   await postActivityAllocationData(activityCompleteFd);
+        await postActivityAllocationData(activityCompleteFd);
 
-      //   for (let [key, value] of activityCompleteFd.entries()) {
-      //     console.log(key, value);
-      //   }
-      // }
+        for (let [key, value] of activityCompleteFd.entries()) {
+          console.log(key, value);
+        }
+      }
     }
 
     // setActualDraftsByDate((prev) => {
@@ -886,8 +883,25 @@ const handleConfirmActualRange = () => {
   };
 
   const handleAddActualRow = (dStr) => {
+        const planAssignments = dateWiseAssignments[dStr] || []; // ADDED
+
+    // ADDED — prefer the plan's own rate for a given emp_type on this date, fallback to global/plan default
+    const rateForType = (empType) => {
+ const planRow = planAssignments.find((r) => r.emp_type === empType && r.contract_rate);
+      if (planRow) return planRow.contract_rate;
+
+      // ADDED — fallback across all planned dates if this date has no matching type
+      for (const dateKey of Object.keys(dateWiseAssignments)) {
+        const match = (dateWiseAssignments[dateKey] || []).find((r) => r.emp_type === empType && r.contract_rate);
+        if (match) return match.contract_rate;
+      }
+
+      return getContractRateByType(empType);
+    };
+
     setActualDraftsByDate((prev) => {
       const draft = prev[dStr] || { confirmed: false, rows: [] };
+      const defaultType = Number(employees[0]?.grade_level) > 1 ? "T" : "E";
       return {
         ...prev,
         [dStr]: {
@@ -899,9 +913,9 @@ const handleConfirmActualRange = () => {
               original_emp_id: null, // brand-new resource → always "Replaced"/new
               emp_id: employees[0]?.emp_id || "",
               employee_name: employees[0]?.name || "",
-              emp_type: Number(employees[0]?.grade_level) > 1 ? "T" : "E",
+              emp_type: defaultType,
               remarks: "",
-              contract_rate: getContractRateByType(Number(employees[0]?.grade_level) > 1 ? "T" : "E"),
+              contract_rate: rateForType(defaultType),
               start_date: dStr,
               end_date: dStr,
             },
@@ -923,7 +937,7 @@ const handleCopyActual = (dStr, planAssignments) => {
         employee_name: row.employee_name,
         emp_type: row.emp_type,
         remarks: row.remarks || "",
-        contract_rate: getContractRateByType(row.emp_type),
+        contract_rate: row.contract_rate || getContractRateByType(row.emp_type),
         start_date: dStr,
         end_date: dStr,
       })),
@@ -966,7 +980,7 @@ const handleCopyAllActual = () => {
           employee_name: row.employee_name,
           emp_type: row.emp_type,
           remarks: row.remarks || "",
-          contract_rate: getContractRateByType(row.emp_type),
+          contract_rate: row.contract_rate || getContractRateByType(row.emp_type),
           start_date: dStr,
           end_date: dStr,
         })),
@@ -1071,6 +1085,9 @@ const handleCancelApiRowEdit = (dStr, rowKey, originalRow) => {
     next.delete(rowKey);
     return next;
   });
+
+  if (!originalRow) return;
+
   setActualDraftsByDate((prev) => {
     const draft = prev[dStr];
     if (!draft) return prev;
@@ -1329,7 +1346,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
             employee_name: r.employee_name,
             emp_type: r.emp_type,
             remarks: r.remarks,
-            contract_rate: 0,
+            contract_rate: r.contract_rate ?? getContractRateByType(r.emp_type),
             start_date: dStr,
             end_date: dStr,
           })),
@@ -1415,7 +1432,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
 
           {filteredPlannedDates.length !== 0 && 
           <CountPill1 $variant={false}>
-            🟢: <strong>Matched Resource</strong> &nbsp;&nbsp; 🔴: <strong>Not Matched Resource</strong>
+            🟢: <strong>Matched With Plan Resource</strong> &nbsp;&nbsp; 🔴: <strong>Not Matched With Plan Resource</strong>
           </CountPill1>}
 
           </div>
@@ -1576,6 +1593,25 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
               const matchedPlanRequiredResource = plannedTL === tlCount && plannedEX === exCount;
               // const matchedActualRequiredResource = plannedTL === actualTlCount && plannedEX === actualExCount;
 
+                  const hasActualForDate = (dStr) =>
+                  resourceList.some((row) => {
+                    const currentDate = DateForApiFormate(dStr, true);
+                    const startDate = DateForApiFormate(row.s_date, true);
+                    const endDate = DateForApiFormate(row.e_date, true);
+                    return currentDate && startDate && endDate && currentDate >= startDate && currentDate <= endDate;
+                  });
+
+                const sortedPlannedDates = filteredPlannedDates
+                  .filter(({ d }) => d instanceof Date && !isNaN(d))
+                  .sort((a, b) => a.d - b.d);
+
+                const nextStartableDate = sortedPlannedDates.find(({ dStr }, idx) => {
+                  if (startedDates.has(dStr) || hasActualForDate(dStr)) return false; // already started/filled, skip
+                  const priorDates = sortedPlannedDates.slice(0, idx);
+                  const allPriorFilled = priorDates.every(({ dStr: priorStr }) => hasActualForDate(priorStr));
+                  return allPriorFilled;
+                })?.dStr;
+
               return (
                 <DateBlock key={dStr}>
                   {/* Date header */}
@@ -1593,7 +1629,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
                     </CountPill1>}
 
                     <CountPill $variant={matchedPlanRequiredResource}>
-                      TL: <strong>{tlCount}</strong> &nbsp;&nbsp; EX: <strong>{exCount}</strong>
+                    Plan (TL: <strong>{tlCount}</strong> &nbsp;&nbsp; EX: <strong>{exCount}</strong>)
                     </CountPill>
                   </div>
 
@@ -1610,7 +1646,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
   <SubPanelHeader $variant="plan" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
     <span>Plan</span>
 
-    {!isPastActivityWindow && !isStarted && isPlannedFromApi && (
+    {!isPastActivityWindow && !isStarted && isPlannedFromApi && dStr === nextStartableDate && (
       <Button size="sm" variant="primary" onClick={() => openConfirmation({
         title: "Start Activity",
         message: `Are you sure you want to start the activity for ${dStr}?`,
@@ -1711,6 +1747,11 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
         </ResourceInfo>
       </ResourceRow>
     ))}
+
+            <TotalsBar style={{ marginTop: 10 }}>
+                      <span>Plan Total: ₹{planTotal}</span>
+                      {/* <span>Actual Total: ₹{actualTotal}</span> */}
+                    </TotalsBar>
 </SubPanel>
 
                       {/* ACTUAL */}
@@ -1760,9 +1801,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
   )}
 
   {displayedActualRows.map((row) => {
-    const disableActualAction =
-      row.is_approved === true ||
-      row.is_present === true;
+    const disableActualAction = row.is_approved === true || row.is_present === true;
 
     return (
       <ActualEditRow
@@ -1774,7 +1813,8 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
 
         readOnly={
   hasResourceActual
-    ? disableActualAction || !editedApiRowKeys.has(row.rowKey)
+    // ? disableActualAction || !editedApiRowKeys.has(row.rowKey)
+    ? true
     : actualDraft?.confirmed
 }
 
@@ -1798,14 +1838,22 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
             value
           );
 
-          if (field === "emp_type") {
-          handleActualFieldChange(
-            dStr,
-            row.rowKey,
-            "contract_rate",
-            getContractRateByType(value)
-          );
-        }
+           if (field === "emp_type") {
+            // CHANGED — search across ALL planned dates for a matching emp_type rate, not just this date
+            let matchedRate = null;
+            for (const dateKey of Object.keys(dateWiseAssignments)) {
+              const match = (dateWiseAssignments[dateKey] || []).find((r) => r.emp_type === value && r.contract_rate);
+              if (match) { matchedRate = match.contract_rate; break; }
+            }
+            const finalRate = matchedRate || getContractRateByType(value);
+
+            handleActualFieldChange(
+              dStr,
+              row.rowKey,
+              "contract_rate",
+              finalRate
+            );
+          }
         }}
 
          disableActualAction={disableActualAction}
@@ -1820,7 +1868,8 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
           );
         }}
 
-        onToggleEdit={hasResourceActual ? () => toggleEditApiRow(row.rowKey, dStr, actualResourcesForDate) : undefined}
+        // onToggleEdit={hasResourceActual ? () => toggleEditApiRow(row.rowKey, dStr, actualResourcesForDate) : undefined}
+        onToggleEdit={undefined}
 
         onRemove={() => {
           if (disableActualAction) return;
@@ -1891,13 +1940,18 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
         </Button>
       </div>
     )}
+
+            <TotalsBar style={{ marginTop: 10 }}>
+                      {/* <span>Plan Total: ₹{planTotal}</span> */}
+                      <span>Actual Total: ₹{actualTotal}</span>
+                    </TotalsBar>
 </SubPanel>
                     </PlanActualGrid>
 
-                    <TotalsBar style={{ marginTop: 10 }}>
+                    {/* <TotalsBar style={{ marginTop: 10 }}>
                       <span>Plan Total: ₹{planTotal}</span>
                       <span>Actual Total: ₹{actualTotal}</span>
-                    </TotalsBar>
+                    </TotalsBar> */}
                   </Section>
 
                   <ButtonRows>
@@ -1945,6 +1999,9 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
   maxActualDate={maxActualDate}
   onSave={handleSaveActualRange}
   isUpdateMode={isUpdateMode}
+  getContractRateByType={getContractRateByType}
+  dateWiseAssignments={dateWiseAssignments}
+  busyDateMap={busyDateMap}
 />}
 
       <ConfirmPopup
@@ -2282,10 +2339,10 @@ const RenderButton = ({ activityStarted, handleStartActivity, handleCopyAllActua
 
   return(
     <ButtonRows>
-     {!hasUnconfirmedDrafts && 
+     {/* {!hasUnconfirmedDrafts && 
      <Button size="sm" variant="primary" onClick={() => handleCopyAllActual()}>
       <LuCopyPlus /> Copy Actual (All Dates)
-    </Button> }
+    </Button> } */}
 
     {hasUnconfirmedDrafts && (
         <Button size="sm" variant="outlines" onClick={() => handleCancelCopyAllActual()}>

@@ -264,7 +264,7 @@ export const AddAndUpdateForm = ({
               {isUploadMode ? "Upload Auditor's Document" : modalMode === "UPDATE" ? "Update Auditor's Details" : "Add Auditor's Details"}
             </ModalTitle>
 
-            {employeeDetails && <ModalTitle>
+            {employeeDetails && modalMode !== "ADD" && <ModalTitle>
               {employeeDetails.name}({employeeDetails.emp_id})
             </ModalTitle>}
           </div>
