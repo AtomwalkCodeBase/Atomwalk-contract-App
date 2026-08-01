@@ -406,7 +406,8 @@ const [savedApiEditKeys, setSavedApiEditKeys] = useState(() => new Set());
     const [resourceList, setResourceList] = useState([]);
 
     const activityEndDateOnly = toLocalDateOnly(activityEnd);
-const isPastActivityWindow = activityEndDateOnly && today > activityEndDateOnly;
+const isPastActivityWindow = DateForApiFormate(activityEnd) && DateForApiFormate(today) > DateForApiFormate(activityEnd);
+
 const hasAnyActivityStarted = allAEntries.length > 0;
 
   const a_id = activityData?.original_A?.id || activityData?.a_id || null;
@@ -462,7 +463,8 @@ const handleStartActivityOnce = async () => {
     }
 
     const now = new Date();
-    const activity_date = DateForApiFormate(toInputDate(today));
+    const activity_date = DateForApiFormate(activityStart);
+
     const start_time = now.toTimeString().slice(0, 5);
 
     const fd = new FormData();
@@ -654,7 +656,7 @@ const handleSubmitAllActuals = async () => {
         activityCompleteFd.append("emp_id", loggedEmpId);
         activityCompleteFd.append("a_id", aIdForDate);
         activityCompleteFd.append("call_mode", "UPDATE");
-        activityCompleteFd.append("activity_date", DateForApiFormate(rows[0]?.start_date));
+        activityCompleteFd.append("activity_date", DateForApiFormate(today));
         activityCompleteFd.append("geo_type", "O");
         activityCompleteFd.append("is_complete", "1");
 
@@ -965,7 +967,7 @@ const handleCopyAllActual = () => {
       const dStr = formatToApiDate(d);
       const dStrComparable = DateForApiFormate(dStr, true);
 
-      if (dStrComparable > lastStartedDate) return;
+      // if (dStrComparable > lastStartedDate) return;
       const currentDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       if (currentDate > todayDate) return;
       if (next[dStr]?.rows?.length) return; // FIXED — only skip if it actually has data, not an empty leftover draft
@@ -1179,13 +1181,33 @@ const isValidDateKey = (dStr) =>
   typeof dStr === "string" &&
   (/^\d{4}-\d{2}-\d{2}$/.test(dStr) || /^\d{2}-\d{2}-\d{4}$/.test(dStr) || /^\d{2}-[A-Za-z]{3}-\d{4}$/.test(dStr));
 
-  const actualOnlyDateKeys = new Set([
+const actualOnlyDateKeys = new Set([
   ...Object.keys(actualDraftsByDate).filter(
     (dStr) => isValidDateKey(dStr) && (actualDraftsByDate[dStr]?.rows || []).length > 0
   ),
-  ...resourceList.map((r) => formatToApiDate(toLocalDateOnly(r.s_date))).filter(Boolean),
+  ...resourceList.flatMap((r) => { // CHANGED — was .map(r => formatToApiDate(toLocalDateOnly(r.s_date)))
+    const s = parseApiDateKey(r.s_date) || toLocalDateOnly(r.s_date); // CHANGED — try parseApiDateKey first for "dd-MMM-yyyy"
+    const e = parseApiDateKey(r.e_date) || toLocalDateOnly(r.e_date);
+    if (!s || !e) return [];
+    const dates = [];
+    const cur = new Date(s);
+    while (cur <= e) {
+      dates.push(formatToApiDate(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }).filter(Boolean),
   ...allAEntries.map((e) => e.start_date).filter(isValidDateKey),
 ]);
+
+  const safeParseDate = (val) => {
+    try {
+      const p = parseApiDateKey(val);
+      if (p instanceof Date && !isNaN(p)) return p;
+    } catch {}
+    const t = toLocalDateOnly(val);
+    return t instanceof Date && !isNaN(t) ? t : null;
+  }
 
 const draftOnlyDates = [...actualOnlyDateKeys]
   .filter((dStr) => !dayWindowStrs.has(dStr))
@@ -1366,6 +1388,10 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
 
   const disableContractRateFields = hasAnyActivityStarted || hasLockedPlannedResource || plannedTLRate || plannedEXRate;
 
+      const hasAnyPlanFromApi = Object.values(dateWiseAssignments || {}).some(
+      (rows) => (rows || []).some((r) => r.status === "ORIGINAL")
+    );
+
   return (
     <>
   <Card
@@ -1373,8 +1399,8 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
     hoverable={false}
     headerAction={
     !hasAnyActivityStarted ? (
-      isPastActivityWindow ? (
-        <Button size="sm" variant="primary" onClick={() => openConfirmation({
+      isPastActivityWindow && hasAnyPlanFromApi ? (
+        <Button size="md" variant="primary" onClick={() => openConfirmation({
           title: "Start Activity",
           message: "Are you sure you want to start this activity?",
           confirmLabel: "Start",
@@ -1384,7 +1410,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
           Start Activity
         </Button>
       ) : null // per-date Start buttons handle it inside each DateBlock instead
-    ) : hasAnyDateWithoutActual ? (
+    ) : isPastActivityWindow  && hasAnyDateWithoutActual ? (
       <RenderButton
         activityStarted={activityStarted}
         handleStartActivity={handleStartActivity}
@@ -1658,7 +1684,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
       </Button>
     )}
 
-    {isStarted && !hasResourceActual && !actualDraft && !isDateBeingEdited && planAssignments.length > 0 && (
+    {!isPastActivityWindow && isStarted && !hasResourceActual && !actualDraft && !isDateBeingEdited && planAssignments.length > 0 && (
       <Button size="sm" variant="outline" onClick={() => handleCopyActual(dStr, planAssignments)}>
         <LuCopy /> Copy Actual
       </Button>
@@ -1808,6 +1834,8 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
         key={row.rowKey}
         row={row}
         employees={employees}
+        busyDateMap={busyDateMap}
+        dStr={dStr} 
         onSave={hasResourceActual ? () => handleSaveApiRowEdit(row.rowKey) : undefined}
         onCancel={hasResourceActual ? () => handleCancelApiRowEdit(dStr, row.rowKey, actualResourcesForDate.find((r) => r.rowKey === row.rowKey)) : undefined}
 
@@ -2210,7 +2238,7 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
   );
 };
 
-const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove, disableActualAction, onToggleEdit, onSave,onCancel, minActualDate, maxActualDate  }) => {
+const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove, disableActualAction, onToggleEdit, onSave,onCancel, minActualDate, maxActualDate, busyDateMap = {}, dStr  }) => {
   if (readOnly) {
     return (
       <ResourceRow>
@@ -2250,7 +2278,9 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
         <FormLabel>Resource {isReplaced && <Badge variant="warning" style={{ fontSize: '0.55rem' }}>Replaced</Badge>}</FormLabel>
         {employees.length > 0 ? (
           <FormSelect value={row.emp_id} onChange={(e) => onEmployeeChange(e.target.value)}>
-            {employees.map((emp) => (
+            {employees.filter((emp) => emp.is_active !== false && emp.is_active !== 0 && emp.is_active !== "false") // ADDED
+              .filter((emp) => emp.emp_id === row.emp_id || !busyDateMap[emp.emp_id]?.[DateForApiFormate(row.start_date || row.s_date || dStr, true)]) // ADDED — keep current selection visible, hide others with allocation on this date
+              .map((emp) => (
               <option key={emp.emp_id} value={emp.emp_id}>{emp.name}</option>
             ))}
           </FormSelect>
@@ -2339,10 +2369,10 @@ const RenderButton = ({ activityStarted, handleStartActivity, handleCopyAllActua
 
   return(
     <ButtonRows>
-     {/* {!hasUnconfirmedDrafts && 
+     {!hasUnconfirmedDrafts && 
      <Button size="sm" variant="primary" onClick={() => handleCopyAllActual()}>
       <LuCopyPlus /> Copy Actual (All Dates)
-    </Button> } */}
+    </Button> }
 
     {hasUnconfirmedDrafts && (
         <Button size="sm" variant="outlines" onClick={() => handleCancelCopyAllActual()}>

@@ -1596,6 +1596,7 @@ export const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
         total_planned_item: 0,
         grouped_data: [],
         claims: [],
+        resource_planned: [],
       };
     }
 
@@ -1641,9 +1642,14 @@ export const groupByOrderItemId = (data = [], resourcePlannedList = []) => {
   return Object.values(grouped).map((group) => {
     const groupStatus = getGroupStatus(group.grouped_data, resourcePlannedList);
 
+    const matchedResourcePlanned = (resourcePlannedList || []).filter(
+      (rp) => extractOrderNumber(rp.order_item_id) === extractOrderNumber(group.order_item_id),
+    );
+
     return {
       ...group,
       ...groupStatus,
+      resource_planned: matchedResourcePlanned,
     };
   });
 };
@@ -1659,3 +1665,5 @@ export const extractOrderNumber = (orderItemId, keepLeadingZeros = false) => {
 
   return keepLeadingZeros ? digits : parseInt(digits, 10).toString();
 };
+
+export const currency = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;

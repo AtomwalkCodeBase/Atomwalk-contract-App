@@ -88,6 +88,13 @@ const [individualRemarks, setIndividualRemarks] = useState({}); // { emp_id: rem
         if (planRow?.contract_rate) return planRow.contract_rate;
         cur.setDate(cur.getDate() + 1);
       }
+
+            // ADDED — fallback: search ALL planned dates for this activity, not just the selected range
+      for (const dateKey of Object.keys(dateWiseAssignments)) {
+        const match = (dateWiseAssignments[dateKey] || []).find((r) => r.emp_type === empType && r.contract_rate);
+        if (match) return match.contract_rate;
+      }
+      
       return getContractRateByType(empType);
     };
 

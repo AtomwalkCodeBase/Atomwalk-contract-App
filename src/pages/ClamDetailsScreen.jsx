@@ -636,7 +636,7 @@ const ClamDetailsScreen = () => {
         {claimList.length > 0 && (
           <InfoPill style={{ marginBottom: "0.8rem", fontSize: "1rem" }}>
             <FaFileInvoiceDollar size={12} style={{ marginRight: "0.4rem" }} />
-            <span>Master Clam Id:</span>
+            <span>Clam Id:</span>
             {claimList[0].master_claim_id}
           </InfoPill>
         )}
@@ -704,6 +704,76 @@ const ClamDetailsScreen = () => {
       </Card>
 
       {/* Paste Resource & Claim Summary (Date-wise) code if required*/}
+
+     { ViewMode === "settlement" &&
+        <Card hoverable={false} style={{ marginTop: "1rem" }} title="Resource & Claim Summary (Date-wise)">
+
+        {dateRows.length === 0 ? (
+          <EmptyRow>No data available</EmptyRow>
+        ) : (
+          dateRows.map((row) => {
+            const { tl_amount: tlTotal, ex_amount: exTotal, claim_amount: claimTotal } = row;
+            const dayTotal = tlTotal + exTotal + claimTotal;
+
+            const isOpen = expandedDate === row.date;
+
+            return (
+              <DateBlock key={row.date}>
+                {/* <DateHeader onClick={() => toggleDate(row.date)}> */}
+                <DateHeader onClick={(e) => { e.stopPropagation(); toggleDate(row.date) }}>
+                  <HeaderDate>{formatDayLabel(row.date)}</HeaderDate>
+                  <HeaderSummary>
+                    <Badge variant="forward" style={{ fontSize: "0.72rem", fontWeight: "600" }}>TL {row.tl_count}</Badge>
+                    <Badge variant="info" style={{ fontSize: "0.72rem", fontWeight: "600" }}>EX {row.ex_count}</Badge>
+                    <span>Total: <strong>{currency(dayTotal)}</strong></span>
+                    {isOpen ? <FaChevronUp size={10} /> : <FaChevronDown size={10} />}
+                  </HeaderSummary>
+                </DateHeader>
+
+                {isOpen && (
+                  <>
+                    <DateBody>
+                      <StatBox pointer={true} onClick={() => navigate("/resource-list", { state: { data: activityData }, })} >
+                        <StatLabel>Total TL</StatLabel>
+                        {/* <StatValue>{row.tl_count} × {currency(row.tl_rate)}</StatValue> */}
+                        <StatValue>{row.tl_count} Resources</StatValue>
+                      </StatBox>
+                      <StatBox>
+                        <StatLabel>TL Total Amount</StatLabel>
+                        <StatValue>{currency(tlTotal)}</StatValue>
+                      </StatBox>
+                      <StatBox pointer={true} onClick={() => navigate("/resource-list", { state: { data: activityData }, })}>
+                        <StatLabel>Total EX</StatLabel>
+                        <StatValue>{row.ex_count} Resources</StatValue>
+                      </StatBox>
+                      <StatBox>
+                        <StatLabel>EX Total Amount</StatLabel>
+                        <StatValue>{currency(exTotal)}</StatValue>
+                      </StatBox>
+                      {/* <StatBox>
+                        <StatLabel>Claims ({dayClaims.length})</StatLabel>
+                        <StatValue>{currency(claimTotal)}</StatValue>
+                      </StatBox> */}
+                    </DateBody>
+                    <TotalsFooter>
+                      <FooterText>Resource Cost: {currency(tlTotal + exTotal)}</FooterText>
+                      {/* <FooterText>Claim Amount: {currency(claimTotal)}</FooterText> */}
+                      {/* <FooterText>Day Total: {currency(dayTotal)}</FooterText> */}
+                    </TotalsFooter>
+                  </>
+                )}
+              </DateBlock>
+            );
+          })
+        )}
+
+        <GrandTotalBar>
+          <span>Resource Cost (TL + EX): {currency(totals.resource)}</span>
+          <span>Claims: {currency(totalClaim.totalOPE)}</span>
+          <span>Grand Total (incl. Claims): {currency(grandTotal)}</span>
+        </GrandTotalBar>
+      </Card>
+}
 
       {openOpeModal &&
         <AddOPEModal

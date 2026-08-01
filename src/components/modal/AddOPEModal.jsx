@@ -198,7 +198,7 @@ const AddOPEModal = ({ isOpen, onClose, claimData = null , onSaved}) => {
 
   const [formData, setFormData] = useState(initialFormData);
 
-  const selectedItem = expenseItemList.find(item => item.id === formData.type);
+  const selectedItem = expenseItemList.find(item => item.id === Number(formData.type));
   const isReceiptRequired = Boolean(selectedItem?.is_exp_bill_required);
 
   const resetForm = useCallback(() => {
@@ -388,7 +388,7 @@ const AddOPEModal = ({ isOpen, onClose, claimData = null , onSaved}) => {
 
                 <FormGroup>
                     <Label>
-                        Receipts/Attachments {isReceiptRequired && <Required>*</Required>}
+                        Receipts/Attachments {isReceiptRequired ? <Required>*</Required> : `(Optional)`}
                     </Label>
                     <FileUploadContainer onClick={() => document.getElementById("file-upload").click()}>
                         <FileInput
