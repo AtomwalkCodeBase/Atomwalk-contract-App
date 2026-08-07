@@ -4,7 +4,7 @@ const getNestedValue = (obj, path) => {
     if (!obj || !path) return [];
 
     const parts = path.split(".");
-    
+
     const extract = (current, index) => {
         if (current == null) return [];
 
@@ -129,6 +129,19 @@ export const useFilter = ({ data = [], fields = [], search = "", extraFilters = 
 
                 // Nested value filter (e.g., "grnItem.status")
                 const values = getNestedValue(item, key);
+
+                // Support array of allowed values
+                if (Array.isArray(filterValue)) {
+                    const allowed = filterValue.map((v) => String(v).toLowerCase());
+                    return values.some((val) => val != null && allowed.includes(String(val).toLowerCase()));
+                }
+
+                // Support comma-separated values in a string (e.g. "AS,AA")
+                if (typeof filterValue === "string" && filterValue.includes(",")) {
+                    const allowed = filterValue.split(",").map((v) => v.trim().toLowerCase());
+                    return values.some((val) => val != null && allowed.includes(String(val).toLowerCase()));
+                }
+
                 return values.some((val) => {
                     if (val == null) return false;
                     return String(val).toLowerCase() === String(filterValue).toLowerCase();

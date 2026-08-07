@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { formatToApiDate, DateForApiFormate, formatToDDMMYYYY } from "../../utils/utils";
+import { formatToApiDate, DateForApiFormate, getCurrentDateTimeDefaults } from "../../utils/utils";
 import Card from "../Card";
 import DataTable, { Td } from "../DataTable";
 import Button from "../Button";
@@ -256,11 +256,6 @@ const parseActualResources = (entry) => {
   });
 };
 
-const findActualEntryForDate = (activityData, dStr) => {
-  const allEntries = activityData?.allAEntries || [];
-  return allEntries.find((entry) => entry.start_date === dStr) || null;
-};
-
 const formatEmpType = (type) => (type === 'T' ? 'TL' : 'EX');
 
 // Dummy claims data for design preview — replace with real claims once API is wired
@@ -372,6 +367,7 @@ const CurrentAssignments = ({
     // console.log("activityData", activityData)
 
       const today = new Date();
+    const { apiDate } = getCurrentDateTimeDefaults();
 
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
@@ -971,6 +967,15 @@ const handleCopyAllActual = () => {
       const currentDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       if (currentDate > todayDate) return;
       if (next[dStr]?.rows?.length) return; // FIXED — only skip if it actually has data, not an empty leftover draft
+
+      const hasResourceActual = resourceList.some((row) => {
+        const currDate = DateForApiFormate(dStr, true);
+        const startDate = DateForApiFormate(row.s_date, true);
+        const endDate = DateForApiFormate(row.e_date, true);
+        return currDate && startDate && endDate && currDate >= startDate && currDate <= endDate;
+      });
+      if (hasResourceActual) return;
+
       const planAssignments = dateWiseAssignments[dStr] || [];
       if (planAssignments.length === 0) return;
       next[dStr] = {
@@ -1672,7 +1677,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
   <SubPanelHeader $variant="plan" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
     <span>Plan</span>
 
-    {!isPastActivityWindow && !isStarted && isPlannedFromApi && dStr === nextStartableDate && (
+    {!isPastActivityWindow && !isStarted && isPlannedFromApi && (dStr === nextStartableDate && apiDate >= DateForApiFormate(nextStartableDate)) && (
       <Button size="sm" variant="primary" onClick={() => openConfirmation({
         title: "Start Activity",
         message: `Are you sure you want to start the activity for ${dStr}?`,
@@ -1684,7 +1689,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
       </Button>
     )}
 
-    {!isPastActivityWindow && isStarted && !hasResourceActual && !actualDraft && !isDateBeingEdited && planAssignments.length > 0 && (
+    {(isStarted || isPastActivityWindow) && !hasResourceActual && !actualDraft && !isDateBeingEdited && planAssignments.length > 0 && (
       <Button size="sm" variant="outline" onClick={() => handleCopyActual(dStr, planAssignments)}>
         <LuCopy /> Copy Actual
       </Button>

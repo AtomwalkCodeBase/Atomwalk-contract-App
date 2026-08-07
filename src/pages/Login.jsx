@@ -5,7 +5,6 @@ import { useAuth } from "../context/AuthContext"
 import { toast } from "react-toastify"
 import { getCompanyName } from "../services/productServices"
 import { useNavigate } from "react-router-dom"
-import logo from '../assets/logo2.png';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(16px); }
@@ -202,7 +201,7 @@ const BrandHeader = styled.div`
 `
 
 const CompanyLogo = styled.img`
-  height: 36px;
+  height: 50px;
   width: auto;
   object-fit: contain;
 `
@@ -229,10 +228,11 @@ const Logins = () => {
   const [formData, setFormData] = useState({ mobile: "", password: "" })
   const [loading, setLoading] = useState(false)
   const [showPin, setShowPin] = useState(false)
-  const [companies, setCompanies] = useState([])
+  // const [companies, setCompanies] = useState([])
   const { customerlogin } = useAuth()
   const path = window.location.pathname
   const navigation = useNavigate()
+  const CompanyImage = localStorage.getItem('companyImg');
 
   useEffect(() => {
     const fetchCompanyName = async () => {
@@ -242,14 +242,15 @@ const Logins = () => {
           const filter = company.data?.filter(
             (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
           )
-          setCompanies(filter)
+          // setCompanies(filter)
           if (filter.length > 0) {
             setFormData((prev) => ({ ...prev, company: filter[0].name }))
             localStorage.setItem("dbName", filter[0].name.split("_").slice(1).join("_"))
           }
-        } else {
-          setCompanies(company.data)
-        }
+        } 
+        // else {
+        //   setCompanies(company.data)
+        // }
       }
     }
     fetchCompanyName()
@@ -284,10 +285,10 @@ const Logins = () => {
   return (
     <PageWrap>
       <LoginCard onSubmit={handleSubmit}>
-      <BrandHeader>
-        <CompanyLogo src={logo} alt="Atomwalk logo" />
+     {CompanyImage && <BrandHeader>
+        <CompanyLogo src={CompanyImage} alt="Matrix logo" />
         {/* <CompanyName>Atom<span>walk</span></CompanyName> */}
-      </BrandHeader>
+      </BrandHeader>}
         <FormTitle>Retainer & Associate Portal</FormTitle>
         <FormSubtitle>
           Manage assigned audits and update resource allocations securely.
@@ -340,7 +341,7 @@ const Logins = () => {
         </FormFooterLinks>
       </LoginCard>
 
-      {/* <PageFooter>© 2024 ATOMWALK MANAGEMENT SOLUTIONS</PageFooter> */}
+      <PageFooter>Developed By Atomwalk technologies Pvt. Ltd.</PageFooter>
     </PageWrap>
   )
 }

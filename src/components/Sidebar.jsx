@@ -29,6 +29,7 @@ import {
   FaListUl,
   FaMoneyBillWaveAlt,
   FaMoneyBill,
+  FaListAlt,
 } from "react-icons/fa"
 import { SiGooglecalendar } from "react-icons/si"
 import { PiListPlusFill } from "react-icons/pi"
@@ -494,11 +495,12 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
   // Grouped menu items structure
   const menuGroups =  [
       {
-        name: "Customer Portal",
-        icon: <FaUserCircle />,
+        name: "Audit Center",
+        icon: <FaListAlt />,
         items: [
           { path: "/activity", name: "Activity List", icon: <FaHome /> },
-          { path: "/dashboard", name: "Retainer Dashboard", icon: <FaUsers /> },
+          { path: "/dashboard", name: "Resource List", icon: <FaUsers /> },
+          { path: "/profitability-dashboard", name: "Receivables Dashboard", icon: <FaMoneyBillWaveAlt /> },
           // { path: "/finance_user", name: "Approve Dashboard", icon: <FaHome /> },
         ],
       },
@@ -534,9 +536,9 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
   }
   const menuItems =  [
     { path: "/activity", name: "Activity List", icon: <FaHome /> },
-      { path: "/dashboard", name: "Retainer Dashboard", icon: <FaUsers /> },
+      { path: "/dashboard", name: "Resource List", icon: <FaUsers /> },
       // { path: "/clam-list", name: "clams", icon: <FaMoneyBill /> },
-      // { path: "/profitability-dashboard", name: "Profitability Dashboard", icon: <FaMoneyBillWaveAlt /> },
+      { path: "/profitability-dashboard", name: "Receivables Dashboard", icon: <FaMoneyBillWaveAlt /> },
     ]
    
 

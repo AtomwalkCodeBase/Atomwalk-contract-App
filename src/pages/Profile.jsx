@@ -1152,24 +1152,6 @@ const Profile = () => {
     fetchProfile()
   }, [])
 
-  const getExperience = (joiningDate) => {
-    if (!joiningDate) return "0 years"
-
-    const joinDate = new Date(joiningDate)
-    const now = new Date()
-
-    let years = now.getFullYear() - joinDate.getFullYear()
-    const hasNotCompletedThisYear =
-      now.getMonth() < joinDate.getMonth() ||
-      (now.getMonth() === joinDate.getMonth() && now.getDate() < joinDate.getDate())
-
-    if (hasNotCompletedThisYear) {
-      years--
-    }
-
-    return `${years} + year${years !== 1 ? "s" : ""}`
-  }
-
   const handleThemeChange = (themeName) => {
     changeTheme(themeName)
     const displayName = theme[themeName]?.name || themeName;
@@ -1218,18 +1200,6 @@ const Profile = () => {
     setConfirmPin("")
     setPinError("")
     setPinSuccess("")
-  }
-    const getShiftLabel = (shiftNo) => {
-    switch (shiftNo) {
-      case 1:
-        return "Morning Shift"
-      case 2:
-        return "Evening Shift"
-      case 3:
-        return "Night Shift"
-      default:
-        return "Working Day"
-    }
   }
 
   const renderTabContent = () => {
@@ -1280,63 +1250,9 @@ const Profile = () => {
                 </DetailLabel>
                 <DetailValue>{profileData.email_id || "Not specified"}</DetailValue>
               </DetailCard>
-
-              {/* <DetailCard color="#D53F8C">
-                <DetailLabel iconColor="#D53F8C">
-                  <FaBirthdayCake /> Birthday
-                </DetailLabel>
-                <DetailValue>{profileData.dob || "Not specified"}</DetailValue>
-              </DetailCard> */}
-
-              {/* <DetailCard color="#2B6CB0">
-                <DetailLabel iconColor="#2B6CB0">
-                  <FaExchangeAlt /> My Shift
-                </DetailLabel>
-                <DetailValue>{getShiftLabel(profileData.current_shift) || "Not specified"}</DetailValue>
-              </DetailCard> */}
             </DetailGrid>
           </>
         )
-
-      // case "permissions":
-      //   return (
-      //     <>
-      //       <SectionTitle>Approval Permissions</SectionTitle>
-      //       <DetailGrid>
-      //         <StatCard bgStart="#4776E6" bgEnd="#8E54E9" style={{ position: "relative" }}>
-      //           <StatIcon>
-      //             <FaTrophy />
-      //           </StatIcon>
-      //           <StatLabel>Grade Level</StatLabel>
-      //           <StatValue>{profileData.grade_level}</StatValue>
-      //         </StatCard>
-
-      //         <StatCard bgStart="#11998e" bgEnd="#38ef7d" style={{ position: "relative" }}>
-      //           <StatIcon>
-      //             <FaShieldAlt />
-      //           </StatIcon>
-      //           <StatLabel>Claim Grade Level</StatLabel>
-      //           <StatValue>{profileData.approve_data?.[0]?.claim_grade_level}</StatValue>
-      //         </StatCard>
-
-      //         <StatCard bgStart="#FF416C" bgEnd="#FF4B2B" style={{ position: "relative" }}>
-      //           <StatIcon>
-      //             <FaCalendarAlt />
-      //           </StatIcon>
-      //           <StatLabel>Max Leave Days</StatLabel>
-      //           <StatValue>{profileData.approve_data?.[2]?.max_days}</StatValue>
-      //         </StatCard>
-
-      //         <StatCard bgStart="#6B46C1" bgEnd="#9F7AEA" style={{ position: "relative" }}>
-      //           <StatIcon>
-      //             <FaIdCard />
-      //           </StatIcon>
-      //           <StatLabel>Max Claim Amount</StatLabel>
-      //           <StatValue>₹{profileData.approve_data?.[1]?.max_claim_amt}</StatValue>
-      //         </StatCard>
-      //       </DetailGrid>
-      //     </>
-      //   )
 
       case "security":
         return (
@@ -2255,29 +2171,10 @@ const Profile = () => {
                   <FaCalendarAlt />
                   <span>Joined: {profileData.date_of_join || "Not specified"}</span>
                 </ProfileDetail>
-                {/* <ProfileDetail>
-                  <FaExchangeAlt/>
-                  <span>{getShiftLabel(profileData.current_shift) || "Not specified"}</span>
-                </ProfileDetail> */}
               </div>
             </ProfileInfo>
           </StyledCard>
 
-          {/* {!isFmsLogin && 
-          <StyledCard>
-            <div style={{ padding: "1.5rem" }}>
-              <SectionTitle>Quick Stats</SectionTitle>
-              <div style={{ display: "grid", gap: "1rem" }}>
-                <StatCard bgStart="#4C51BF" bgEnd="#6B46C1" style={{ position: "relative", minHeight: "120px" }}>
-                  <StatIcon>
-                    <FaCalendarAlt />
-                  </StatIcon>
-                  <StatLabel>Leave Balance</StatLabel>
-                  <StatValue>{profileData.max_no_leave} Days</StatValue>
-                </StatCard>
-              </div>
-            </div>
-          </StyledCard>} */}
         </ProfileSidebar>
 
         <ProfileContent>
@@ -2287,9 +2184,6 @@ const Profile = () => {
                 <TabButton active={activeTab === "personal"} onClick={() => setActiveTab("personal")}>
                   <FaIdCard /> Personal Info
                 </TabButton>
-                {/* <TabButton active={activeTab === "permissions"} onClick={() => setActiveTab("permissions")}>
-                  <FaShieldAlt /> Permissions
-                </TabButton> */}
                 <TabButton active={activeTab === "security"} onClick={() => setActiveTab("security")}>
                   <FaLock /> Security
                 </TabButton>

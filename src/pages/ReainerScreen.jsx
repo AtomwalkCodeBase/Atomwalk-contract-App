@@ -476,7 +476,7 @@ const RetainerScreen = () => {
   };
 
   return (
-    <Layout title="Auditor Management">
+    <Layout title="My Resource Management">
       <Subtitle>
         <div>
           <p>View and manage all auditors</p>
@@ -529,7 +529,7 @@ const RetainerScreen = () => {
             Clear Filters
           </Button>
         </FilterRow>
-        <Note>**After Document Upload resource will verify</Note>
+        <Note>**After Document Upload resource can be verify</Note>
         <Table>
           <thead>
             <tr>

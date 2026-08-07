@@ -9,9 +9,8 @@ import {
   formatRetainerActivities,
   formatToApiDate,
   generateDatesBetween,
+  getCurrentDateTimeDefaults,
   getMonthRange,
-  getRowStatus,
-  groupDatesIntoRanges,
   mergeAdjacentRows,
   recomputeEmployeeRows,
   splitRangeAtDate,
@@ -24,10 +23,11 @@ import Button from "../Button";
 import Card from "../Card";
 import { ResourceAvailability } from "../ScreenComponents/ResourceAvaiblityCard copy";
 import CurrentAssignments from "../ScreenComponents/CurrentAssignResourceList copy";
-import { FaArrowLeft, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaUser, FaUserTie } from "react-icons/fa";
+import { FaArrowLeft, FaBoxes, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaPlus, FaUser, FaUserTie } from "react-icons/fa";
 import styled from "styled-components";
-import { FaPenToSquare } from "react-icons/fa6";
+import { FaCheckToSlot, FaPenToSquare } from "react-icons/fa6";
 import ConfirmPopup from "../ConfirmPopup";
+import { ImCross } from "react-icons/im";
 
 const Tagline = styled.p`
  color: ${({ theme }) => theme.colors.textLight};
@@ -119,6 +119,7 @@ const DetailValue = styled.span`
 
 const ResourceAllocation = () => {
   const location = useLocation();
+  const { apiDate } = getCurrentDateTimeDefaults()
   const [activityData, setActivityData] = useState(location.state?.data);
   const resourcePlannedList = location.state?.resourcePlannedList;
 
@@ -130,9 +131,9 @@ const ResourceAllocation = () => {
   const [loading, setLoading] = useState(false);
   const [showResourceAvailability, setShowResourceAvailability] = useState(false);
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
-  const [confirmPopupMode, setConfirmPopupMode] = useState("save"); // "save" | "missingDates"
+  const [confirmPopupMode, setConfirmPopupMode] = useState("save"); // "save" | "missingDates" | "overAllocation"
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [missingDatesForConfirm, setMissingDatesForConfirm] = useState([]);
+  const [confirmDates, setConfirmDates] = useState([]);
 
   const [employees, setEmployees] = useState([]);
 
@@ -146,7 +147,6 @@ const ResourceAllocation = () => {
   const activityStart = activityData?.original_P?.start_date || activityData?.planned_start_date || "";
   const activityEnd = activityData?.original_P?.end_date || activityData?.planned_end_date || "";
 
-  
   const isLocked = (row) => row.is_approved || !!activityData?.allAEntries?.length;
   
   const ownershipMap = useMemo(() => buildOwnershipMap(originalAllocations), [originalAllocations]);
@@ -195,13 +195,18 @@ const ResourceAllocation = () => {
 
   const pendingCount = addPayload.length + updatePayload.length + deletePayload.length;
   const saveLabel =
+    // [
+    //   addPayload.length && `Add ${addPayload.length}`,
+    //   updatePayload.length && `Update ${updatePayload.length}`,
+    //   deletePayload.length && `Remove ${deletePayload.length}`,
+    // ]
     [
-      addPayload.length && `Add ${addPayload.length}`,
-      updatePayload.length && `Update ${updatePayload.length}`,
-      deletePayload.length && `Remove ${deletePayload.length}`,
+      addPayload.length && `Submit`,
+      updatePayload.length && `Submit/Update`,
+      // deletePayload.length && `Update Plan`,
     ]
       .filter(Boolean)
-      .join(" · ") || "Save Changes";
+      .join(" & ") || "Save Changes";
 
   // ---- Load ----
 
@@ -662,12 +667,35 @@ const handleRoleChange = (emp, dStr, nextRole) => {
     //   return;
     // }
 
+    const overAssignedDates = dayWindow
+      .map((d) => formatToApiDate(d))
+      .filter((dStr) => {
+        const dComparable = DateForApiFormate(dStr, true);
+        const dayAssignments = workingAllocations.filter((r) =>
+          datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+        );
+        const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+        const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+        return tlCount > plannedTL || exCount > plannedEX;
+      });
+
+    if (overAssignedDates.length > 0) {
+      const message = `More resources are assigned than planned for: ${overAssignedDates.join(", ")}.`;
+      toast.warning(message);
+      setConfirmDates(overAssignedDates);
+      setConfirmPopupMode("overAllocation");
+      setShowConfirmPopup(true);
+      return;
+    }
+
     const missedDates = dayWindow
       .map((d) => formatToApiDate(d))
       .filter((dStr) => !plannedDateSet.has(DateForApiFormate(dStr, true)));
 
     if (missedDates.length > 0) {
-      setMissingDatesForConfirm(missedDates);
+      const message = `No resources are planned for: ${missedDates.join(", ")}.`;
+      toast.warning(message);
+      setConfirmDates(missedDates);
       setConfirmPopupMode("missingDates");
       setShowConfirmPopup(true);
       return;
@@ -678,124 +706,111 @@ const handleRoleChange = (emp, dStr, nextRole) => {
   };
 
   const handleConfirmSubmit = async () => {
-    setIsWaringSubmitting(true);
-    await handleSubmit();
+    setIsSubmitting(true);
+    const success = await handleSubmit();
     setIsSubmitting(false);
-    setShowConfirmPopup(false);
+    if (success) {
+      setShowConfirmPopup(false);
+    }
   };
 
   const handleSubmit = async () => {
     const hasTLResource = workingAllocations.some(
-    (row) => row.emp_type === "T" && row.is_active !== false
-  );
+      (row) => row.emp_type === "T" && row.is_active !== false
+    );
 
-  const hasEXResource = workingAllocations.some(
-    (row) => row.emp_type === "E" && row.is_active !== false
-  );
+    const hasEXResource = workingAllocations.some(
+      (row) => row.emp_type === "E" && row.is_active !== false
+    );
 
-  if (
-    hasTLResource && plannedTL !== 0 &&
-    (!tlContractRate || Number(tlContractRate) <= 0)
-  ) {
-    toast.error("Please enter TL Contract Rate");
-    return;
-  }
+    if (
+      hasTLResource && plannedTL !== 0 &&
+      (!tlContractRate || Number(tlContractRate) <= 0)
+    ) {
+      toast.error("Please enter TL Contract Rate");
+      return false;
+    }
 
-  if (
-    hasEXResource && plannedEX !== 0 &&
-    (!exContractRate || Number(exContractRate) <= 0)
-  ) {
-    toast.error("Please enter EX Contract Rate");
-    return;
-  }
+    if (
+      hasEXResource && plannedEX !== 0 &&
+      (!exContractRate || Number(exContractRate) <= 0)
+    ) {
+      toast.error("Please enter EX Contract Rate");
+      return false;
+    }
     try {
       setIsSubmitting(true);
       const p_id = activityData?.original_P?.id;
-      if (!p_id) return;
+      if (!p_id) {
+        toast.error("Unable to save: missing activity ID");
+        return false;
+      }
 
-          // NEW — every date in the plan must meet required TL/EX before saving
-      // const missingDates = dayWindow.filter((d) => {
-      //   const dStr = formatToApiDate(d);
-      //   const dayAssignments = dateWiseAssignments[dStr] || [];
-      //   const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
-      //   const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
-      //   return tlCount < plannedTL || exCount < plannedEX;
-      // });
+      const skipStrictStaffingValidation =
+        confirmPopupMode === "overAllocation" || confirmPopupMode === "missingDates";
 
-      // if (missingDates.length > 0) {
-      //   const dateList = missingDates.map((d) => formatToApiDate(d)).join(", ");
-      //   toast.error(`Required TL/EX not met for: ${dateList}`);
-      //   return;
-      // }
-
-const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
-  const dayAssignments = workingAllocations.filter((r) =>
-    datesBetweenComparable(r.start_date, r.end_date).includes(date)
-  );
-  const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
-  const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
-  
-  const issues = [];
-  if (tlCount !== plannedTL) {
-    const diff = tlCount - plannedTL;
-    if (diff > 0) {
-      issues.push(`Remove ${diff} Team Lead${diff > 1 ? 's' : ''}`);
-    } else {
-      issues.push(`Add ${Math.abs(diff)} Team Lead${Math.abs(diff) > 1 ? 's' : ''}`);
-    }
-  }
-  if (exCount !== plannedEX) {
-    const diff = exCount - plannedEX;
-    if (diff > 0) {
-      issues.push(`Remove ${diff} Executive${diff > 1 ? 's' : ''}`);
-    } else {
-      issues.push(`Add ${Math.abs(diff)} Executive${Math.abs(diff) > 1 ? 's' : ''}`);
-    }
-  }
-  return issues;
-};
-
-      const plannedDateSet = new Set(
-        workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
-      );
-
-      const missingDates = [...plannedDateSet].filter((dComparable) => {
+      const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
         const dayAssignments = workingAllocations.filter((r) =>
-          datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+          datesBetweenComparable(r.start_date, r.end_date).includes(date)
         );
         const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
         const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
-        return tlCount !== plannedTL || exCount !== plannedEX;
-      });
+        
+        const issues = [];
+        if (tlCount !== plannedTL) {
+          const diff = tlCount - plannedTL;
+          if (diff > 0) {
+            issues.push(`Remove ${diff} Team Lead${diff > 1 ? 's' : ''}`);
+          } else {
+            issues.push(`Add ${Math.abs(diff)} Team Lead${Math.abs(diff) > 1 ? 's' : ''}`);
+          }
+        }
+        if (exCount !== plannedEX) {
+          const diff = exCount - plannedEX;
+          if (diff > 0) {
+            issues.push(`Remove ${diff} Executive${diff > 1 ? 's' : ''}`);
+          } else {
+            issues.push(`Add ${Math.abs(diff)} Executive${Math.abs(diff) > 1 ? 's' : ''}`);
+          }
+        }
+        return issues;
+      };
 
-      if (missingDates.length > 0) {
+      if (!skipStrictStaffingValidation) {
+        const plannedDateSet = new Set(
+          workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
+        );
+
+        const missingDates = [...plannedDateSet].filter((dComparable) => {
+          const dayAssignments = workingAllocations.filter((r) =>
+            datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+          );
+          const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+          const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+          return tlCount !== plannedTL || exCount !== plannedEX;
+        });
+
+        if (missingDates.length > 0) {
           let errorMessage = '';
           if (missingDates.length === 1) {
-            // Single date format
             const date = missingDates[0];
             const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
             const formattedDate = formatDate(date, true);
-            
             errorMessage = `Resource requirement not met for ${formattedDate}\n`;
             errorMessage += issues.join('\n');
-          }  else {
-            // Multiple dates format
+          } else {
             errorMessage = 'Resource requirements not met\n';
             const details = missingDates.sort().map(date => {
               const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
               const formattedDate = formatDate(date, true);
               return `${formattedDate}: ${issues.join(', ')}`;
             });
-            // errorMessage += details.join('\n');
             errorMessage += details.join('; ');
           }
-      
-          toast.warning(errorMessage);
-          return;
 
-        // const dateList = missingDates.sort().join(", ");
-        // toast.error(`Required TL/EX not met for: ${DateForApiFormate(dateList)}`);
-        // return;
+          toast.warning(errorMessage);
+          return false;
+        }
       }
 
       const activeResources = workingAllocations;
@@ -829,9 +844,9 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
         await postAllocationData(fd);
         
         
-      for (let [key, value] of fd.entries()) {
-       console.log(key, value);
-      }
+      // for (let [key, value] of fd.entries()) {
+      //  console.log(key, value);
+      // }
       }
 
       if (activeResources.length > 0) {
@@ -847,17 +862,18 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
         activityFd.append("resource_list", resourceListStr);
         await postActivityAllocationData(activityFd);
 
-        for (let [key, value] of activityFd.entries()) {
-          console.log(key, value);
-        }
+        // for (let [key, value] of activityFd.entries()) {
+        //   console.log(key, value);
+        // }
       }
 
       toast.success("Saved successfully");
-      setShowConfirmPopup(false);
       loadAllData();
+      return true;
     } catch (err) {
       toast.error(err?.response?.data?.message || "Save failed");
-    }finally{
+      return false;
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -868,6 +884,8 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
   const plannedEX = matchingRetainer?.ex_count || 0;
   const plannedTLRate = matchingRetainer?.tl_rate ;
   const plannedEXRate = matchingRetainer?.ex_rate ;
+
+  // console.log("activityData", activityData)
 
   useEffect(() => {
   if (workingAllocations.length !== 0) return;
@@ -890,7 +908,15 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
     );
   }, [tlContractRate, exContractRate]);
 
-  // console.log(activityData)
+  const isFullyAllocated = useMemo(() => {
+    if (!dayWindow?.length) return false;
+    const plannedDateSet = new Set(
+      workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
+    );
+    return dayWindow.every((d) =>
+      plannedDateSet.has(DateForApiFormate(formatToApiDate(d), true))
+    );
+  }, [dayWindow, workingAllocations]);
 
   return (
     <Layout title="Allocation Plan Overview">
@@ -914,7 +940,7 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
         </DetailItem>
 
         <DetailItem>
-          <DetailIconWrap><FaFileAlt size={13} /></DetailIconWrap>
+          <DetailIconWrap><FaUser size={13} /></DetailIconWrap>
           <DetailText>
             <DetailLabel>Customer</DetailLabel>
             <DetailValue>{activityData.customer_name}</DetailValue>
@@ -952,6 +978,14 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
           <DetailText>
             <DetailLabel>Location</DetailLabel>
             <DetailValue>{activityData.store_name  || '—'}</DetailValue>
+          </DetailText>
+        </DetailItem>
+
+        <DetailItem>
+          <DetailIconWrap><FaBoxes size={13} /></DetailIconWrap>
+          <DetailText>
+            <DetailLabel>No of Items</DetailLabel>
+            <DetailValue>{activityData?.original_P?.no_of_items  || '—'}</DetailValue>
           </DetailText>
         </DetailItem>
       </DetailsGrid>
@@ -994,21 +1028,10 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
 
         {pendingCount > 0 && (
           <div style={{ marginTop: "1rem", padding: "0.75rem", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Button onClick={handleSaveClick} color="primary" style={{ marginLeft: "auto" }}>{saveLabel} Resources in plan </Button>
+            {/* <Button onClick={handleSaveClick} color="primary" style={{ marginLeft: "auto" }}>{saveLabel} </Button> */}
+            <Button onClick={handleSaveClick} color="primary" style={{ marginLeft: "auto" }}><FaCheckToSlot /> Submit/Update Plan </Button>
           </div>
         )}
-
-        {!["AA", "AS", "C", "PA"].includes(activityData.activityStatus) && !activityData.a_id  &&
-          <div style={{display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem"}}>
-
-            <Button onClick={() => setShowResourceAvailability(true)}>Add Resources</Button>
-            {showResourceAvailability &&
-              <Button variant="outline" onClick={() => setShowResourceAvailability(false)}>Close</Button>}
-          </div>
-        }
-        
-
-
 
         {showResourceAvailability && <ResourceAvailability
           employees={employees}
@@ -1027,18 +1050,37 @@ const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
           lastAutoAssign={lastAutoAssign}
         />}
 
+        {apiDate <= DateForApiFormate(activityData.planned_end_date) ? (
+          !["AA", "AS", "C", "PA"].includes(activityData.activityStatus) &&!activityData.a_id && (
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem",}}>
+             {!showResourceAvailability && <Button onClick={() => setShowResourceAvailability(true)}>
+                <FaPlus />Add Resources
+              </Button>}
+              {showResourceAvailability && (
+                <Button variant="outlines" onClick={() => setShowResourceAvailability(false)}>
+                  <ImCross /> Close
+                </Button>
+              )}
+            </div>
+          )
+        ) : (
+          !isFullyAllocated && ( <h4> You are not able to allocate. You have exceeded the allocation end date.</h4>)
+        )}
+
 
       {/* </Card> */}
 
     <ConfirmPopup
       isOpen={showConfirmPopup}
       isLoading={isSubmitting}
-      onConfirm={handleSubmit}
+      onConfirm={handleConfirmSubmit}
       onClose={() => setShowConfirmPopup(false)}
       title="Confirm Resource Plan"
       message={
         confirmPopupMode === "missingDates"
-          ? `No resources are planned for: ${missingDatesForConfirm.join(", ")}. Are you sure you want to save anyway?`
+          ? `No resources are planned for: ${confirmDates.join(", ")}. Are you sure you want to save anyway?`
+          : confirmPopupMode === "overAllocation"
+          ? `More resources are assigned than planned for: ${confirmDates.join(", ")}. Do you want to continue?`
           : "Are you sure you want to save these resources in the plan?"
       }
       confirmLabel="Yes, Save"

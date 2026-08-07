@@ -4,6 +4,7 @@ import { customerslogin } from "../services/ConstantServies"
 // import { useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
 import { getCustomerDetailList } from "../services/productServices"
+import { getCompanyInfo } from "../services/authServices"
 
 const AuthContext = createContext()
 
@@ -26,6 +27,15 @@ export const AuthProvider = ({ children }) => {
           setLoading(false); // ✅ no user → stop loading
           return;
         }
+
+        try {
+        const res = await getCompanyInfo();
+        setCompanyInfo(res?.data);
+        localStorage.setItem('companyImg', res?.data?.image || null);
+      }
+      catch (error) {
+        console.log('Failed to fetch company info:', error);
+      }
 
       try {
         const res = await getCustomerDetailList(custId);
@@ -53,6 +63,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("dbName")
     localStorage.removeItem("userToken")
     localStorage.removeItem("cust_emp_id")
+    window.sessionStorage.removeItem("activityListSelection");
+    window.sessionStorage.removeItem("ReceivableListSelection");
     setCurrentUser(null)
   }
   const customerlogin = async (userData) => {

@@ -145,8 +145,7 @@ const Modal = ({
     return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
+  
   const handleSave = () => {
     if (saveDisabled) return;
     if (setIsConfirmOpen) {
@@ -156,6 +155,30 @@ const Modal = ({
     }
   };
 
+   useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && !saveDisabled) {
+        const target = e.target;
+        if (target.tagName === 'TEXTAREA') {
+          if (e.shiftKey) return;
+        }
+        if (target.tagName === 'INPUT' && target.type === 'text') {
+          e.preventDefault();
+        }
+        handleSave();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, saveDisabled, setIsConfirmOpen, onSave]);
+
+  if (!isOpen) return null;
+  
   return createPortal(
    <Overlay onClick={onClose}>
   <ModalBox width={width} onClick={(e) => e.stopPropagation()}>

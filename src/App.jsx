@@ -20,50 +20,18 @@ import { ThemeProvider } from "./context/ThemeContext";
 
 import RetainerScreen from "./pages/ReainerScreen";
 import Logins from "./pages/Login";
-import Hello from "./pages/Hello";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ActivityListScreen from "./pages/ActivityListScreen";
 import ActivityListScreen1 from "./pages/New/ActivityListScreen";
 import ProfitabilityDashboard from "./pages/ProfitabilityDashboard";
-// import ResourceAllocationList from "./components/modal/ResourceAllocationList";
-// import ResourceAllocation from "./components/modal/ResourceAllocation";
 import ResourceAllocation from "./components/modal/ModifiedAssignedResourceModal";
-// import ClamList from "./pages/ClamList";
 import ClamDetailsScreen from "./pages/ClamDetailsScreen";
 import ClamList1 from "./pages/ClaimList1";
 import ClamList from "./pages/New/ClaimList1";
 import { ActivityProvider } from "./context/ActivityClaimContext";
-// import AllocationPlanScreen from "./components/NEWMODAL/AllocationPlanScreen";
 
 function App() {
-  const url = "https://www.atomwalk.com/rest-auth/login/";
-  const data = {
-    username: "ASHUTOSH@PMA_00001",
-    password: "ashutosh@11",
-  };
-
-  useEffect(() => {
-    if (!localStorage.getItem("apiResponse")) {
-      loginAndStore();
-    }
-  }, []);
-
-  const loginAndStore = async () => {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Network response was not ok");
-      const responseData = await response.json();
-      localStorage.setItem("apiResponse", JSON.stringify(responseData));
-    } catch (error) {
-      console.error("Error during login:", error);
-    }
-  };
-
   return (
       <AuthProvider>
         <ThemeProvider>
@@ -72,7 +40,6 @@ function App() {
             {/* <Router> */}
               <Routes>
                 {/* Public Routes */}
-                {/* <Route path="/" element={<Hello />} /> */}
                 <Route path="/login" element={<Logins />} />
 
                 {/* Protected Routes with GlobalStyles */}

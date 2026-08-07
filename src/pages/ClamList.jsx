@@ -9,7 +9,6 @@ import { toast } from 'react-toastify';
 import { getEmpAllocationData, getEmpClaim, getemployeeLists } from '../services/productServices';
 import DataTable, { Td } from '../components/DataTable';
 import { useFilter } from '../hooks/useFilter';
-// import { formatDate } from 'date-fns';
 import Card from '../components/Card';
 import { FaBoxes, FaFileInvoice, FaHandHoldingUsd, FaWallet } from 'react-icons/fa';
 import { usePagination } from '../hooks/usePagination';
@@ -20,7 +19,6 @@ import { useNavigate } from 'react-router-dom';
 const Tagline = styled.p`
  color: ${({ theme }) => theme.colors.textLight};
 `
-
 const ClaimsHeader = styled.div`
   display: flex;
   justify-content: space-between;
@@ -310,7 +308,7 @@ const ClamList = () => {
       setAssignedActivity(formatRetainerActivities(response.data))
       // console.log("normalizeProjects(response.data)", formatRetainerActivities(response.data))
     } catch (error) {
-      toast.error("No data found...")
+      toast.error(error.data.message || error.message || "No data found..." )
       setIsLoading(false)
     } finally {
       setIsLoading(false)

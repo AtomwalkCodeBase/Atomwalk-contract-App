@@ -204,7 +204,7 @@ const LogoutButton = styled(ActionButton)`
 //   width: 80px;
 
 const Header = ({ sidebarWidth = "250px", onMobileMenuClick }) => {
-  const { logout, profile } = useAuth()
+  const { logout, profile, companyInfo } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -229,14 +229,18 @@ const Header = ({ sidebarWidth = "250px", onMobileMenuClick }) => {
         <MobileMenuButton onClick={onMobileMenuClick}>
           <FaBars />
         </MobileMenuButton>
-        <img src={profile?.image} alt="Company Logo" style={{ width: "50px", height: "50px", borderRadius: "10px", marginRight: "10px", border: "0.2px solid #000" }} />
+        <img src={companyInfo?.image} alt="Company Logo" style={{ maxWidth: "500px", height: "50px", borderRadius: "10px", marginRight: "10px", border: "0.2px solid #000" }} />
       </div>
 
       <HeaderActions>
 
         <UserProfile onClick={handleprofile}>
-            <UserAvatar>
+            {/* <UserAvatar>
               {profile?.name?.charAt(0) || <FaUser />}
+            </UserAvatar> */}
+            <UserAvatar>
+                 <img src={profile?.image} alt="Company Logo" style={{ width: "50px", height: "50px", borderRadius: "10px", marginRight: "10px", border: "0.2px solid #000" }} />
+
             </UserAvatar>
           <UserName>{profile?.name || "User"}</UserName>
         </UserProfile>

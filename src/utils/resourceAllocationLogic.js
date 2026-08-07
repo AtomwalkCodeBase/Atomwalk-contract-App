@@ -13,6 +13,11 @@ const toLocalDateOnly = (value) => {
             value.getDate()
         );
     }
+
+    const comparable = DateForApiFormate(value, true);
+    if (!comparable) return null;
+    const [year, month, day] = comparable.split("-").map(Number);
+    return new Date(year, month - 1, day);
 }
 
 export const buildActualPayloadsForSubmit = (actualDraftsByDate, resourceList) => {
