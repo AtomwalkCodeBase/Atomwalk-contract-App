@@ -691,8 +691,8 @@ const handleResetMonth = () => {
     handlePageChange?.(1);
   };
 
-  console.log("asTotals", JSON.stringify(asTotals))
-  console.log("plannedTotals", JSON.stringify(plannedTotals))
+  // console.log("asTotals", JSON.stringify(asTotals))
+  // console.log("plannedTotals", JSON.stringify(plannedTotals))
 
   const statsCard = [
     {
@@ -861,7 +861,7 @@ const handleResetMonth = () => {
   				<FilterRow style={{ marginBottom: "1rem" }}>
 					<SearchBox type="text" placeholder="Search customer name, audit type, location, order item id ..." value={filter.search} onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value, }))} />
 
-          <FilterSelect
+          {/* <FilterSelect
             name="status"
             value={Array.isArray(filter.status) ? "" : filter.status}
             onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
@@ -871,7 +871,7 @@ const handleResetMonth = () => {
 						<option value="P">In Progress</option>
 						<option value="C">Completed</option>
 						<option value="NS">Not Started</option>
-					</FilterSelect>
+					</FilterSelect> */}
 
 					<Button variant="outline" size='sm' onClick={handleClearFilters}>Clear Filters</Button>
           <Button variant="outline" size="sm" onClick={handleResetMonth}> Reset Month </Button>

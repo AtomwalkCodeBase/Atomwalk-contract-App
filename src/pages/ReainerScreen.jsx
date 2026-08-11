@@ -226,9 +226,11 @@ const RetainerScreen = () => {
     let matchesDropdown = true;
 
     if (selectedStatus !== "All") {
-      if (selectedStatus === "RET-G1-TL") {
+      if (selectedStatus === "CP-G1-TL") {
+      // if (selectedStatus === "RET-G1-TL") {
         matchesDropdown = grade === "TL";
-      } else if (selectedStatus === "RET-G1-EX") {
+      } else if (selectedStatus === "CP-G1-EX") {
+     // } else if (selectedStatus === "RET-G1-EX") {
         matchesDropdown = grade === "EX";
       }
     }
@@ -488,7 +490,8 @@ const RetainerScreen = () => {
             name: "",
             gender: "M",
             email_id: "",
-            grade_level: "RET-G1-TL",
+            // grade_level: "RET-G1-TL",
+            grade_level: "CP-G1-TL",
             mobile_number: "",
             address_line_1: "",
             address_line_2: "",
@@ -515,8 +518,11 @@ const RetainerScreen = () => {
             onChange={(e) => setSelectedStatus(e.target.value)}
           >
             <option value="All">All</option>
+            <option value="CP-G1-TL">Team Lead</option>
+            <option value="CP-G1-EX">Executive</option>
+            {/* <option value="All">All</option>
             <option value="RET-G1-TL">Team Lead</option>
-            <option value="RET-G1-EX">Executive</option>
+            <option value="RET-G1-EX">Executive</option> */}
           </FilterSelect>
 
           <Button variant="outline"
@@ -595,7 +601,8 @@ const RetainerScreen = () => {
                         emp_id: employee.additional_ref_number,
                         name: employee.name,
                         gender: employee.gender,
-                        grade_level: employee.grade_level <= 1 ? "RET-G1-EX" : "RET-G1-TL",
+                        // grade_level: employee.grade_level <= 1 ? "RET-G1-EX" : "RET-G1-TL",
+                        grade_level: employee.grade_level <= 1 ? "CP-G1-EX" : "CP-G1-TL",
                         dob: DateForApiFormate(employee.dob, true),
                         email_id: employee.email_id || "",
                         mobile_number: employee.mobile_number || "",

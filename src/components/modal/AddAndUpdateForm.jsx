@@ -309,8 +309,11 @@ export const AddAndUpdateForm = ({
                 <FormGroup>
                   <Label>Grade <Required>*</Required></Label>
                   <FormSelect value={formData.grade_level} onChange={(e) => onChange("grade_level", e.target.value)}>
-                    <option value="RET-G1-TL">Team Lead</option>
-                    <option value="RET-G1-EX">Executive</option>
+                    {/* for demo Area TL and EX */}
+                    {/* <option value="RET-G1-TL">Team Lead</option>
+                    <option value="RET-G1-EX">Executive</option> */}
+                    <option value="CP-G1-TL">Team Lead</option>
+                    <option value="CP-G1-EX">Executive</option>
                   </FormSelect>
                 </FormGroup>
               </CompactRow>

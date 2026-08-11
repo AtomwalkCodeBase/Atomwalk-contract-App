@@ -240,7 +240,8 @@ const Logins = () => {
       if (company.status === 200) {
         if (path === "/retainer/login") {
           const filter = company.data?.filter(
-            (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
+            // (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
+            (data) => data.ref_cust_name === "Matrix Business Services (APM)"
           )
           // setCompanies(filter)
           if (filter.length > 0) {
@@ -335,10 +336,10 @@ const Logins = () => {
 
         <Divider></Divider>
 
-        <FormFooterLinks>
+        {/* <FormFooterLinks>
           <a>Forgot Pin?</a>
           <a>Need Help?</a>
-        </FormFooterLinks>
+        </FormFooterLinks> */}
       </LoginCard>
 
       <PageFooter>Developed By Atomwalk technologies Pvt. Ltd.</PageFooter>

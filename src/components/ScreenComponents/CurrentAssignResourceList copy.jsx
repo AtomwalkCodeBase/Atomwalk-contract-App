@@ -643,9 +643,9 @@ const handleSubmitAllActuals = async () => {
       fd.append("call_mode", hasAddOrUpdate ? "UPDATE" : "UPDATE"); // always UPDATE — ADD alone can't carry deletes
       fd.append("c_emp_list", JSON.stringify(rows));
       await postAllocationData(fd);
-      for (let [key, value] of fd.entries()) {
-        console.log(key, value);
-      }
+      // for (let [key, value] of fd.entries()) {
+      //   console.log(key, value);
+      // }
 
       if (hasAddOrUpdate) {
         const activityCompleteFd = new FormData();
@@ -658,9 +658,9 @@ const handleSubmitAllActuals = async () => {
 
         await postActivityAllocationData(activityCompleteFd);
 
-        for (let [key, value] of activityCompleteFd.entries()) {
-          console.log(key, value);
-        }
+        // for (let [key, value] of activityCompleteFd.entries()) {
+        //   console.log(key, value);
+        // }
       }
     }
 
@@ -1402,36 +1402,37 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
   <Card
     title="Resource Overview"
     hoverable={false}
-    headerAction={
-    !hasAnyActivityStarted ? (
-      isPastActivityWindow && hasAnyPlanFromApi ? (
-        <Button size="md" variant="primary" onClick={() => openConfirmation({
-          title: "Start Activity",
-          message: "Are you sure you want to start this activity?",
-          confirmLabel: "Start",
-          onConfirm: handleStartActivityOnce,
-          reload: true,
-        })}>
-          Start Activity
-        </Button>
-      ) : null // per-date Start buttons handle it inside each DateBlock instead
-    ) : isPastActivityWindow  && hasAnyDateWithoutActual ? (
-      <RenderButton
-        activityStarted={activityStarted}
-        handleStartActivity={handleStartActivity}
-        handleCopyAllActual={handleCopyAllActual}
-        handleCancelCopyAllActual={handleCancelCopyAllActual}
-        hasUnconfirmedDrafts={hasUnconfirmedDrafts}
-        handleOpenActualRangeModal={handleOpenActualRangeModal}
-      />
-    )  : isPastActivityWindow ?  (
-    <ButtonRows>
-      <Button size="sm" variant="outline" onClick={handleOpenActualRangeModal}>
-        <FaPlus /> Add Actual
-      </Button>
-    </ButtonRows>
-  )  : null
-  }  >  
+  //   headerAction={
+  //   !hasAnyActivityStarted ? (
+  //     isPastActivityWindow && hasAnyPlanFromApi ? (
+  //       <Button size="md" variant="primary" onClick={() => openConfirmation({
+  //         title: "Start Activity",
+  //         message: "Are you sure you want to start this activity?",
+  //         confirmLabel: "Start",
+  //         onConfirm: handleStartActivityOnce,
+  //         reload: true,
+  //       })}>
+  //         Start Activity
+  //       </Button>
+  //     ) : null // per-date Start buttons handle it inside each DateBlock instead
+  //   ) : isPastActivityWindow  && hasAnyDateWithoutActual ? (
+  //     <RenderButton
+  //       activityStarted={activityStarted}
+  //       handleStartActivity={handleStartActivity}
+  //       handleCopyAllActual={handleCopyAllActual}
+  //       handleCancelCopyAllActual={handleCancelCopyAllActual}
+  //       hasUnconfirmedDrafts={hasUnconfirmedDrafts}
+  //       handleOpenActualRangeModal={handleOpenActualRangeModal}
+  //     />
+  //   )  : isPastActivityWindow ?  (
+  //   <ButtonRows>
+  //     <Button size="sm" variant="outline" onClick={handleOpenActualRangeModal}>
+  //       <FaPlus /> Add Actual
+  //     </Button>
+  //   </ButtonRows>
+  // )  : null
+  // } 
+   >  
       {/* <ButtonRows>
     <Button variant="primary" onClick={handleCopyAllActual}>
       Copy Actual (All Dates)
@@ -1677,7 +1678,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
   <SubPanelHeader $variant="plan" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
     <span>Plan</span>
 
-    {!isPastActivityWindow && !isStarted && isPlannedFromApi && (dStr === nextStartableDate && apiDate >= DateForApiFormate(nextStartableDate)) && (
+    {/* {!isPastActivityWindow && !isStarted && isPlannedFromApi && (dStr === nextStartableDate && apiDate >= DateForApiFormate(nextStartableDate)) && (
       <Button size="sm" variant="primary" onClick={() => openConfirmation({
         title: "Start Activity",
         message: `Are you sure you want to start the activity for ${dStr}?`,
@@ -1689,7 +1690,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
       </Button>
     )}
 
-    {(isStarted || isPastActivityWindow) && !hasResourceActual && !actualDraft && !isDateBeingEdited && planAssignments.length > 0 && (
+    {isStarted && !hasResourceActual && !actualDraft && !isDateBeingEdited && planAssignments.length > 0 && (
       <Button size="sm" variant="outline" onClick={() => handleCopyActual(dStr, planAssignments)}>
         <LuCopy /> Copy Actual
       </Button>
@@ -1699,7 +1700,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
       <Button size="sm" variant="outlines" onClick={() => handleCancelCopyActual(dStr)}>
         Cancel Copy Actual
       </Button>
-    )}
+    )} */}
   </SubPanelHeader>
 
   {planAssignments.length === 0 ? (
@@ -2165,6 +2166,13 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
   const formattedEnd = activityEnd ? DateForApiFormate(activityEnd, true) : "";
 
   return (
+    <>
+      <div>
+
+       <ResourceName>
+            Resource Name: {row.employee_name || row.emp_id}({row.emp_id})
+          </ResourceName>
+      </div>
     <EditRowContainer onClick={(e) => e.stopPropagation()}>
       <FormField>
         <FormLabel>Start Date</FormLabel>
@@ -2240,6 +2248,7 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
         </Button>
       </div>
     </EditRowContainer>
+    </>
   );
 };
 

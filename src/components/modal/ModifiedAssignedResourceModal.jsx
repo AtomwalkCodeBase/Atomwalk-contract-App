@@ -157,7 +157,7 @@ const ResourceAllocation = () => {
     return map;
   }, [originalAllocations]);
   
-  const { dayWindow, dateWiseAssignments} = useDateWiseAssignments({ activityStart, activityEnd, allocations: workingAllocations, originalById, getRowStatus});
+  const { dayWindow, dateWiseAssignments} = useDateWiseAssignments({ activityStart, activityEnd, allocations: workingAllocations, originalById});
   // ---- Derived data — ALL computed from workingAllocations, nothing else ----
 
   const employeeDateMap = useMemo(() => {

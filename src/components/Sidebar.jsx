@@ -488,7 +488,7 @@ const Sidebar = ({ onToggle, initialOpen = false }) => {
   const [isOpen, setIsOpen] = useState(initialOpen)
   const [expandedGroups, setExpandedGroups] = useState({})
   const location = useLocation()
-  const { logout, profile, iscoustomerLogin } = useAuth()
+  const { logout, profile } = useAuth()
   const { theme, uiPreferences } = useTheme()
   const sidebarStyle = uiPreferences?.layout?.sidebarStyle || "standard"
 
