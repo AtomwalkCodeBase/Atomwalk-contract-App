@@ -152,7 +152,7 @@ export const ClaimCard = ({
           renderRow={(item) => {
             const { variant, label } = getClaimStatusVariant(item.expense_status);
             const index = item?.master_data?.claim_items?.findIndex(
-              (data) => data.claim_id === item.claim_id
+              (data) => data.id === item.id
             );
 
             const showRowActions = ViewMode !== "VIEW" && ViewMode !== "settlement" && item.expense_status === "N";
@@ -238,7 +238,7 @@ export const ClaimCard = ({
       )}
 
       <ClaimGrandTotalBar>
-        <span>Total Claim Amount: {currency(totalClaim.totalOPE)}</span>
+        <span>Total Claim Amount: {currency(totalClaim.totalApproved + totalClaim.totalSubmitted )}</span>
       </ClaimGrandTotalBar>
 
       {canShowActionButtons && claimList.length > 0 && (

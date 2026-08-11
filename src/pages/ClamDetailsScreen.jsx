@@ -167,16 +167,27 @@ const ClamDetailsScreen = () => {
 
   const totalClaim = useMemo(() => {
     return claimList.reduce(
-      (acc, claim) => {
-        acc.totalOPE += Number(claim?.expense_amt || 0);
-        acc.totalSettlement += Number(claim?.settlement_amt || 0);
+      (acc, claim) => { (claim?.claim_items || []).forEach((item) => {
+        const { label } = getClaimStatusVariant(item.expense_status);
+        const expenseAmt = Number(item?.expense_amt || 0);
+        const settlementAmt = Number(item?.settlement_amt || 0);
+
+        // Add to respective totals based on status
+        if (label === "Submitted") {
+          acc.totalSubmitted += expenseAmt;
+          acc.totalSettlement += settlementAmt;
+        } else if (label === "Approved") {
+          acc.totalApproved += expenseAmt;
+          acc.totalSettlement += settlementAmt;
+        }
+      });
         return acc;
       },
-      { totalOPE: 0, totalSettlement: 0 }
+      { totalSubmitted: 0, totalApproved: 0, totalSettlement: 0 }
     );
   }, [claimList]);
 
-  const grandTotal = totals.resource + totalClaim.totalOPE;
+  const grandTotal = totals.resource + totalClaim.totalApproved;
 
   const fetchResourceData = useCallback(async () => {
     const startDate = activityData?.planned_start_date || activityData.earliestPlannedDate;
@@ -476,7 +487,7 @@ const ClamDetailsScreen = () => {
 
           <GrandTotalBar>
             <span style={{cursor: "pointer"}} onClick={() => setActiveTab("resource")}>Resource Cost (TL + EX): {currency(totals.resource)}</span>
-            <span style={{cursor: "pointer"}} onClick={() => setActiveTab("claim")}>Claims: {currency(totalClaim.totalOPE)}</span>
+            <span style={{cursor: "pointer"}} onClick={() => setActiveTab("claim")}>Claims: {currency(totalClaim.totalApproved)}</span>
             <span style={{cursor: "pointer"}} onClick={() => window.history.back()}>Grand Total (incl. Claims): {currency(grandTotal)}</span>
           </GrandTotalBar>
         </Card>
