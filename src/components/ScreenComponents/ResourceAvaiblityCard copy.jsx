@@ -9,6 +9,7 @@ import PaginationComponent from "../Pagination";
 import styled from "styled-components";
 import Badge from "../Badge";
 import Button from "../Button";
+import { ImCross } from "react-icons/im";
 
 const InfoStrip = styled.div`
   display: flex;
@@ -194,6 +195,7 @@ export const ResourceAvailability = ({
   handleAutoAssign,
   handleUndoAutoAssign,
   lastAutoAssign,
+  showResourceAvailability, setShowResourceAvailability
 }) => {
   const [filter, setFilter] = useState({ search: "", roleFilter: "ALL" });
   const [roleByDate, setRoleByDate] = useState({});
@@ -337,6 +339,13 @@ export const ResourceAvailability = ({
   return (
     <Card hoverable={false}
       title={`Resource Availability (${formatDate(activityStart)} – ${formatDate(activityEnd)})`}
+      headerAction=
+                      {showResourceAvailability && (
+                <Button variant="outlines" onClick={() => setShowResourceAvailability(false)}>
+                  <ImCross /> Close
+                </Button>
+              )}
+      
     >
       <InfoStrip>
         <InfoPill>

@@ -1048,6 +1048,8 @@ const handleRoleChange = (emp, dStr, nextRole) => {
           handleAutoAssign={handleAutoAssign}
           handleUndoAutoAssign={handleUndoAutoAssign}
           lastAutoAssign={lastAutoAssign}
+          showResourceAvailability={showResourceAvailability}
+          setShowResourceAvailability={setShowResourceAvailability}
         />}
 
         {apiDate <= DateForApiFormate(activityData.planned_end_date) ? (
@@ -1056,11 +1058,11 @@ const handleRoleChange = (emp, dStr, nextRole) => {
              {!showResourceAvailability && <Button onClick={() => setShowResourceAvailability(true)}>
                 <FaPlus />Add Resources
               </Button>}
-              {showResourceAvailability && (
+              {/* {showResourceAvailability && (
                 <Button variant="outlines" onClick={() => setShowResourceAvailability(false)}>
                   <ImCross /> Close
                 </Button>
-              )}
+              )} */}
             </div>
           )
         ) : (
