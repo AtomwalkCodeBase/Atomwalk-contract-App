@@ -201,9 +201,12 @@ const BrandHeader = styled.div`
 `
 
 const CompanyLogo = styled.img`
-  height: 50px;
+  max-height: 6rem;
+  max-width: 80%;
   width: auto;
+  height: auto;
   object-fit: contain;
+  aspect-ratio: 16 / 9;
 `
 
 const CompanyName = styled.span`
@@ -240,8 +243,8 @@ const Logins = () => {
       if (company.status === 200) {
         if (path === "/retainer/login") {
           const filter = company.data?.filter(
-            // (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
-            (data) => data.ref_cust_name === "Matrix Business Services (APM)"
+            (data) => data.ref_cust_name === "DEMO Allocation Project Management (Atomwalk)"
+            // (data) => data.ref_cust_name === "Matrix Business Services (APM)"
           )
           // setCompanies(filter)
           if (filter.length > 0) {
