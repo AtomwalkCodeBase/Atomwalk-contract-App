@@ -425,7 +425,7 @@ export const ResourceAvailability = ({
         </FilterSelect>
       </div>
 
-      <Note>**If you want to change the emp type then 1st select the role then select the date.</Note>
+      <Note>**If you want to change the resource type then 1st select the role then select the date.</Note>
 
       <DataTable
         columns={columns}

@@ -21,7 +21,7 @@ const Th = styled.th`
   text-align: left;
   background: ${({ theme }) => theme.colors.backgroundAlt};
   padding: 0.75rem;
-  font-size: 0.85rem;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
   color: ${({ theme }) => theme.colors.text};
   font-weight: 600;
 `

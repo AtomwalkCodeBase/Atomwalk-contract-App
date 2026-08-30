@@ -485,7 +485,7 @@ export const formatRetainerActivities = (apiData = [], resourcePlannedLists = []
       activityStatus = "AA";
     }
 
-    else if (isActualSubmitted) {
+    else if (isActualSubmitted || original_A) {
       statusDisplay = "Actual Submitted";
       activityStatus = "AS";
     }
@@ -1440,6 +1440,9 @@ export const buildPayloads = (workingAllocations, originalAllocations) => {
         id: effectiveId,
         emp_id: row.emp_id,
         emp_type: row.emp_type,
+        start_date: DateForApiFormate(row.start_date),
+        end_date: DateForApiFormate(row.end_date),
+        contract_rate: rateNum,
       });
     }
   });

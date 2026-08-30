@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Layout from "../Layout";
 import {
   buildOwnershipMap,
@@ -27,7 +27,8 @@ import { FaArrowLeft, FaBoxes, FaCalendarAlt, FaFileAlt, FaMapMarkerAlt, FaPlus,
 import styled from "styled-components";
 import { FaCheckToSlot, FaPenToSquare } from "react-icons/fa6";
 import ConfirmPopup from "../ConfirmPopup";
-import { ImCross } from "react-icons/im";
+import { FaFileDownload } from "react-icons/fa";
+import { AllocationColumns, ExcelBuilder } from "../../ExcelFormate/ProfitabilityDashboard/ExcelBuilder";
 
 const Tagline = styled.p`
  color: ${({ theme }) => theme.colors.textLight};
@@ -136,12 +137,9 @@ const ResourceAllocation = () => {
   const [confirmDates, setConfirmDates] = useState([]);
 
   const [employees, setEmployees] = useState([]);
-
-  // originalAllocations: frozen DB snapshot for THIS activity, set once per load.
+  const [isExportingAllocation, setIsExportingAllocation] = useState(false);
   const [originalAllocations, setOriginalAllocations] = useState([]);
-  // workingAllocations: the only mutable state driving both cards.
   const [workingAllocations, setWorkingAllocations] = useState([]);
-  // busyAllocations: read-only reference data (other activities blocking a date).
   const [busyAllocations, setBusyAllocations] = useState([]);
 
   const activityStart = activityData?.original_P?.start_date || activityData?.planned_start_date || "";
@@ -158,7 +156,6 @@ const ResourceAllocation = () => {
   }, [originalAllocations]);
   
   const { dayWindow, dateWiseAssignments} = useDateWiseAssignments({ activityStart, activityEnd, allocations: workingAllocations, originalById});
-  // ---- Derived data — ALL computed from workingAllocations, nothing else ----
 
   const employeeDateMap = useMemo(() => {
     const map = {};
@@ -194,19 +191,113 @@ const ResourceAllocation = () => {
   );
 
   const pendingCount = addPayload.length + updatePayload.length + deletePayload.length;
-  const saveLabel =
-    // [
-    //   addPayload.length && `Add ${addPayload.length}`,
-    //   updatePayload.length && `Update ${updatePayload.length}`,
-    //   deletePayload.length && `Remove ${deletePayload.length}`,
-    // ]
-    [
-      addPayload.length && `Submit`,
-      updatePayload.length && `Submit/Update`,
-      // deletePayload.length && `Update Plan`,
-    ]
-      .filter(Boolean)
-      .join(" & ") || "Save Changes";
+  // const saveLabel =
+  //   // [
+  //   //   addPayload.length && `Add ${addPayload.length}`,
+  //   //   updatePayload.length && `Update ${updatePayload.length}`,
+  //   //   deletePayload.length && `Remove ${deletePayload.length}`,
+  //   // ]
+  //   [
+  //     addPayload.length && `Submit`,
+  //     updatePayload.length && `Submit/Update`,
+  //     // deletePayload.length && `Update Plan`,
+  //   ]
+  //     .filter(Boolean)
+  //     .join(" & ") || "Save Changes";
+
+  const canExportAllocation =
+    ["PS", "AS"].includes(activityData?.activityStatus) &&
+    DateForApiFormate(apiDate, true) >= DateForApiFormate(activityEnd, true);
+
+  const getAllocationExportRows = async () => {
+    const isActualSubmitted = activityData?.activityStatus === "AS";
+    const actualAllocationId = activityData?.original_A?.id;
+
+    if (isActualSubmitted && !actualAllocationId) {
+      throw new Error("Missing actual allocation ID");
+    }
+
+    const resources = isActualSubmitted
+      ? await loadExisting({ allocation_id: actualAllocationId })
+      : workingAllocations;
+    const formattedAllocationId = isActualSubmitted
+      ? `A${String(actualAllocationId).padStart(9, "0")}`
+      : "";
+    const cpEmpId = localStorage.getItem("cust_emp_id") || "";
+
+    return resources.map((resource) => ({
+      allocationId: formattedAllocationId,
+      cpEmpId,
+      resourceId: resource.emp_id,
+      startDate: DateForApiFormate(resource.start_date || resource.s_date),
+      endDate: DateForApiFormate(resource.end_date || resource.e_date),
+      resourceType: resource.emp_type,
+      contractRate: Number(resource.contract_rate) || 0,
+      auditScanCount: 1,
+      isPresent: true,
+      remark: "",
+    }));
+  };
+
+  const getAllocationFile = async () => {
+    const rows = await getAllocationExportRows();
+    if (!rows.length) throw new Error("No allocated resources found");
+
+    return ExcelBuilder({
+      fileName: `Allocation-${activityData?.order_item_key || activityData?.original_P?.id || "Report"}.xlsx`,
+      sheetName: "Allocation",
+      // title: `Resource Allocation - ${activityData?.order_item_key || "Order Item"}`,
+      columns: AllocationColumns,
+      rows,
+      download: false,
+    });
+  };
+
+  const handleDownloadAllocation = async () => {
+    try {
+      setIsExportingAllocation(true);
+      const file = await getAllocationFile();
+      const fileName = `Allocation-${activityData?.order_item_key || activityData?.original_P?.id || "Report"}.xlsx`;
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(file);
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      toast.error(error.message || "Failed to download allocation");
+    } finally {
+      setIsExportingAllocation(false);
+    }
+  };
+
+  // const handleShareAllocation = async () => {
+  //   try {
+  //     if (!navigator.share) {
+  //       toast.info("File sharing is not supported on this device");
+  //       return;
+  //     }
+
+  //     setIsExportingAllocation(true);
+  //     const file = await getAllocationFile();
+  //     const fileName = `Allocation-${activityData?.order_item_key || activityData?.original_P?.id || "Report"}.xlsx`;
+  //     const sharedFile = new File([file], fileName, { type: file.type });
+
+  //     if (navigator.canShare && !navigator.canShare({ files: [sharedFile] })) {
+  //       toast.info("File sharing is not supported on this device");
+  //       return;
+  //     }
+
+  //     await navigator.share({
+  //       title: "Resource Allocation",
+  //       text: `Resource allocation for ${activityData?.order_item_key || "order item"}`,
+  //       files: [sharedFile],
+  //     });
+  //   } catch (error) {
+  //     if (error.name !== "AbortError") toast.error(error.message || "Failed to share allocation");
+  //   } finally {
+  //     setIsExportingAllocation(false);
+  //   }
+  // };
 
   // ---- Load ----
 
@@ -305,8 +396,6 @@ const ResourceAllocation = () => {
   const getContractRateByType = (empType) => {
     if (empType === "T") {
       return tlContractRate === "" ? 0 : Number(tlContractRate);
-
-      return plannedTLRate != null ? Number(plannedTLRate) : "";
     }
 
     return exContractRate === "" ? 0 : Number(exContractRate);
@@ -518,7 +607,7 @@ const handleRoleChange = (emp, dStr, nextRole) => {
         const ownerRow = empRows.find(
           (r) => r.start_date <= d && r.end_date >= d
         );
-        dateEmpTypes[d] = ownerRow?.emp_type || emp_type_default(emp);
+        dateEmpTypes[d] = ownerRow?.emp_type;
         dateEmpRates[d] = ownerRow?.contract_rate ?? getContractRateByType(dateEmpTypes[d]);
       });
       dateEmpTypes[dStrComparable] = nextRole;
@@ -653,19 +742,85 @@ const handleRoleChange = (emp, dStr, nextRole) => {
       workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
     );
 
-    const mismatchedDates = [...plannedDateSet].filter((dComparable) => {
-      const dayAssignments = workingAllocations.filter((r) =>
-        datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
-      );
-      const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
-      const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
-      return tlCount < plannedTL || exCount < plannedEX;
-    });
+    // const mismatchedDates = [...plannedDateSet].filter((dComparable) => {
+    //   const dayAssignments = workingAllocations.filter((r) =>
+    //     datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+    //   );
+    //   const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+    //   const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+    //   return tlCount < plannedTL || exCount < plannedEX;
+    // });
 
     // if (mismatchedDates.length > 0) {
     //   toast.error(`Required TL/EX not met for: ${mismatchedDates.sort().join(", ")}`);
     //   return;
     // }
+
+    const mismatchedDates = [...plannedDateSet].filter((dComparable) => {
+  const dayAssignments = workingAllocations.filter((r) =>
+    datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+  );
+
+  const tlCount = dayAssignments.filter(
+    (a) => a.emp_type === "T" && a.is_active !== false
+  ).length;
+
+  const exCount = dayAssignments.filter(
+    (a) => a.emp_type === "E" && a.is_active !== false
+  ).length;
+
+  // TL and EX must BOTH exactly match the planned requirement
+  return tlCount !== plannedTL || exCount !== plannedEX;
+});
+
+if (mismatchedDates.length > 0) {
+  const details = mismatchedDates
+    .sort()
+    .map((date) => {
+      const dayAssignments = workingAllocations.filter((r) =>
+        datesBetweenComparable(r.start_date, r.end_date).includes(date)
+      );
+
+      const tlCount = dayAssignments.filter(
+        (a) => a.emp_type === "T" && a.is_active !== false
+      ).length;
+
+      const exCount = dayAssignments.filter(
+        (a) => a.emp_type === "E" && a.is_active !== false
+      ).length;
+
+      const issues = [];
+
+      if (tlCount !== plannedTL) {
+        const diff = tlCount - plannedTL;
+
+        issues.push(
+          diff > 0
+            ? `Remove ${diff} Team Lead${diff > 1 ? "s" : ""}`
+            : `Add ${Math.abs(diff)} Team Lead${
+                Math.abs(diff) > 1 ? "s" : ""
+              }`
+        );
+      }
+
+      if (exCount !== plannedEX) {
+        const diff = exCount - plannedEX;
+
+        issues.push(
+          diff > 0
+            ? `Remove ${diff} Executive${diff > 1 ? "s" : ""}`
+            : `Add ${Math.abs(diff)} Executive${
+                Math.abs(diff) > 1 ? "s" : ""
+              }`
+        );
+      }
+
+      return `${formatDate(date, true)}: ${issues.join(", ")}`;
+    });
+
+  toast.error(`Resource requirements not met\n${details.join("; ")}`);
+  return;
+}
 
     const overAssignedDates = dayWindow
       .map((d) => formatToApiDate(d))
@@ -746,72 +901,71 @@ const handleRoleChange = (emp, dStr, nextRole) => {
         return false;
       }
 
-      const skipStrictStaffingValidation =
-        confirmPopupMode === "overAllocation" || confirmPopupMode === "missingDates";
+      // const skipStrictStaffingValidation = confirmPopupMode === "overAllocation" || confirmPopupMode === "missingDates";
 
-      const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
-        const dayAssignments = workingAllocations.filter((r) =>
-          datesBetweenComparable(r.start_date, r.end_date).includes(date)
-        );
-        const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
-        const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+      // const getStaffingIssues = (date, workingAllocations, plannedTL, plannedEX) => {
+      //   const dayAssignments = workingAllocations.filter((r) =>
+      //     datesBetweenComparable(r.start_date, r.end_date).includes(date)
+      //   );
+      //   const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+      //   const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
         
-        const issues = [];
-        if (tlCount !== plannedTL) {
-          const diff = tlCount - plannedTL;
-          if (diff > 0) {
-            issues.push(`Remove ${diff} Team Lead${diff > 1 ? 's' : ''}`);
-          } else {
-            issues.push(`Add ${Math.abs(diff)} Team Lead${Math.abs(diff) > 1 ? 's' : ''}`);
-          }
-        }
-        if (exCount !== plannedEX) {
-          const diff = exCount - plannedEX;
-          if (diff > 0) {
-            issues.push(`Remove ${diff} Executive${diff > 1 ? 's' : ''}`);
-          } else {
-            issues.push(`Add ${Math.abs(diff)} Executive${Math.abs(diff) > 1 ? 's' : ''}`);
-          }
-        }
-        return issues;
-      };
+      //   const issues = [];
+      //   if (tlCount !== plannedTL) {
+      //     const diff = tlCount - plannedTL;
+      //     if (diff > 0) {
+      //       issues.push(`Remove ${diff} Team Lead${diff > 1 ? 's' : ''}`);
+      //     } else {
+      //       issues.push(`Add ${Math.abs(diff)} Team Lead${Math.abs(diff) > 1 ? 's' : ''}`);
+      //     }
+      //   }
+      //   if (exCount !== plannedEX) {
+      //     const diff = exCount - plannedEX;
+      //     if (diff > 0) {
+      //       issues.push(`Remove ${diff} Executive${diff > 1 ? 's' : ''}`);
+      //     } else {
+      //       issues.push(`Add ${Math.abs(diff)} Executive${Math.abs(diff) > 1 ? 's' : ''}`);
+      //     }
+      //   }
+      //   return issues;
+      // };
 
-      if (!skipStrictStaffingValidation) {
-        const plannedDateSet = new Set(
-          workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
-        );
+      // if (!skipStrictStaffingValidation) {
+      //   const plannedDateSet = new Set(
+      //     workingAllocations.flatMap((r) => datesBetweenComparable(r.start_date, r.end_date))
+      //   );
 
-        const missingDates = [...plannedDateSet].filter((dComparable) => {
-          const dayAssignments = workingAllocations.filter((r) =>
-            datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
-          );
-          const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
-          const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
-          return tlCount !== plannedTL || exCount !== plannedEX;
-        });
+      //   const missingDates = [...plannedDateSet].filter((dComparable) => {
+      //     const dayAssignments = workingAllocations.filter((r) =>
+      //       datesBetweenComparable(r.start_date, r.end_date).includes(dComparable)
+      //     );
+      //     const tlCount = dayAssignments.filter((a) => a.emp_type === "T").length;
+      //     const exCount = dayAssignments.filter((a) => a.emp_type === "E").length;
+      //     return tlCount !== plannedTL || exCount !== plannedEX;
+      //   });
 
-        if (missingDates.length > 0) {
-          let errorMessage = '';
-          if (missingDates.length === 1) {
-            const date = missingDates[0];
-            const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
-            const formattedDate = formatDate(date, true);
-            errorMessage = `Resource requirement not met for ${formattedDate}\n`;
-            errorMessage += issues.join('\n');
-          } else {
-            errorMessage = 'Resource requirements not met\n';
-            const details = missingDates.sort().map(date => {
-              const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
-              const formattedDate = formatDate(date, true);
-              return `${formattedDate}: ${issues.join(', ')}`;
-            });
-            errorMessage += details.join('; ');
-          }
+      //   if (missingDates.length > 0) {
+      //     let errorMessage = '';
+      //     if (missingDates.length === 1) {
+      //       const date = missingDates[0];
+      //       const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
+      //       const formattedDate = formatDate(date, true);
+      //       errorMessage = `Resource requirement not met for ${formattedDate}\n`;
+      //       errorMessage += issues.join('\n');
+      //     } else {
+      //       errorMessage = 'Resource requirements not met\n';
+      //       const details = missingDates.sort().map(date => {
+      //         const issues = getStaffingIssues(date, workingAllocations, plannedTL, plannedEX);
+      //         const formattedDate = formatDate(date, true);
+      //         return `${formattedDate}: ${issues.join(', ')}`;
+      //       });
+      //       errorMessage += details.join('; ');
+      //     }
 
-          toast.warning(errorMessage);
-          return false;
-        }
-      }
+      //     toast.warning(errorMessage);
+      //     return false;
+      //   }
+      // }
 
       const activeResources = workingAllocations;
 
@@ -923,6 +1077,14 @@ const handleRoleChange = (emp, dStr, nextRole) => {
       <ClaimsHeader>
         <Tagline>Track and manage your assigned audit tasks</Tagline>
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: "flex-end" }}>
+          {canExportAllocation && <>
+            <Button size="md" onClick={handleDownloadAllocation} disabled={isExportingAllocation}>
+              <FaFileDownload /> Download Plan Allocation
+            </Button>
+            {/* <Button size="md" onClick={handleShareAllocation} disabled={isExportingAllocation}>
+              <FaShareAlt /> Share
+            </Button> */}
+          </>}
           <Button size="md" onClick={() => window.history.back()}>
             <FaArrowLeft />Back
           </Button>
@@ -1013,6 +1175,7 @@ const handleRoleChange = (emp, dStr, nextRole) => {
           activityData={activityData}
           isActual={false}
           employees={employees}
+          emp_loading={loading}
           loadAllData={loadAllData}
           plannedTL={plannedTL}
           plannedEX={plannedEX}
@@ -1035,6 +1198,7 @@ const handleRoleChange = (emp, dStr, nextRole) => {
 
         {showResourceAvailability && <ResourceAvailability
           employees={employees}
+          emp_loading={loading}
           dayWindow={dayWindow}
           activityData={activityData}
           activityDates={dayWindow}

@@ -5,10 +5,7 @@ import styled from "styled-components";
 import { useActivity } from "../context/ActivityClaimContext";
 import Button from "../components/Button";
 import { toast } from "react-toastify";
-import {
-  FaBoxes, FaCheckCircle, FaCheckDouble, FaClock, FaExclamationCircle,
-  FaEye, FaFileContract, FaFileDownload, FaFileInvoice, FaHandHoldingUsd, FaWallet,
-} from "react-icons/fa";
+import {FaBoxes, FaCheckCircle, FaEye, FaFileContract, FaFileDownload, FaWallet,} from "react-icons/fa";
 import StatsCard from "../components/StatsCard";
 import DataTable, { Td } from "../components/DataTable";
 import Badge from "../components/Badge";
@@ -18,6 +15,7 @@ import { usePagination } from "../hooks/usePagination";
 import Card from "../components/Card";
 import { useNavigate } from "react-router-dom";
 import { ExcelBuilder, ProfitabilityDashboardColumns } from "../ExcelFormate/ProfitabilityDashboard/ExcelBuilder";
+import { theme } from "../styles/Theme";
 
 const ClaimsHeader = styled.div`
   display: flex;
@@ -53,12 +51,12 @@ const StatsGrid = styled.div`
 const CustomerName = styled.div`
   font-weight: 600;
   color: ${({ theme }) => theme.colors.text};
-  font-size: 0.875rem;
+  font-size: inherit;
   line-height: 1.3;
 `;
 
 const OrderItemId = styled.div`
-  font-size: 0.75rem;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
   color: ${({ theme }) => theme.colors.textLight};
   font-family: monospace;
   background: ${({ theme }) => theme.colors.backgroundAlt};
@@ -69,7 +67,7 @@ const OrderItemId = styled.div`
 `;
 
 const StoreLocation = styled.div`
-  font-size: 0.75rem;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
   color: ${({ theme }) => theme.colors.textLight};
   font-family: monospace;
   background: ${({ theme }) => theme.colors.accentLight};
@@ -113,100 +111,6 @@ const SearchBox = styled.input`
   }
 `;
 
-const FilterSelect = styled.select`
-  padding: 0.5rem 1rem;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 6px;
-  background: white;
-  min-width: 150px;
-
-  @media (max-width: 768px) {
-    width: 45%;
-    min-width: unset;
-  }
-
-  @media (max-width: 480px) {
-    width: 100%;
-  }
-`;
-
-const RateRow = styled.div`
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: ${({ theme }) => theme.spacing.xs};
-`;
-
-const ActualAmount = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.md};
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-const Separator = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.xs};
-  color: ${({ theme }) => theme.colors.textLight};
-`;
-
-const PlanAmount = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.sm};
-  font-weight: 400;
-  color: ${({ theme }) => theme.colors.textLight};
-`;
-
-const MetaChip = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: ${({ theme }) => theme.fontSizes.xs};
-  padding: 1px 6px;
-  border-radius: ${({ theme }) => theme.borderRadius.full};
-  background: ${({ theme }) => theme.colors.backgroundAlt};
-  color: ${({ theme }) => theme.colors.textLight};
-`;
-
-const MetaLabel = styled.span`
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.primary};
-`;
-
-const MetaRow = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: ${({ theme }) => theme.spacing.md};
-  margin-top: ${({ theme }) => theme.spacing.xs};
-`;
-
-const MetaGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-`;
-
-const MetaGroupLabel = styled.span`
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.primary};
-  letter-spacing: 0.02em;
-`;
-
-const MetaValues = styled.span`
-  font-size: ${({ theme }) => theme.fontSizes.xs};
-  color: ${({ theme }) => theme.colors.textLight};
-  display: flex;
-  gap: 4px;
-`;
-
-const MetaActual = styled.span`
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-const MetaPlanTag = styled.span`
-  color: ${({ theme }) => theme.colors.textLight};
-`;
-
 const RateCell = styled.div`
   display: flex;
   /* justify-content: flex-end; */
@@ -221,23 +125,13 @@ const RateBox = styled.div`
   min-width: 64px;
   padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
   border-radius: ${({ theme }) => theme.borderRadius.md};
-  background: ${({ theme }) =>
-    theme.colors.backgroundAlt};
+  background: ${({ theme }) => theme.colors.backgroundAlt};
   border: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
 const RateBoxActual = styled(RateBox)`
   background: ${({ theme }) => theme.colors.primaryLight};
   border-color: ${({ theme }) => theme.colors.primary};
-`;
-
-const BoxLabel = styled.span`
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: ${({ theme }) => theme.colors.primary};
-  margin-bottom: 2px;
 `;
 
 const BoxAmount = styled.span`
@@ -457,10 +351,14 @@ const handleResetMonth = () => {
     let actualContractRate = 0;
     let actualApprovedContractRate = 0;
     let plannedContractRate = 0;
+    let actualCpRate = 0;
+    let plannedCpRate = 0;
     let actualTL = 0;
     let actualEx = 0;
     let plannedTL = 0;
     let plannedEx = 0;
+    let plannedTLRate = 0;
+    let plannedExRate = 0;
 
     (group.resource_planned || []).forEach((rp) => {
       const rpId = String(
@@ -489,28 +387,48 @@ const handleResetMonth = () => {
 
     const firstItem = (group.grouped_data || [])[0];
     const retainers = firstItem?.original_P?.retainer_list || [];
-    retainers
-      .filter((r) => String(r.a_type || "").toUpperCase() === "P")
+    const myRetainers = retainers.filter((r) => {
+    const retainerEmpId = String(r.emp_id ?? ""); return retainerEmpId === String(emp_id);
+     });
+    myRetainers
+      // .filter((r) => String(r.a_type || "").toUpperCase() === "P")
       .forEach((r) => {
         const days = getDays(r.start_date, r.end_date);
+        const aType = String(r.a_type || "").toUpperCase();
         const tlCount = Number(r.tl_count ?? 0);
         const tlRate = Number(r.tl_rate ?? 0);
         const exCount = Number(r.ex_count ?? 0);
         const exRate = Number(r.ex_rate ?? 0);
 
-        plannedTL += tlCount * days;
-        plannedEx += exCount * days;
-        plannedContractRate += days * (tlCount * tlRate + exCount * exRate);
-      });
+        const systemAmt = days * (tlCount * tlRate + exCount * exRate);
+
+        const cpRateValue = Number(r.cp_rate ?? 0);
+        const finalRate = cpRateValue > 0 ? cpRateValue : systemAmt;
+
+if (aType === "P") {
+      plannedCpRate += finalRate;
+      plannedTL += tlCount * days;
+      plannedEx += exCount * days;
+      plannedContractRate += systemAmt;
+      plannedTLRate = tlRate;
+      plannedExRate = exRate;
+    } else if (aType === "A") {
+      actualCpRate += finalRate;
+    }
+    });
 
     return {
       actualContractRate,
       actualApprovedContractRate,
       plannedContractRate,
+      actualCpRate,
+      plannedCpRate,
       actualTL,
       actualEx,
       plannedTL,
       plannedEx,
+      plannedTLRate,
+      plannedExRate,
     };
   };
 
@@ -557,6 +475,8 @@ const handleResetMonth = () => {
     totalActualContractRate: 0,          // actual only
     totalApprovedContractRate: 0,  // actual approved only
     totalPendingContractRate: 0,   // planned only
+    totalActualCpRate: 0,  
+    totalPlannedCpRate: 0, 
   };
 
     groupedDataWithClaims.forEach((group) => {
@@ -567,6 +487,8 @@ const handleResetMonth = () => {
     totals.totalActualContractRate += rp.actualContractRate;
     totals.totalApprovedContractRate += rp.actualApprovedContractRate;
     totals.totalPendingContractRate += rp.plannedContractRate;
+    totals.totalActualCpRate += rp.actualCpRate;
+    totals.totalPlannedCpRate += rp.plannedCpRate;
     });
 
     return totals;
@@ -587,6 +509,10 @@ const handleResetMonth = () => {
       totalEx: rp.actualEx,
       totalTLPending: rp.plannedTL,
       totalExPending: rp.plannedEx,
+      plannedTLRate: rp.plannedTLRate,
+      plannedExRate: rp.plannedExRate,
+      plannedCpRate: rp.plannedCpRate,
+      actualCpRate: rp.actualCpRate,
     };
   };
 
@@ -676,8 +602,10 @@ const handleResetMonth = () => {
   const asData = getActivityDataByStatus(["AS", "AA"]);
   const asTotals = getOverallClaimTotals(asData);
 
+  
   const plannedData = getActivityDataByStatus(["PS", "PA", "P"]);
   const plannedTotals = getOverallClaimTotals(plannedData);
+
 
   const applyActivityFilter = (statuses) => {
     setSelectedActivityStatus(statuses);
@@ -699,15 +627,26 @@ const handleResetMonth = () => {
       label: "Total Revenue Amount",
       value: currency(
       //  (asTotals.totalActualContractRate || 0) + (asTotals.totalClaimApproved || 0) + (plannedTotals.totalActualContractRate || 0) + (((plannedTotals.totalPendingContractRate || 0) - ((plannedTotals.totalActualContractRate || 0)) + (plannedTotals.totalClaimSubmitted || 0))) ,
-       (asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0) + ((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0)) + ((asTotals.totalClaimApproved || 0) + (asTotals.totalClaimSubmitted || 0)) + ((plannedTotals.totalClaimApproved || 0) + (plannedTotals.totalClaimSubmitted || 0))),
+      //  (asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0) + ((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0)) + ((asTotals.totalClaimApproved || 0) + (asTotals.totalClaimSubmitted || 0)) + ((plannedTotals.totalClaimApproved || 0) + (plannedTotals.totalClaimSubmitted || 0))),
+      (asTotals.totalActualCpRate || 0) +
+      (plannedTotals.totalActualCpRate || 0) +
+      ((plannedTotals.totalPlannedCpRate || 0) + (asTotals.totalPlannedCpRate || 0)) -
+      ((plannedTotals.totalActualCpRate || 0) + (asTotals.totalActualCpRate || 0)) +
+      ((asTotals.totalClaimApproved || 0) + (asTotals.totalClaimSubmitted || 0)) +
+      ((plannedTotals.totalClaimApproved || 0) + (plannedTotals.totalClaimSubmitted || 0))
+    ),
       color: "warning",
       icon: <FaWallet />,
       sections: [
         {
           items: [
-            { label: "Approved", value: currency(((asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0)) + (asTotals.totalClaimApproved + plannedTotals.totalClaimApproved)), status: "success", subStatus: "actual" },
+            // { label: "Approved", value: currency(((asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0)) + (asTotals.totalClaimApproved + plannedTotals.totalClaimApproved)), status: "success", subStatus: "actual" },
+            { label: "Approved", value: currency(((asTotals.totalActualCpRate || 0) + (plannedTotals.totalActualCpRate || 0)) + (asTotals.totalClaimApproved + plannedTotals.totalClaimApproved)), status: "success", subStatus: "actual" },
             // { label: "Plan", value: currency(((plannedTotals.totalPendingContractRate || asTotals.totalPendingContractRate || 0) - (plannedTotals.totalActualContractRate || asTotals.totalActualContractRate || 0)) + (plannedTotals.totalClaimSubmitted || 0)), status: "info", subStatus: "plan" }
-            { label: "Pending", value: currency((((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0))) + (asTotals.totalClaimSubmitted + plannedTotals.totalClaimSubmitted)), status: "info", subStatus: "plan" }
+            // { label: "Pending", value: currency((((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0))) + (asTotals.totalClaimSubmitted + plannedTotals.totalClaimSubmitted)), status: "info", subStatus: "plan" }
+            { label: "Pending", value: currency((((plannedTotals.totalPlannedCpRate || 0) + (asTotals.totalPlannedCpRate || 0)) -
+                ((plannedTotals.totalActualCpRate || 0) + (asTotals.totalActualCpRate || 0))) +
+              (asTotals.totalClaimSubmitted + plannedTotals.totalClaimSubmitted)), status: "info", subStatus: "plan" }
           ]
         },
       ],  
@@ -719,14 +658,19 @@ const handleResetMonth = () => {
     },
     {
       label: "Resource Amount",
-      value: currency((asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0) + ((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0))),
+      // value: currency((asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0) + ((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0))),
+      value: currency((asTotals.totalActualCpRate || 0) +
+      (plannedTotals.totalActualCpRate || 0) +
+      ((plannedTotals.totalPlannedCpRate || 0) + (asTotals.totalPlannedCpRate || 0)) -
+      ((plannedTotals.totalActualCpRate || 0) + (asTotals.totalActualCpRate || 0))),
       color: "info",
       icon: <FaFileContract />,
       sections: [
         {
           items: [
-            { label: "Approved", value: currency((asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0)), status: "success", subStatus: "actual" },
-            { label: "Pending", value: currency(((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0))), status: "info", subStatus: "plan" }
+            { label: "Approved", value: currency((asTotals.totalActualCpRate || 0) + (plannedTotals.totalActualCpRate || 0)), status: "success", subStatus: "actual" },
+            { label: "Pending", value: currency(((plannedTotals.totalPlannedCpRate || 0) + (asTotals.totalPlannedCpRate || 0)) -
+              ((plannedTotals.totalActualCpRate || 0) + (asTotals.totalActualCpRate || 0))), status: "info", subStatus: "plan" }
           ]
         },
       ], 
@@ -794,15 +738,18 @@ const handleResetMonth = () => {
       activityStatus: ["AA", "AS"].includes(group.activityStatus) ? "Completed" : "Planned",
       startDate: first.actual_start_date || first.planned_start_date,
       endDate: first.actual_end_date || first.planned_end_date,
-      planRate: totals.totalPendingContractRate,
+      // planRate: totals.totalPendingContractRate,
       planTL: totals.totalTLPending,
+      tlRate: totals.plannedTLRate,
       planEX: totals.totalExPending,
-      actualRate: totals.totalActualContractRate,
+      exRate: totals.plannedExRate,
       actualTL: totals.totalTL,
       actualEX: totals.totalEx,
+      actualRate: totals.totalActualContractRate,
+      payAble: totals.actualCpRate,
       claimStatus: getClaimStatusVariant(claim?.expense_status).label,
       claimAmount: totals.totalClaimApproved,
-      total: totals.totalActualContractRate + totals.totalClaimApproved,
+      total: totals.actualCpRate + totals.totalClaimApproved,
     };
   });
 
@@ -810,7 +757,7 @@ const handleResetMonth = () => {
     <Layout title="Receivables Dashboard">
       <ClaimsHeader>
         <Tagline>View your monthly earnings and receivables summary.</Tagline>
-        <div>
+
           <div
             style={{
               marginTop: "0.5rem",
@@ -840,7 +787,6 @@ const handleResetMonth = () => {
               Next &gt;
             </Button>
           </div>
-        </div>
       </ClaimsHeader>
 
       <StatsGrid>
@@ -852,7 +798,6 @@ const handleResetMonth = () => {
             color={stats.color}
             onClick={stats.onClick}
             sections={stats.sections} onItemClick={(item) => { stats.onItemClick(item); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) }}
-
           />
         ))}
       </StatsGrid>
@@ -887,8 +832,10 @@ const handleResetMonth = () => {
           
           const {
             totalActualContractRate, totalTL, totalClaimApproved, totalPendingContractRate,
-    totalEx, totalTLPending ,totalExPending
+    totalEx, totalTLPending ,totalExPending, actualCpRate
           } = getGroupClaimTotals(group);
+
+          const Variance = actualCpRate - totalActualContractRate;
 
           return (
             <>
@@ -943,6 +890,12 @@ const handleResetMonth = () => {
     </RateBox>
   </RateCell>
 </Td>
+              <Td style={{ textAlign: "right", paddingRight: "3rem" , color: theme.colors.success, fontWeight: 600 }}>
+                {currency(actualCpRate)}{" "}
+              </Td>
+              <Td style={{ textAlign: "right", paddingRight: "3rem", color: `${Variance === 0 ? theme.colors.text : Variance > 0 ? theme.colors.success : theme.colors.error}`, fontWeight: 600 }}>
+                {currency(Variance)}{" "}
+              </Td>
               <Td>
                 <Badge variant={variant}>{label}</Badge>
               </Td>
@@ -950,7 +903,7 @@ const handleResetMonth = () => {
                 {currency(totalClaimApproved)}{" "}
               </Td>
               <Td style={{ textAlign: "right", paddingRight: "3rem", fontWeight: "900", }}>
-                {currency((totalActualContractRate || 0 ) + totalClaimApproved)}{" "}
+                {currency((actualCpRate || 0 ) + totalClaimApproved)}{" "}
               </Td>
               <Td>   
                  <Button size='sm' variant='outline' onClick={() => navigate('/clamDetails', { state: { data: { ...group, mode: "settlement" } } })}>
@@ -1018,7 +971,9 @@ const column = [
     Store Location
   </>,
   "Activity status",
-  <>Resource Rate <br/> (Actual/plan)</>,
+  <>System Amt <br/> (Actual/plan)</>,
+  "Payable",
+  "Variance",
   "Claim status",
   "Claim Approved",
   "Total Amount",

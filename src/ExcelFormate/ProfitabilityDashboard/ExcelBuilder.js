@@ -7,6 +7,7 @@ export const ExcelBuilder = async ({
     title = "",
     columns = [],
     rows = [],
+    download = true,
 }) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(sheetName);
@@ -200,7 +201,7 @@ export const ExcelBuilder = async ({
     // Grand Total
     //------------------------------------
 
-    const sumKeys = ["actualRate", "claimAmount", "total"];
+    const sumKeys = ["actualRate", "payAble", "claimAmount", "total"];
 
     const lastRow = worksheet.lastRow.number + 1;
 
@@ -237,12 +238,26 @@ export const ExcelBuilder = async ({
     //------------------------------------
 
     const buffer = await workbook.xlsx.writeBuffer();
+    const file = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
 
-    saveAs(
-        new Blob([buffer]),
-        fileName
-    );
+    if (download) saveAs(file, fileName);
+    return file;
 };
+
+export const AllocationColumns = [
+    { header: "ALLOCATION ID", key: "allocationId" },
+    { header: "CP EMP ID", key: "cpEmpId" },
+    { header: "RESOURCE ID", key: "resourceId" },
+    { header: "START DATE", key: "startDate" },
+    { header: "END DATE", key: "endDate" },
+    { header: "RESOURCE TYPE (T/E)", key: "resourceType" },
+    { header: "CONTRACT RATE", key: "contractRate", type: "currency" },
+    { header: "NO OF AUDIT/ SCAN", key: "auditScanCount" },
+    { header: "IS PRESENT?", key: "isPresent" },
+    { header: "REMARK", key: "remark" },
+];
 
 
 export const ProfitabilityDashboardColumns = [
@@ -264,38 +279,47 @@ export const ProfitabilityDashboardColumns = [
         type: "date",
     },
 
-    {
-        header: "Plan Rate",
-        key: "planRate",
-        type: "currency",
-    },
+    // {
+    //     header: "Plan Rate",
+    //     key: "planRate",
+    //     type: "currency",
+    // },
 
     {
         header: "Plan TL",
         key: "planTL",
     },
-
+    {
+        header: "TL Rate",
+        key: "tlRate",
+    },
     {
         header: "Plan EX",
         key: "planEX",
     },
-
     {
-        header: "Actual Rate",
-        key: "actualRate",
-        type: "currency",
+        header: "EX Rate",
+        key: "exRate",
     },
-
     {
         header: "Actual TL",
         key: "actualTL",
     },
-
     {
         header: "Actual EX",
         key: "actualEX",
     },
 
+    {
+        header: "System Amt",
+        key: "actualRate",
+        type: "currency",
+    },
+    {
+        header: "Payable Amt",
+        key: "payAble",
+        type: "currency",
+    },
     {
         header: "Claim Status",
         key: "claimStatus",

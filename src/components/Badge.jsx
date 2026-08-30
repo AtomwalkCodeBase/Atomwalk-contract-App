@@ -5,7 +5,7 @@ const BadgeContainer = styled.span`
   align-items: center;
   justify-content: center;
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
   font-weight: 500;
   border-radius: 9999px;
   

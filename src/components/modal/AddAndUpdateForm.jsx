@@ -277,7 +277,7 @@ export const AddAndUpdateForm = ({
             <>
               <CompactRow>
                 <FormGroup>
-                  <Label>Auditor ID <Required>*</Required></Label>
+                  <Label>Auditor ID</Label>
                   <Input type="text" value={formData.emp_id} onChange={(e) => onChange("emp_id", e.target.value)} />
                 </FormGroup>
                 <FormGroup>
@@ -303,17 +303,17 @@ export const AddAndUpdateForm = ({
                   <Input type="email" value={formData.email_id} onChange={(e) => onChange("email_id", e.target.value)} />
                 </FormGroup>
                 <FormGroup>
-                  <Label>Mobile Number</Label>
+                  <Label>Mobile Number <Required>*</Required></Label>
                   <Input type="tel" maxLength="10" value={formData.mobile_number} onChange={(e) => onChange("mobile_number", e.target.value)} />
                 </FormGroup>
                 <FormGroup>
                   <Label>Grade <Required>*</Required></Label>
                   <FormSelect value={formData.grade_level} onChange={(e) => onChange("grade_level", e.target.value)}>
                     {/* for demo Area TL and EX */}
-                    <option value="RET-G1-TL">Team Lead</option>
-                    <option value="RET-G1-EX">Executive</option>
-                    {/* <option value="CP-G1-TL">Team Lead</option>
-                    <option value="CP-G1-EX">Executive</option> */}
+                    {/* <option value="RET-G1-TL">Team Lead</option>
+                    <option value="RET-G1-EX">Executive</option> */}
+                    <option value="CP-G1-TL">Team Lead</option>
+                    <option value="CP-G1-EX">Executive</option>
                   </FormSelect>
                 </FormGroup>
               </CompactRow>
@@ -370,20 +370,28 @@ export const AddAndUpdateForm = ({
                 <>
                   <CompactRow>
                     <FormGroup>
-                      <Label>Select Id Proof Type<Required>*</Required></Label>
+                      <Label>Select Govt. Id Proof<Required>*</Required></Label>
                       <FormSelect id="proofType" name="proofType" value={formDataFile.proofType} onChange={(e) => onChangeUpload("proofType", e.target.value)} required>
                         <option value="" disabled>Select Id Proof</option>
                         <option value="A">Aadhar Card</option>
-                        <option value="P">Pan Card</option>
-                        <option value="D">Driving license</option>
+                        {/* <option value="P">Pan Card</option>
+                        <option value="D">Driving license</option> */}
                       </FormSelect>
                     </FormGroup>
                     <FormGroup>
                       <Label>Enter ID Proof Number <Required>*</Required></Label>
                       <Input
                         type="text"
+                        inputMode="numeric"
+                        maxLength={formDataFile.proofType === "A" ? 12 : undefined}
                         value={formDataFile.govt_id_number}
-                        onChange={(e) => onChangeUpload("govt_id_number", e.target.value, true)}
+                        onChange={(e) => onChangeUpload(
+                          "govt_id_number",
+                          formDataFile.proofType === "A"
+                            ? e.target.value.replace(/\D/g, "").slice(0, 12)
+                            : e.target.value,
+                          true
+                        )}
                       />
                     </FormGroup>
                   </CompactRow>

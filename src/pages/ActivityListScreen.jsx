@@ -9,17 +9,13 @@ import Button from '../components/Button';
 import { usePagination } from '../hooks/usePagination';
 import DataTable, { Td } from '../components/DataTable';
 import PaginationComponent from '../components/Pagination';
-import AddOPEModal from '../components/modal/AddOPEModal';
-import OpeListModal from '../components/modal/OpeListModal';
 import Badge from '../components/Badge';
 import { theme } from '../styles/Theme';
 import { useFilter } from '../hooks/useFilter';
-import { AssignEmployee } from '../components/modal/Assignemployee';
 import { useNavigate } from 'react-router-dom';
-import { FaCheck, FaChevronDown, FaChevronUp, FaClipboardList, FaEye, FaEyeSlash, FaHourglassEnd, FaMinusCircle, FaMoneyBillWave, FaUserCheck, FaUserPlus, FaUsers, FaUserTimes } from 'react-icons/fa';
+import { FaCheck, FaClipboardList, FaEye, FaHourglassEnd, FaMoneyBillWave, FaUserCheck, FaUserPlus, FaUserTimes } from 'react-icons/fa';
 import StatsCard from '../components/StatsCard';
-import Tabs from '../components/Tabs';
-import { BsListCheck } from 'react-icons/bs';
+import { IoIosArrowDown, IoIosArrowUp } from 'react-icons/io';
 
 const Tagline = styled.p`
  color: ${({ theme }) => theme.colors.textLight};
@@ -72,29 +68,6 @@ const CustomRangeRow = styled.div`
     align-items: stretch;
   }
 `;
-const FilterContainer = styled.div`
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-
-  @media (max-width: 1024px) {
-    gap: 0.7rem;
-  }
-
-  @media (max-width: 768px) {
-    width: 100%;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-
-  @media (max-width: 480px) {
-    flex-direction: column;
-    width: 100%;
-    align-items: stretch;
-  }
-`;
 const FilterSelect = styled.select`
   padding: 0.5rem 1rem;
   border: 1px solid ${({ theme }) => theme.colors.border};
@@ -109,38 +82,6 @@ const FilterSelect = styled.select`
 
   @media (max-width: 480px) {
     width: 100%;
-  }
-`;
-const DateInput = styled.input`
-  padding: 0.4rem 0.7rem;
-  border-radius: 6px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: white;
-
-  @media (max-width: 768px) {
-    width: 45%;
-  }
-
-  @media (max-width: 480px) {
-    width: 100%;
-  }
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  overflow-x: auto;
-  overflow-y: hidden;
-
-  th {
-    text-align: left;
-    padding: 12px;
-    background: #f3f4f6;
-  }
-
-  td {
-    padding: 12px;
-    border-bottom: 1px solid #eee;
   }
 `;
 const ButtonGroup = styled.div`
@@ -188,30 +129,6 @@ const StoreLocation = styled.div`
   white-space: nowrap;
 `;
 
-const ResourcesRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: ${({ theme }) => theme.fontSizes.sm};
-  padding: ${({ theme }) => theme.spacing.sm};
-  background: ${({ theme, variant }) =>
-    variant === "primary" ? `${theme.colors.primary}10` :
-      variant === "success" ? `${theme.colors.success}10` :
-        'transparent'
-  };
-  border-radius:  ${({ theme }) => theme.borderRadius.lg};
-`;
-
-const ResourcesLabel = styled.span`
-  font-weight: 700;
-  min-width: 25px;
-  color: ${({ theme, variant }) =>
-    variant === "primary" ? theme.colors.primary :
-      variant === "success" ? theme.colors.success :
-        theme.colors.primary
-  };
-`;
-
 const ResourcesValue = styled.span`
   color: ${({ theme }) => theme.colors.text};
   display: flex;
@@ -256,7 +173,7 @@ const SearchBox = styled.input`
 
 const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: ${({ theme }) => theme.spacing.lg};
   margin-bottom: ${({ theme }) => theme.spacing.xl};
 
@@ -563,7 +480,7 @@ const sortedFilteredData = useMemo(() => {
   });
 }, [FilteredData]);
 
-  const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(sortedFilteredData, 10)
+  const { paginatedData, currentPage, itemsPerPage, totalItems, handlePageChange, } = usePagination(sortedFilteredData, 10);
 
   const handleExpandRow = (row) => {
     setExpandedRow((prev) =>
@@ -616,7 +533,7 @@ const sortedFilteredData = useMemo(() => {
   const notAssignedCount = getStatusCount(groupedData, "Not Planned");
   const notStartedCount = getStatusCount(groupedData, "Not Started");
   const actualSubmittedCount = getStatusCount(groupedData, "Actual Submitted");
-  const planApprovedCount = getStatusCount(groupedData, "Plan Approved");
+  // const planApprovedCount = getStatusCount(groupedData, "Plan Approved");
   const planSubmittedCount = getStatusCount(groupedData, "Plan Submitted");
 
   const statsData = [
@@ -655,21 +572,14 @@ const sortedFilteredData = useMemo(() => {
       color: "info",
       onClick: (prev) => setFilter({ ...prev, status: "P" }),
     },
-    {
-      icon: <BsListCheck />,
-      label: "Planned Approved",
-      value: planApprovedCount,
-      color: "info",
-      onClick: (prev) => setFilter({ ...prev, status: "PA" }),
-    }
+    // {
+    //   icon: <BsListCheck />,
+    //   label: "Planned Approved",
+    //   value: planApprovedCount,
+    //   color: "info",
+    //   onClick: (prev) => setFilter({ ...prev, status: "PA" }),
+    // }
   ]
-
-  const TABS = [
-    { key: "month", label: "Monthly view" },
-    { key: "week", label: "Weekly view" }
-  ]
-
-  console.log("paginatedData", paginatedData)
 
   return (
     <Layout title="Audit/OrderItem Allocation List">
@@ -793,9 +703,9 @@ const sortedFilteredData = useMemo(() => {
                         }}
                       >
                         {expandedRow === employee.order_item_id ? (
-                          <FaEyeSlash size={16} />
+                          <IoIosArrowUp size={16} />
                         ) : (
-                          <FaEye size={16} />
+                          <IoIosArrowDown size={16} />
                         )}
 
                         {expandedRow === employee.order_item_id
@@ -842,7 +752,7 @@ const sortedFilteredData = useMemo(() => {
                   "Sl No.",
                   "Planned Date",
                   "Planned Resource",
-                  "Status",
+                  "Resource Status",
                   "Action",
                 ]}
                 data={groupedData}
@@ -871,13 +781,8 @@ const sortedFilteredData = useMemo(() => {
                     <>
                       {/* Serial No */}
                       <Td style={{ paddingLeft: "1.5rem" }}>{index + 1}</Td>
-
-                      {/* Planned Date */}
                       <Td>{displayPlannedDate}</Td>
-
-                      {/* Planned Resource */}
                       <Td>
-                        {/* <ResourcesRow variant="primary"> */}
                         <ResourcesValue>
                           <ResourceCount variant="primary">
                             {resource?.tl_count || 0}
@@ -888,21 +793,13 @@ const sortedFilteredData = useMemo(() => {
                           </ResourceCount>
                           {" "}EX
                         </ResourcesValue>
-                        {/* </ResourcesRow> */}
                       </Td>
-
-                      {/* Status */}
                       <Td>
-                        <Badge
-                          variant={getStatusVariant(
-                            item.activityStatus
-                          )}
-                        >
+                        <Badge variant={getStatusVariant(item.activityStatus)}>
                           {item.statusDisplay}
                         </Badge>
                       </Td>
 
-                      {/* Action */}
                       <Td>
                         <Button
                           size="sm"
@@ -912,10 +809,7 @@ const sortedFilteredData = useMemo(() => {
                               ? "primary"
                               : "outline"
                           }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAssignResources1(item, e);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); handleAssignResources1(item, e);}}
                         >
                           {!isResourceAssigned &&
                             (item.activityStatus === "NS" || item.activityStatus === "NP") ? (
@@ -924,10 +818,7 @@ const sortedFilteredData = useMemo(() => {
                             <FaEye />
                           )}
 
-                          {!isResourceAssigned &&
-                            (item.activityStatus === "NS" || item.activityStatus === "NP")
-                            ? "Assign"
-                            : "View"}{" "}
+                          {!isResourceAssigned && (item.activityStatus === "NS" || item.activityStatus === "NP") ? "Assign" : "View"}
                           Resources
                         </Button>
                       </Td>

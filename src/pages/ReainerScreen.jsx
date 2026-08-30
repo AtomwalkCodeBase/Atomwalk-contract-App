@@ -149,7 +149,7 @@ const RetainerScreen = () => {
 
   const [formDataFile, setFormDataFile] = useState({
     emp_id: "",
-    proofType: "",
+    proofType: "A",
     govt_id_number: "",
     file: null,
     profile_img: null,
@@ -226,11 +226,11 @@ const RetainerScreen = () => {
     let matchesDropdown = true;
 
     if (selectedStatus !== "All") {
-      // if (selectedStatus === "CP-G1-TL") {
-      if (selectedStatus === "RET-G1-TL") {
+      if (selectedStatus === "CP-G1-TL") {
+      // if (selectedStatus === "RET-G1-TL") {
         matchesDropdown = grade === "TL";
-      // } else if (selectedStatus === "CP-G1-EX") {
-     } else if (selectedStatus === "RET-G1-EX") {
+      } else if (selectedStatus === "CP-G1-EX") {
+    //  } else if (selectedStatus === "RET-G1-EX") {
         matchesDropdown = grade === "EX";
       }
     }
@@ -338,7 +338,7 @@ const RetainerScreen = () => {
   const removeFile = () => { setFormDataFile((prev) => ({ ...prev, file: null, })) }
 
   const handleAddEmployee = async () => {
-    if (!formData.emp_id || !formData.name || !formData.gender || !formData.dob || !formData.email_id || !formData.address_line_1) {
+    if (!formData.name || !formData.gender || !formData.dob || !formData.email_id || !formData.address_line_1) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -439,6 +439,10 @@ const RetainerScreen = () => {
           toast.error("Govt ID number is required");
           return;
         }
+        if (formDataFile.proofType === "A" && !/^\d{12}$/.test(formDataFile.govt_id_number.trim())) {
+          toast.error("Aadhar number must be exactly 12 digits");
+          return;
+        }
 
         if (call_mode === "ADD" && !hasFile) {
           toast.error("Please upload a file");
@@ -490,8 +494,8 @@ const RetainerScreen = () => {
             name: "",
             gender: "M",
             email_id: "",
-            grade_level: "RET-G1-TL",
-            // grade_level: "CP-G1-TL",
+            // grade_level: "RET-G1-TL",
+            grade_level: "CP-G1-TL",
             mobile_number: "",
             address_line_1: "",
             address_line_2: "",
@@ -517,12 +521,12 @@ const RetainerScreen = () => {
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
           >
-            {/* <option value="All">All</option>
-            <option value="CP-G1-TL">Team Lead</option>
-            <option value="CP-G1-EX">Executive</option> */}
             <option value="All">All</option>
+            <option value="CP-G1-TL">Team Lead</option>
+            <option value="CP-G1-EX">Executive</option>
+            {/* <option value="All">All</option>
             <option value="RET-G1-TL">Team Lead</option>
-            <option value="RET-G1-EX">Executive</option>
+            <option value="RET-G1-EX">Executive</option> */}
           </FilterSelect>
 
           <Button variant="outline"
@@ -582,7 +586,7 @@ const RetainerScreen = () => {
                       }
                       setFormDataFile({
                         emp_id: employee.emp_id,
-                        proofType: pType,
+                        proofType: pType || "A",
                         govt_id_number: gNumber,
                         file: employee.emp_file_1 || null,
                         isExisting: !!(employee.ref_govt_id_number && employee.emp_file_1),
@@ -601,8 +605,8 @@ const RetainerScreen = () => {
                         emp_id: employee.additional_ref_number,
                         name: employee.name,
                         gender: employee.gender,
-                        grade_level: employee.grade_level <= 1 ? "RET-G1-EX" : "RET-G1-TL",
-                        // grade_level: employee.grade_level <= 1 ? "CP-G1-EX" : "CP-G1-TL",
+                        // grade_level: employee.grade_level <= 1 ? "RET-G1-EX" : "RET-G1-TL",
+                        grade_level: employee.grade_level <= 1 ? "CP-G1-EX" : "CP-G1-TL",
                         dob: DateForApiFormate(employee.dob, true),
                         email_id: employee.email_id || "",
                         mobile_number: employee.mobile_number || "",

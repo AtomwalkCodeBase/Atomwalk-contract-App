@@ -1,18 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { formatToApiDate, DateForApiFormate, getCurrentDateTimeDefaults } from "../../utils/utils";
 import Card from "../Card";
-import DataTable, { Td } from "../DataTable";
 import Button from "../Button";
 import Badge from "../Badge";
-import { FaCalendarAlt, FaEdit, FaFileAlt, FaMapMarkerAlt, FaPlus, FaTrash, FaUser, FaUserCheck, FaUserPlus, FaUserSlash, FaUserTie } from "react-icons/fa";
+import { FaEdit, FaPlus, FaTrash, FaUserCheck, FaUserPlus, FaUserSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { LuCopy, LuCopyPlus } from "react-icons/lu";
+import { LuCopyPlus } from "react-icons/lu";
 import { getContractAllocationData, postActivityAllocationData, postAllocationData } from "../../services/productServices";
 import { buildActualPayloadsForSubmit } from "../../utils/resourceAllocationLogic";
 import { useNavigate } from "react-router-dom";
 import ConfirmPopup from "../ConfirmPopup";
-import Modal from "../Modal";
 import AddActualModal from "./AddActualModal";
 import { useFilter } from "../../hooks/useFilter";
 import { theme } from "../../styles/Theme";
@@ -176,56 +174,6 @@ const TotalsBar = styled.div`
   font-weight: 600;
   color: #333;
 `;
-
-const ClaimsTable = styled.div`
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #eee;
-  border-radius: 6px;
-  overflow: hidden;
-`;
-
-const ClaimsHeaderRow = styled.div`
-  display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr 0.8fr;
-  background: ${({ theme }) => theme.colors?.backgroundAlt || '#f1f5f9'};
-  padding: 6px 10px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #888;
-`;
-
-const ClaimsRow = styled.div`
-  display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr 0.8fr;
-  align-items: center;
-  padding: 7px 10px;
-  border-top: 1px solid #f1f1f1;
-  font-size: 0.76rem;
-  color: #333;
-`;
-
-const FileLink = styled.a`
-  font-size: 0.72rem;
-  color: ${({ theme }) => theme.colors?.primary || '#0E7A91'};
-  text-decoration: underline;
-`;
-
-const GrandTotalBar = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 24px;
-  padding: 10px 12px;
-  margin-top: 10px;
-  background: ${({ theme }) => theme.colors?.primary || '#0E7A91'}1A;
-  border: 1px solid ${({ theme }) => theme.colors?.primary || '#0E7A91'}33;
-  border-radius: 6px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: ${({ theme }) => theme.colors?.primary || '#0E7A91'};
-`;
-
 const ButtonRows = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -243,9 +191,6 @@ const CountPill1 = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.md || '0.25rem'};
 `;
 
-/* ---------------------------------- */
-/* Helpers                             */
-/* ---------------------------------- */
 
 // Parses an entry's resource strings: "empId^name^rate^type"
 const parseActualResources = (entry) => {
@@ -257,12 +202,6 @@ const parseActualResources = (entry) => {
 };
 
 const formatEmpType = (type) => (type === 'T' ? 'TL' : 'EX');
-
-// Dummy claims data for design preview — replace with real claims once API is wired
-const getDummyClaims = (dStr) => [
-  { category: "Travel", id: `CLM-${dStr}-01`, amount: 1200, file: "#" },
-  { category: "Food", id: `CLM-${dStr}-02`, amount: 450, file: "#" },
-];
 
 
 const toLocalDateOnly = (value) => {
@@ -348,6 +287,7 @@ const CurrentAssignments = ({
   activityEnd,
   activityData,
   employees = [],
+  emp_loading,
   loadAllData,
   plannedTL,
   plannedEX,
@@ -363,6 +303,7 @@ const CurrentAssignments = ({
   const loggedEmpId = localStorage.getItem("cust_emp_id");
 
     const [loading, setLoading] = useState(false);
+    const isDataLoading = loading || emp_loading;
 
     // console.log("activityData", activityData)
 
@@ -1243,7 +1184,6 @@ const filteredPlannedDates = useFilter({
     },
   },
 });
-// console.log("plannedDates", plannedDates)
 
 // const didAutoSetFilterRef = useRef(false);
 useEffect(() => {
@@ -1266,9 +1206,6 @@ useEffect(() => {
 
   const maxDate = new Date(Math.max(...validDates));
 
-  // console.log("activityStartDateOnly", activityStart)
-  // console.log("candidateMinDate", candidateMinDate)
-
   setFilterStartDate(toInputDate(minDate));
   setFilterEndDate(toInputDate(maxDate));
 }, [plannedDates]);
@@ -1289,9 +1226,6 @@ const maxAllowedActualDate =
 
   const minActualDate = activityStartDate ? toInputDate(activityStartDate) : "";
 const maxActualDate = toInputDate(maxAllowedActualDate);
-
-  // console.log("activityData", activityData)
-  // console.log("plannedDates", JSON.stringify(plannedDates))
 
 const hasAnyDateWithoutActual = plannedDates.some(({ dStr }) => {
   const alreadyHasResourceActual = resourceList.some((row) => {
@@ -1506,7 +1440,7 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
 
           {filteredPlannedDates.filter(({ d }) => d instanceof Date && !isNaN(d)).length === 0 ? (
             <EmptyRow style={{ fontSize: "1rem", padding: "2rem" }}>
-              No resource allocated
+              {isDataLoading ? "Loading..." : "No resource allocated"}
             </EmptyRow>
           ) : (
             filteredPlannedDates
@@ -1561,24 +1495,12 @@ const handleSaveActualRange = (rows, startDate, endDate) => {
 
               const isStarted = startedDates.has(dStr) || hasResourceActual;
 
-              // console.log("isStarted", isStarted)
-              // console.log("startedDates", startedDates)
-              // console.log("actualResourcesForDate", actualResourcesForDate)
-
               // const actualEntry = allAEntries.find((entry) => entry.start_date === dStr) || null;
               // const actualResources = parseActualResources(actualEntry);
 
               const actualDraft = actualDraftsByDate[dStr];
               const actualRows = actualDraft?.rows || [];
 
-              // console.log("actualDraft", JSON.stringify(actualDraftsByDate))
-              // console.log("actualDraft", actualDraft)
-              // console.log("actualDraft", isStarted)
-
-              // console.log("actualResourcesForDate", actualResourcesForDate)
-              // console.log("actualDraft", actualDraftsByDate)
-              // console.log("actualDraft", actualDraft)
-              // console.log("actualRows", actualRows)
 const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
 
   //             const displayedActualRows = hasResourceActual
@@ -1615,10 +1537,6 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
               // const actualTotal = actualResources.reduce((sum, r) => sum + (Number(r.rate) || 0),0);
               // const actualTotal = actualRows.reduce((sum, r) => sum + (Number(r.contract_rate) || 0), 0);
               const actualTotal = displayedActualRows.reduce((sum, r) => sum + (Number(r.contract_rate) || 0), 0); // FIXED — total must match what's rendered
-
-              const claims = getDummyClaims(dStr);
-              const claimsTotal = claims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-              const grandTotal = planTotal + claimsTotal;
 
               const hasActual = allAEntries.some((entry) => entry.start_date === dStr);
 
@@ -1704,7 +1622,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
   </SubPanelHeader>
 
   {planAssignments.length === 0 ? (
-    <EmptyRow>No resources planned</EmptyRow>
+    <EmptyRow>{isDataLoading ? "Loading..." : "No resources planned"}</EmptyRow>
   ) : (
     planAssignments.map((row) => {
       const disableAction = row.is_approved || activityData?.allAEntries?.length;
@@ -1829,7 +1747,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
   </SubPanelHeader>
  
   {displayedActualRows.length === 0 && (
-    <EmptyRow>No actual data recorded</EmptyRow>
+    <EmptyRow>{isDataLoading ? "Loading..." : "No actual data recorded"}</EmptyRow>
   )}
 
   {displayedActualRows.map((row) => {
@@ -1840,6 +1758,7 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
         key={row.rowKey}
         row={row}
         employees={employees}
+        empLoading={emp_loading}
         busyDateMap={busyDateMap}
         dStr={dStr} 
         onSave={hasResourceActual ? () => handleSaveApiRowEdit(row.rowKey) : undefined}
@@ -1976,29 +1895,14 @@ const draftRowsByKey = new Map(actualRows.map((r) => [r.rowKey, r]));
     )}
 
             <TotalsBar style={{ marginTop: 10 }}>
-                      {/* <span>Plan Total: ₹{planTotal}</span> */}
                       <span>Actual Total: ₹{actualTotal}</span>
                     </TotalsBar>
 </SubPanel>
                     </PlanActualGrid>
 
-                    {/* <TotalsBar style={{ marginTop: 10 }}>
-                      <span>Plan Total: ₹{planTotal}</span>
-                      <span>Actual Total: ₹{actualTotal}</span>
-                    </TotalsBar> */}
                   </Section>
 
                   <ButtonRows>
-                    {/* {hasResourceActual && activityData?.original_P?.is_ope_actual &&
-                      <>
-                        <Button onClick={() => navigate('/clamDetails', { state: { data:{...activityData, mode: "ADD"} } })}>Add claims</Button>
-                        <Button onClick={() => navigate('/clamDetails', { state: { data:{...activityData, mode: "VIEW"} } })}>View claims</Button>
-                      </>
-                    }  */}
-{/* 
-                    {planAssignments.length !== 0 && activityData.activityStatus === "C" && <Button onClick={() => handleOpenActualModal(dStr)}>
-                      {hasActual ? "Update Actual" : "Add Actual"}
-                    </Button>} */}
                    
                   </ButtonRows>
                 </DateBlock>
@@ -2103,64 +2007,6 @@ const FormSelect = styled.select`
   }
 `;
 
-const ActualModalOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
-
-const ActualModalContent = styled.div`
-  background: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  width: 400px;
-  max-width: 90%;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-`;
-
-const ActualModalHeader = styled.h3`
-  margin-top: 0;
-  margin-bottom: 16px;
-  color: #333;
-`;
-
-const ActualFormGroup = styled.div`
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-`;
-
-const ActualLabel = styled.label`
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #555;
-`;
-
-const ActualInput = styled.input`
-  padding: 8px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.9rem;
-`;
-
-const ActualSelect = styled.select`
-  padding: 8px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.9rem;
-`;
-
-const ActualButtonGroup = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
-`;
 const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, activityEnd, openConfirmation, tlContractRate, exContractRate, }) => {
   const formattedStart = activityStart ? DateForApiFormate(activityStart, true) : "";
   const formattedEnd = activityEnd ? DateForApiFormate(activityEnd, true) : "";
@@ -2252,7 +2098,7 @@ const InlineEditForm = ({ row, onChange, onConfirm, onCancel, activityStart, act
   );
 };
 
-const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove, disableActualAction, onToggleEdit, onSave,onCancel, minActualDate, maxActualDate, busyDateMap = {}, dStr  }) => {
+const ActualEditRow = ({ row, employees, empLoading, readOnly, isReplaced, onFieldChange, onEmployeeChange, onRemove, disableActualAction, onToggleEdit, onSave,onCancel, minActualDate, maxActualDate, busyDateMap = {}, dStr  }) => {
   if (readOnly) {
     return (
       <ResourceRow>
@@ -2260,6 +2106,9 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
           <ResourceName>
             {row.employee_name || row.emp_id}
             {isReplaced && <Badge variant="info" style={{ fontSize: '0.58rem' }}>Add</Badge>}
+            {row.a_quantity != null && row.a_quantity !== "" && row.a_quantity !== 0 && (
+              <span style={{ fontSize: '0.7rem', color: theme.colors.textLight }}>(Qty: {row.a_quantity})</span>
+            )}
           </ResourceName>
           <ResourceMeta>
             <Badge variant={row.emp_type === 'T' ? 'forward' : 'info'} style={{ fontSize: '0.6rem' }}>
@@ -2290,7 +2139,9 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
     <EditRowContainer>
       <FormField>
         <FormLabel>Resource {isReplaced && <Badge variant="warning" style={{ fontSize: '0.55rem' }}>Replaced</Badge>}</FormLabel>
-        {employees.length > 0 ? (
+        {empLoading ? (
+          <FormInput type="text" value="Loading employees..." disabled />
+        ) : employees.length > 0 ? (
           <FormSelect value={row.emp_id} onChange={(e) => onEmployeeChange(e.target.value)}>
             {employees.filter((emp) => emp.is_active !== false && emp.is_active !== 0 && emp.is_active !== "false") // ADDED
               .filter((emp) => emp.emp_id === row.emp_id || !busyDateMap[emp.emp_id]?.[DateForApiFormate(row.start_date || row.s_date || dStr, true)]) // ADDED — keep current selection visible, hide others with allocation on this date
@@ -2333,7 +2184,7 @@ const ActualEditRow = ({ row, employees, readOnly, isReplaced, onFieldChange, on
           min={row.start_date || minActualDate}
           max={maxActualDate}
           value={DateForApiFormate(row.end_date || row.e_date ||  "", true)}
-          onChange={(e) => onFieldChange(getStartDateField(row), e.target.value)}
+          onChange={(e) => onFieldChange(getEndDateField(row), e.target.value)}
         />
       </FormField>
 
