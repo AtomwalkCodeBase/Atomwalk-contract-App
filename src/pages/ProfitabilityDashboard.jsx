@@ -405,7 +405,7 @@ const handleResetMonth = () => {
         const cpRateValue = Number(r.cp_rate ?? 0);
         const finalRate = cpRateValue > 0 ? cpRateValue : systemAmt;
 
-if (aType === "P") {
+    if (aType === "P") {
       plannedCpRate += finalRate;
       plannedTL += tlCount * days;
       plannedEx += exCount * days;
@@ -619,8 +619,8 @@ if (aType === "P") {
     handlePageChange?.(1);
   };
 
-  // console.log("asTotals", JSON.stringify(asTotals))
-  // console.log("plannedTotals", JSON.stringify(plannedTotals))
+  // console.log("asTotals", asTotals)
+  // console.log("plannedTotals", plannedTotals)
 
   const statsCard = [
     {
@@ -658,26 +658,20 @@ if (aType === "P") {
     },
     {
       label: "Resource Amount",
-      // value: currency((asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0) + ((plannedTotals.totalPendingContractRate || 0) + (asTotals.totalPendingContractRate || 0)) - ((plannedTotals.totalActualContractRate || 0) + (asTotals.totalActualContractRate || 0))),
-      value: currency((asTotals.totalActualCpRate || 0) +
-      (plannedTotals.totalActualCpRate || 0) +
-      ((plannedTotals.totalPlannedCpRate || 0) + (asTotals.totalPlannedCpRate || 0)) -
-      ((plannedTotals.totalActualCpRate || 0) + (asTotals.totalActualCpRate || 0))),
+      value: currency((asTotals.totalActualCpRate || 0) + (plannedTotals.totalActualCpRate || 0)),
       color: "info",
       icon: <FaFileContract />,
       sections: [
         {
           items: [
             { label: "Approved", value: currency((asTotals.totalActualCpRate || 0) + (plannedTotals.totalActualCpRate || 0)), status: "success", subStatus: "actual" },
-            { label: "Pending", value: currency(((plannedTotals.totalPlannedCpRate || 0) + (asTotals.totalPlannedCpRate || 0)) -
-              ((plannedTotals.totalActualCpRate || 0) + (asTotals.totalActualCpRate || 0))), status: "info", subStatus: "plan" }
+            { label: "System Amt", value: currency((asTotals.totalActualContractRate || 0) + (plannedTotals.totalActualContractRate || 0)), status: "info", subStatus: "system" }
           ]
         },
       ], 
-      // onClick: () => applyActivityFilter(["AS", "AA", "PS", "PA", "P"]),
       onItemClick: (item) => {
         if (item.subStatus === "actual") applyActivityFilter(["AS", "AA"]);
-        if (item.subStatus === "plan") applyActivityFilter(["PS", "PA", "P"]);
+        if (item.subStatus === "system") applyActivityFilter(["AS", "AA"]);
       },
     },
     {

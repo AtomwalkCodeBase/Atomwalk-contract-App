@@ -19,7 +19,7 @@ const Table = styled.table`
 
 const Th = styled.th`
   text-align: left;
-  background: ${({ theme }) => theme.colors.backgroundAlt};
+  background: ${({ theme }) => theme.colors.shadow};
   padding: 0.75rem;
   font-size: ${({ theme }) => theme.fontSizes.sm};
   color: ${({ theme }) => theme.colors.text};
@@ -61,6 +61,8 @@ const ExpandableContent = styled.div`
 
 const StyledRow = styled.tr`
   cursor: ${({ rowAction }) => rowAction ? 'pointer' : 'default'};
+  background-color: ${({ theme, $index }) =>  $index % 2 === 0 ? theme.colors.backgroundAlt : 'transparent'};
+
   
   td {
     padding-top: 1rem;
@@ -115,7 +117,7 @@ function DataTable({
               
               return (
               <React.Fragment key={rowId || index}>
-                <StyledRow onClick={() => rowAction?.(row)} rowAction={rowAction}>
+                <StyledRow onClick={() => rowAction?.(row)} rowAction={rowAction}  $index={index}>
                   {renderRow(row)}
                 </StyledRow>
 

@@ -60,12 +60,16 @@ const Table = styled.table`
   th {
     text-align: left;
     padding: 12px;
-    background: #f3f4f6;
+    background: ${theme.colors.shadow};
   }
 
   td {
     padding: 12px;
     border-bottom: 1px solid #eee;
+  }
+
+  tbody tr:nth-child(even) td {
+    background-color: ${theme.colors.backgroundAlt};
   }
 `;
 
