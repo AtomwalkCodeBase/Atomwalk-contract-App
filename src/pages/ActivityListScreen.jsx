@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
 import styled from 'styled-components';
 import Card from '../components/Card';
-import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, getWeekRange, formatDate2, getGroupStatus, matchClaimsToActivity } from '../utils/utils';
+import { formatDate, formatRetainerActivities, formatToDDMMYYYY, getMonthRange, getStatusVariant, formatMonthLabel, getWeekRange, formatDate2, getGroupStatus, matchClaimsToActivity, removeAllocation } from '../utils/utils';
 import { getContractAllocationData, getEmpAllocationData, getEmpClaim, getemployeeLists } from '../services/productServices';
 import { toast } from 'react-toastify';
 import Button from '../components/Button';
@@ -195,7 +195,7 @@ const getStoredActivityListSelection = () => {
   }
 };
 
-const activityColumn = [<>Customer<br />Order Item ID</>, <>Audit Type<br />Store Location</>, "Planned Date", "Plan slots", "Status", "Actions"]
+const activityColumn = [<>Customer<br />Order Item ID</>, "Branch", <>Audit Type<br />Store Location</>, "Planned Date", "Plan slots", "Status", "Actions"]
 
 function getMatchingRetainerList(original_P = {}) {
   const {
@@ -651,6 +651,9 @@ const sortedFilteredData = useMemo(() => {
               <>
                 <Td>
                   <CustomerName>{employee.customer_name}</CustomerName> <OrderItemId>{employee?.order_item_key}</OrderItemId>
+                </Td>
+                <Td>
+                  {removeAllocation(firstItem?.activity_name)}
                 </Td>
                 <Td>
                   {employee.product_name}<br />

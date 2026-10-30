@@ -254,7 +254,7 @@ export const AllocationColumns = [
     { header: "END DATE", key: "endDate" },
     { header: "RESOURCE TYPE (T/E)", key: "resourceType" },
     { header: "CONTRACT RATE", key: "contractRate", type: "currency" },
-    { header: "NO OF AUDIT/ SCAN", key: "auditScanCount" },
+    { header: "NO OF AUDIT/SCAN", key: "auditScanCount" },
     { header: "IS PRESENT?", key: "isPresent" },
     { header: "REMARK", key: "remark" },
 ];

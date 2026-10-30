@@ -13,6 +13,7 @@ import {
   getMonthRange,
   mergeAdjacentRows,
   recomputeEmployeeRows,
+  removeAllocation,
   splitRangeAtDate,
   useDateWiseAssignments,
 } from "../../utils/utils";
@@ -213,16 +214,27 @@ const ResourceAllocation = () => {
     const isActualSubmitted = activityData?.activityStatus === "AS";
     const actualAllocationId = activityData?.original_A?.id;
 
+    const plannedAllocationId = activityData?.original_P?.id;
+    if (!plannedAllocationId) {
+      throw new Error("Missing plan allocation ID");
+    }
     if (isActualSubmitted && !actualAllocationId) {
       throw new Error("Missing actual allocation ID");
     }
 
-    const resources = isActualSubmitted
-      ? await loadExisting({ allocation_id: actualAllocationId })
-      : workingAllocations;
-    const formattedAllocationId = isActualSubmitted
-      ? `A${String(actualAllocationId).padStart(9, "0")}`
-      : "";
+    let resources = (await loadExisting({
+      allocation_id: plannedAllocationId,
+      start_date: DateForApiFormate(activityStart),
+      end_date: DateForApiFormate(activityEnd),
+    })).filter((resource) => resource?.is_active === true);
+    if (!resources.length) {
+      resources = (resourcePlannedList || []).filter(
+        (resource) =>
+          String(resource?.allocation_id) === String(plannedAllocationId) &&
+          resource?.is_active === true
+      );
+    }
+    const formattedAllocationId = isActualSubmitted ? `A${String(actualAllocationId).padStart(9, "0")}` : "";
     const cpEmpId = localStorage.getItem("cust_emp_id") || "";
 
     return resources.map((resource) => ({
@@ -241,6 +253,7 @@ const ResourceAllocation = () => {
 
   const getAllocationFile = async () => {
     const rows = await getAllocationExportRows();
+
     if (!rows.length) throw new Error("No allocated resources found");
 
     return ExcelBuilder({
@@ -1150,6 +1163,14 @@ if (mismatchedDates.length > 0) {
             <DetailValue>{activityData?.original_P?.no_of_items  || '—'}</DetailValue>
           </DetailText>
         </DetailItem>
+
+        <DetailItem>
+          <DetailIconWrap><FaBoxes size={13} /></DetailIconWrap>
+          <DetailText>
+            <DetailLabel>Branch</DetailLabel>
+            <DetailValue>{removeAllocation(activityData?.original_P?.activity_name  || '—')}</DetailValue>
+          </DetailText>
+        </DetailItem>
       </DetailsGrid>
        {activityData.store_remarks && <DetailItem style={{marginTop: "1rem"}}>
           <DetailIconWrap><FaPenToSquare size={13} /></DetailIconWrap>
@@ -1216,22 +1237,28 @@ if (mismatchedDates.length > 0) {
           setShowResourceAvailability={setShowResourceAvailability}
         />}
 
-        {apiDate <= DateForApiFormate(activityData.planned_end_date) ? (
-          !["AA", "AS", "C", "PA"].includes(activityData.activityStatus) &&!activityData.a_id && (
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem",}}>
-             {!showResourceAvailability && <Button onClick={() => setShowResourceAvailability(true)}>
-                <FaPlus />Add Resources
-              </Button>}
-              {/* {showResourceAvailability && (
-                <Button variant="outlines" onClick={() => setShowResourceAvailability(false)}>
-                  <ImCross /> Close
-                </Button>
-              )} */}
-            </div>
-          )
-        ) : (
-          !isFullyAllocated && ( <h4> You are not able to allocate. You have exceeded the allocation end date.</h4>)
-        )}
+{apiDate <= DateForApiFormate(activityData.planned_end_date) ? (
+  !["AA", "AS", "C", "PA"].includes(activityData.activityStatus) &&
+  !activityData.a_id &&
+  !["S", "A"].includes(activityData.status) && (
+    <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem" }}>
+      {!showResourceAvailability && (
+        <Button onClick={() => setShowResourceAvailability(true)}>
+          <FaPlus />Add Resources
+        </Button>
+      )}
+      {/* {showResourceAvailability && (
+        <Button variant="outlines" onClick={() => setShowResourceAvailability(false)}>
+          <ImCross /> Close
+        </Button>
+      )} */}
+    </div>
+  )
+) : (
+  !isFullyAllocated && (
+    <h4> You are not able to allocate. You have exceeded the allocation end date.</h4>
+  )
+)}
 
 
       {/* </Card> */}
