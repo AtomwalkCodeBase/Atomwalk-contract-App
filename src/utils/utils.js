@@ -546,8 +546,8 @@ export const formatRetainerActivities = (apiData = [], resourcePlannedLists = []
       project_name: original_P?.project_name ?? "",
 
       activity_name: original_P?.activity_name ?? "",
-      status: original_P?.status ?? "",
-      status_display: original_P?.status_display ?? "",
+      status: original_A?.status ?? "",
+      status_display: original_A?.status_display ?? "",
 
       order_item_id: original_P?.order_item_id ?? "",
 
