@@ -1237,28 +1237,26 @@ if (mismatchedDates.length > 0) {
           setShowResourceAvailability={setShowResourceAvailability}
         />}
 
-{apiDate <= DateForApiFormate(activityData.planned_end_date) ? (
-  !["AA", "AS", "C", "PA"].includes(activityData.activityStatus) &&
-  !activityData.a_id &&
-  !["S", "A"].includes(activityData.status) && (
-    <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem" }}>
-      {!showResourceAvailability && (
-        <Button onClick={() => setShowResourceAvailability(true)}>
-          <FaPlus />Add Resources
-        </Button>
-      )}
-      {/* {showResourceAvailability && (
-        <Button variant="outlines" onClick={() => setShowResourceAvailability(false)}>
-          <ImCross /> Close
-        </Button>
-      )} */}
-    </div>
-  )
-) : (
-  !isFullyAllocated && (
-    <h4> You are not able to allocate. You have exceeded the allocation end date.</h4>
-  )
-)}
+       {/* TODO: re-enable date check — apiDate <= DateForApiFormate(activityData.planned_end_date) */}
+      {!["AA", "AS", "C", "PA"].includes(activityData.activityStatus) &&
+        !activityData.a_id &&
+        !["S", "A"].includes(activityData.status) && (
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginBottom: "1rem" }}>
+            {!showResourceAvailability && (
+              <Button onClick={() => setShowResourceAvailability(true)}>
+                <FaPlus />Add Resources
+              </Button>
+            )}
+            {/* {showResourceAvailability && (
+              <Button variant="outlines" onClick={() => setShowResourceAvailability(false)}>
+                <ImCross /> Close
+              </Button>
+            )} */}
+          </div>
+        )}
+      {/* !isFullyAllocated && (
+        <h4> You are not able to allocate. You have exceeded the allocation end date.</h4>
+      ) */}
 
 
       {/* </Card> */}
