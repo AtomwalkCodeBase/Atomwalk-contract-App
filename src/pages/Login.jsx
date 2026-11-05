@@ -346,7 +346,7 @@ const Logins = () => {
       </LoginCard>
 
       <PageFooter>Developed By Atomwalk technologies Pvt. Ltd.</PageFooter>
-      <PageFooter>Version: 1.0.2</PageFooter>
+      <PageFooter>Version: 1.0.3</PageFooter>
     </PageWrap>
   )
 }
